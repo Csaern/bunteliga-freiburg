@@ -1,15 +1,16 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import './App.css'; // Importiere deine CSS-Datei
+import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
-// Importiere hier später deine anderen Seitenkomponenten
-// import ResultsPage from './pages/ResultsPage';
-// import ReservePage from './pages/ReservePage';
-// import HistoryPage from './pages/HistoryPage';
-// import ContactPage from './pages/ContactPage';
-// import TeamsPage from './pages/TeamsPage';
+import ResultsPage from './pages/ResultsPage';
+import ReservePage from './pages/ReservePage'; 
+import HistoryPage from './pages/HistoryPage'; 
+import ContactPage from './pages/ContactPage'; 
+import TeamsPage from './pages/TeamsPage';     
+import ImpressumPage from './pages/ImpressumPage'; 
+import PrivacyPage from './pages/PrivacyPage';   
 
 function App() {
   return (
@@ -18,16 +19,14 @@ function App() {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          {/* 
-          Definiere hier Routen für deine anderen Seiten, sobald du sie erstellst:
           <Route path="/ergebnisse" element={<ResultsPage />} />
           <Route path="/platzreservierung" element={<ReservePage />} />
           <Route path="/historie" element={<HistoryPage />} />
           <Route path="/kontakt" element={<ContactPage />} />
           <Route path="/teams" element={<TeamsPage />} />
-          */}
-          {/* Fallback-Route für nicht gefundene Seiten */}
-          <Route path="*" element={<div>Seite nicht gefunden</div>} />
+          <Route path="/impressum" element={<ImpressumPage />} />
+          <Route path="/datenschutz" element={<PrivacyPage />} />
+          <Route path="*" element={<div><h2>404 - Seite nicht gefunden</h2><p>Die angeforderte Seite existiert nicht.</p></div>} />
         </Routes>
       </main>
       <Footer />

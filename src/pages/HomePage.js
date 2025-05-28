@@ -36,6 +36,7 @@ const HomePage = () => {
       <section className="hero-section">
         <h2>NEWS</h2>
         <p>Wir gratulieren dem 1. FC Ferdi Weiß zum Meistertitel der Saison 2024/25!!!</p>
+        <h1>Hans ist der beste !!!</h1>
       </section>
 
       <section className="navigation-cards-container">
