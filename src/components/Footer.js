@@ -5,18 +5,17 @@ import { useTheme } from '@mui/material/styles';
 const Footer = () => {
   const theme = useTheme();
 
-  const footerBlur = 'blur(8px)';
-
   return (
     <Box
       component="footer"
       sx={{
-        backgroundColor: '#000',
-        backdropFilter: footerBlur,
+        backgroundColor: 'rgb(15, 15, 15)',
+        backdropFilter: 'blur(8px)',
         color: theme.palette.grey[500], 
         py: { xs: 3, md: 4 },
         mt: 'auto', 
-        borderTop: `1px solid ${theme.palette.grey[800]}`, 
+        borderTop: `1px solid ${theme.palette.grey[900]}`,
+        boxShadow: theme.shadows[3]
       }}
     >
       <Container maxWidth="xl">
@@ -29,7 +28,8 @@ const Footer = () => {
               flexWrap: 'wrap', 
               justifyContent: 'center',
               fontFamily: 'comfortaa',
-              fontWeight: 400
+              fontWeight: 400,
+              fontSize: {xs: 12, md: 15}
             }}
           >
             <Link href="/kontakt" color="inherit" underline="hover">Kontakt</Link>
@@ -37,9 +37,9 @@ const Footer = () => {
             <Link href="/datenschutz" color="inherit" underline="hover">Datenschutz</Link>
           </Box>
           
-          <Divider sx={{ width: '50%', maxWidth: '300px', borderColor: 'rgba(255, 255, 255, 0.1)', mb: 2 }} />
-          <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400] }}>
-            © {new Date().getFullYear()} HFT Rakete Freiburg
+          <Divider sx={{ width: '50%', maxWidth: '300px', borderColor: 'rgba(255, 255, 255, 0.1)', mb: 2}} />
+          <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], fontSize: {xs: 12, md: 15}, fontWeight: 600 }}>
+            <Link href="https://rakete-freiburg.de/" color="inherit" underline="hover">© {new Date().getFullYear()} HFT Rakete Freiburg</Link>
           </Typography>
         </Box>
       </Container>

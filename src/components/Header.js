@@ -49,7 +49,7 @@ const initialLogoHeight = 58;
 const shrunkLogoHeight = 40;
 const mobileInitialLogoHeight = 60;
 const mobileShrunkLogoHeight = 30;
-const appBarBackgroundColor = 'rgba(0, 0, 0, 0.85)';
+const appBarBackgroundColor = 'rgb(15, 15, 15)';
 const appBarBlur = 'blur(8px)';
 const CustomDrawerHeader = styled('div')(({ theme }) => ({
   display: 'flex',
@@ -70,7 +70,7 @@ function Header() {
 
   React.useEffect(() => {
     const handleScroll = () => {
-      setIsShrunk(window.scrollY > 50);
+      setIsShrunk(window.scrollY > 30);
     };
     window.addEventListener('scroll', handleScroll);
     return () => {
@@ -139,9 +139,10 @@ function Header() {
     <AppBar 
       position="sticky" 
       sx={{ 
-          backgroundColor: '#000', 
+          backgroundColor: appBarBackgroundColor, 
           backdropFilter: appBarBlur,
-          boxShadow: isShrunk ? theme.shadows[4] : theme.shadows[1] 
+          boxShadow: isShrunk ? theme.shadows[4] : theme.shadows[1],
+          borderBottom: `1px solid ${theme.palette.grey[900]}`,
       }}
     >
       <Container maxWidth="xl">
@@ -196,7 +197,7 @@ function Header() {
             >
               {isShrunk ? (
                 <Typography variant="h7" component="div" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', letterSpacing: '.2rem', display:'flex', alignItems:'center' }}>
-                  BUNTE&nbsp;<Box component="span" sx={{ color: 'error.main', ml: -0.5}}>LIGA</Box>
+                  BUNTE&nbsp;<Box component="span" sx={{ color: 'error.main', ml: -0.}}>LIGA</Box>
                 </Typography>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', lineHeight: 1.1 }}>

@@ -1,5 +1,6 @@
 import React from 'react';
 import NavigationCard from '../components/NavigationCard';
+import NewsCarousel from '../components/News/News';
 // import './HomePage.css'; // Erstelle HomePage.css für spezifische Styles
 
 const HomePage = () => {
@@ -33,22 +34,7 @@ const HomePage = () => {
 
   return (
     <div className="homepage">
-      <section className="hero-section">
-        <h2>NEWS</h2>
-        <p>Wir gratulieren dem 1. FC Ferdi Weiß zum Meistertitel der Saison 2024/25!!!</p>
-        <h1>Hans ist der beste !!!</h1>
-      </section>
-
-      <section className="navigation-cards-container">
-        {navItems.map((item, index) => (
-          <NavigationCard
-            key={index}
-            title={item.title}
-            subtitle={item.subtitle}
-            link={item.link}
-          />
-        ))}
-      </section>
+      <NewsCarousel />
     </div>
   );
 };

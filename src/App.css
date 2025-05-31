@@ -5,8 +5,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f4f4f4; /* Beispielhafter Hintergrund */
-  color: #333;
+  background-color: rgb(15, 15, 15); /* Beispielhafter Hintergrund */
+  color: #ffffff;
 }
 
 .app-container {

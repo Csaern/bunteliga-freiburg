@@ -11,22 +11,15 @@ import ContactPage from './pages/ContactPage';
 import TeamsPage from './pages/TeamsPage';     
 import ImpressumPage from './pages/ImpressumPage'; 
 import PrivacyPage from './pages/PrivacyPage'; 
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import '@fontsource/comfortaa';
 
-const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-  },
-});  
-
 function App() {
   return (
-    <ThemeProvider theme={darkTheme}>
+
     <div className="app-container">
       <Header />
       <main className="main-content">
@@ -44,7 +37,7 @@ function App() {
       </main>
       <Footer />
     </div>
-    </ThemeProvider>
+
   );
 }
 
