@@ -70,7 +70,7 @@ function Header() {
 
   React.useEffect(() => {
     const handleScroll = () => {
-      setIsShrunk(window.scrollY > 30);
+      setIsShrunk(window.scrollY > 150);
     };
     window.addEventListener('scroll', handleScroll);
     return () => {
