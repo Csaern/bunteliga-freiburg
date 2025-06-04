@@ -17,6 +17,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
 import { styled, useTheme } from '@mui/material/styles';
+import { Link } from 'react-router-dom';
 
 import HomeIcon from '@mui/icons-material/Home';
 import TableViewIcon from '@mui/icons-material/TableView';
@@ -29,7 +30,7 @@ import logo from '../img/logo.png';
 
 const pages = [
   { text: 'Home', iconName: 'HomeIcon', path: '/' },
-  { text: 'Ergebnisse', iconName: 'TableViewIcon', path: '/ergebnisse' },
+  { text: 'Ergebnisse', iconName: 'TableViewIcon', path: '/#Ergebnisse' },
   { text: 'Teams', iconName: 'Diversity3Icon', path: '/teams' },
   { text: 'Historiker-Ecke', iconName: 'ScheduleIcon', path: '/historie' },
   { text: 'Kontakt', iconName: 'PermContactCalendarIcon', path: '/kontakt' },
@@ -96,14 +97,29 @@ function Header() {
   const [isShrunk, setIsShrunk] = React.useState(false);
 
   React.useEffect(() => {
+    // Direkter Event-Handler ohne Debouncing
     const handleScroll = () => {
-      setIsShrunk(window.scrollY > 150);
+        const scrollY = window.scrollY;
+        // Hysterese-Logik:
+        // Wenn nicht geschrumpft und Scroll-Position > 150 -> schrumpfen
+        if (!isShrunk && scrollY > 150) {
+          setIsShrunk(true);
+        // Wenn geschrumpft und Scroll-Position < 100 -> vergrößern
+        } else if (isShrunk && scrollY < 100) {
+          setIsShrunk(false);
+        }
+        // In der Zone zwischen 100 und 150 passiert nichts, der Zustand bleibt erhalten.
     };
+
     window.addEventListener('scroll', handleScroll);
+
+    // Aufräumfunktion: Entferne den Listener beim Unmounten
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, []);
+  // Wichtig: isShrunk in die Abhängigkeitsliste aufnehmen,
+  // damit die Logik innerhalb von handleScroll immer den aktuellen isShrunk-Wert hat.
+  }, [isShrunk]); 
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -134,7 +150,9 @@ function Header() {
             return (
               <ListItem key={pageItem.text} disablePadding>
                 <ListItemButton
-                  onClick={() => { navigate(pageItem.path); handleDrawerToggle(); }}
+                component={Link}
+                to={pageItem.path}
+                  onClick={() => {handleDrawerToggle(); }}
                   sx={{ 
                     backgroundColor: isActive ? '#00A99D' : 'transparent',
                     '&:hover': {
@@ -210,17 +228,17 @@ function Header() {
             <Box
               sx={{
                 ml: 1,
-                pt: 0.2, // Beibehaltung des leichten Paddings oben
+                pt: 0.2, 
                 display: 'flex',
-                alignItems: 'center', // Für den einzeiligen Fall (isShrunk)
+                alignItems: 'center', 
                 fontFamily: 'comfortaa',
                 fontWeight: 700,
                 color: 'inherit',
-                transition: 'none', // Wie gewünscht
+                transition: 'none', 
                 ...(isShrunk ? 
                   { 
-                    fontSize: theme.typography.h6.fontSize, // Basisschriftgröße
-                    letterSpacing: '.2rem' // Beibehaltung des Letter-Spacings
+                    fontSize: theme.typography.h6.fontSize, 
+                    letterSpacing: '.2rem' 
                   } : 
                   { 
                     flexDirection: 'column', 
@@ -294,14 +312,14 @@ function Header() {
                   sx={{
                     ml: 0.5,
                     display: 'flex',
-                    alignItems: 'center', // Für den einzeiligen Fall (isShrunk)
+                    alignItems: 'center', 
                     fontFamily: 'comfortaa',
                     fontWeight: 600,
                     color: 'inherit',
-                    transition: 'none', // Übergang für die Hauptbox entfernt
+                    transition: 'none', 
                      ...(isShrunk ? 
                         { 
-                            fontSize: theme.typography.body1.fontSize, // Basisschriftgröße
+                            fontSize: theme.typography.body1.fontSize, 
                             letterSpacing: '0.05rem', 
                             alignItems:'center' 
                         } : 
@@ -394,4 +412,3 @@ function Header() {
   );
 }
 export default Header;
-
