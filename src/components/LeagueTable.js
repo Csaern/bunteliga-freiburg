@@ -87,7 +87,7 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
         color: theme.palette.grey[300],
         fontFamily: 'comfortaa',
         borderBottom: `1px solid ${theme.palette.grey[800]}`,
-        py: isMobile ? 0.5 : 1, // Weniger Padding auf Mobile
+        py: isMobile ? 0.6 : 1, // Weniger Padding auf Mobile
         px: isMobile ? 0.5 : 1, // Weniger Padding auf Mobile
         fontSize: isMobile ? '0.7rem' : '0.8rem', // Kleinere Schrift auf Mobile
         ...sx,
@@ -136,7 +136,7 @@ const LeagueTable = () => {
         sx={{ 
             mb: 2, // Weniger Margin Bottom auf Mobile
             mt: 2,
-            color: theme.palette.error.main, 
+            color: '#00A99D', 
             fontWeight: 700,
             fontFamily: 'comfortaa',
             textAlign: 'center',
@@ -186,8 +186,8 @@ const LeagueTable = () => {
                     <Avatar 
                         alt={`${row.name} Logo`} 
                         sx={{ 
-                            width: isMobile ? 16 : 20, 
-                            height: isMobile ? 16 : 20, 
+                            width: isMobile ? 20 : 20, 
+                            height: isMobile ? 20 : 20, 
                             mr: isMobile ? 0.5 : 1, 
                             fontSize: isMobile ? '0.6rem' : '0.7rem',
                             color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]), 

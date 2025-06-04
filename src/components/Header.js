@@ -45,12 +45,39 @@ const iconMap = {
 };
 
 const drawerWidth = 240;
-const initialLogoHeight = 58;
+const initialLogoHeight = 65;
 const shrunkLogoHeight = 40;
 const mobileInitialLogoHeight = 60;
 const mobileShrunkLogoHeight = 30;
-const appBarBackgroundColor = 'rgb(15, 15, 15)';
+const appBarBackgroundColor = 'rgba(10, 10, 10, 0.77)';
 const appBarBlur = 'blur(8px)';
+
+// Farbpalette für den bunten Schriftzug
+const colorfulTextPalette = [
+  '#00A99D', // Blaugrün
+  '#FFBF00', // Gold/Bernstein
+  '#3366CC', // Kräftiges Blau
+  '#4CAF50', // Sattes Grün
+];
+
+// Hilfsfunktion, um einen Text bunt darzustellen
+const ColorfulText = ({ text }) => {
+  return (
+    <Box component="span" sx={{ display: 'inline-flex' }}>
+      {text.split('').map((char, index) => (
+        <Box
+          component="span"
+          key={index}
+          sx={{ color: colorfulTextPalette[index % colorfulTextPalette.length] }}
+        >
+          {char}
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
+
 const CustomDrawerHeader = styled('div')(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
@@ -109,9 +136,9 @@ function Header() {
                 <ListItemButton
                   onClick={() => { navigate(pageItem.path); handleDrawerToggle(); }}
                   sx={{ 
-                    backgroundColor: isActive ? theme.palette.error.main : 'transparent',
+                    backgroundColor: isActive ? '#00A99D' : 'transparent',
                     '&:hover': {
-                      backgroundColor: isActive ? theme.palette.error.dark : theme.palette.grey[800],
+                      backgroundColor: isActive ? '#FFBF00' : theme.palette.grey[800],
                     },
                     borderRadius: theme.shape.borderRadius,
                     margin: theme.spacing(0.5, 1),
@@ -125,6 +152,7 @@ function Header() {
                     primaryTypographyProps={{ 
                         fontWeight: isActive ? 'bold' : 'normal',
                         color: isActive ? theme.palette.common.white : theme.palette.grey[300],
+                        fontFamily: 'comfortaa',
                     }} 
                   />
                 </ListItemButton>
@@ -152,9 +180,9 @@ function Header() {
             position: 'relative',
             minHeight: { 
                 xs: isShrunk ? 48 : 70, 
-                md: isShrunk ? 50 : 80 
+                md: isShrunk ? 50 : 90 
             }, 
-            transition: theme.transitions.create(['min-height'], { // Only min-height for Toolbar itself
+            transition: theme.transitions.create(['min-height'], { 
               duration: theme.transitions.duration.short,
             }),
             py: { xs: isShrunk ? 0.25 : 0.5, md: isShrunk ? 0.25 : 0.5 }, 
@@ -182,30 +210,36 @@ function Header() {
             <Box
               sx={{
                 ml: 1,
-                pt: 0.2,
+                pt: 0.2, // Beibehaltung des leichten Paddings oben
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'center', // Für den einzeiligen Fall (isShrunk)
                 fontFamily: 'comfortaa',
                 fontWeight: 700,
                 color: 'inherit',
-                transition: 'none',
+                transition: 'none', // Wie gewünscht
                 ...(isShrunk ? 
-                  { fontSize: theme.typography.h6.fontSize, letterSpacing: '.2rem' } : 
-                  { flexDirection: 'column', alignItems: 'flex-start' } // Align items to start for multi-line
+                  { 
+                    fontSize: theme.typography.h6.fontSize, // Basisschriftgröße
+                    letterSpacing: '.2rem' // Beibehaltung des Letter-Spacings
+                  } : 
+                  { 
+                    flexDirection: 'column', 
+                    alignItems: 'flex-start' 
+                  }
                 ),
               }}
             >
               {isShrunk ? (
-                <Typography variant="h7" component="div" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', letterSpacing: '.2rem', display:'flex', alignItems:'center' }}>
-                  BUNTE&nbsp;<Box component="span" sx={{ color: 'error.main', ml: -0.}}>LIGA</Box>
+                <Typography variant="h6" component="div" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', letterSpacing: '.2rem', display:'flex', alignItems:'center' }}>
+                  BUNTE&nbsp;<ColorfulText text="LIGA" />
                 </Typography>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', lineHeight: 1.1 }}>
-                  <Typography component="span" variant="h7" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', letterSpacing: '.2rem', color: 'inherit' }}>
+                  <Typography component="span" variant="h5" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', letterSpacing: '.2rem', color: 'inherit' }}>
                     BUNTE LIGA
                   </Typography>
-                  <Typography component="span" variant="h5" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', color: 'error.main', pt: 0.3, letterSpacing: '0.05em', mt: '-0.1em', lineHeight:1 }}>
-                    FREIBURG
+                  <Typography component="span" variant="h4" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', pt: 0.3, letterSpacing: '0.05em', mt: '-0.1em', lineHeight:1 }}>
+                    <ColorfulText text="FREIBURG" />
                   </Typography>
                 </Box>
               )}
@@ -213,7 +247,7 @@ function Header() {
           </Box>
           
           {/* --- Mobile: Menü Icon (links) --- */}
-          <Box sx={{ display: { xs: 'flex', md: 'none' }, zIndex: 1301 /* Bleibt über dem Drawer */ }}>
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, zIndex: 1301 }}>
             <IconButton
               size="large"
               aria-label="Menü öffnen"
@@ -260,28 +294,35 @@ function Header() {
                   sx={{
                     ml: 0.5,
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'center', // Für den einzeiligen Fall (isShrunk)
                     fontFamily: 'comfortaa',
                     fontWeight: 600,
                     color: 'inherit',
-                    transition: 'all 0.3s ease-in-out',
+                    transition: 'none', // Übergang für die Hauptbox entfernt
                      ...(isShrunk ? 
-                        { fontSize: theme.typography.body1.fontSize, letterSpacing: '0.05rem', alignItems:'center' } : 
-                        { flexDirection: 'column', alignItems: 'center' } 
+                        { 
+                            fontSize: theme.typography.body1.fontSize, // Basisschriftgröße
+                            letterSpacing: '0.05rem', 
+                            alignItems:'center' 
+                        } : 
+                        { 
+                            flexDirection: 'column', 
+                            alignItems: 'center' 
+                        }
                     ),
                   }}
                 >
                   {isShrunk ? (
                     <Typography variant="body1" component="div" sx={{ fontFamily: 'inherit', ml: 0.2, fontWeight: 600, letterSpacing: '0.05rem', display:'flex', alignItems:'center'}}>
-                      BUNTE&nbsp;<Box component="div" sx={{ color: 'error.main', ml: -0.4, fontWeight: 600 }}>LIGA</Box>
+                      BUNTE&nbsp;<ColorfulText text="LIGA" />
                     </Typography>
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', lineHeight: 1.0 }}>
                       <Typography component="div" variant="h6" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', letterSpacing: '0.05rem',color: 'inherit', whiteSpace:'nowrap' }}>
                         BUNTE LIGA
                       </Typography>
-                      <Typography component="div" variant="h5" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', color: 'error.main', mb: 0.4 ,ml: 0.2, letterSpacing: '0.07em', mt: '-0.05em', whiteSpace:'nowrap', lineHeight:0.7 }}>
-                        FREIBURG
+                      <Typography component="div" variant="h5" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', mb: 0.4 ,ml: 0.2, letterSpacing: '0.07em', mt: '-0.05em', whiteSpace:'nowrap', lineHeight:0.7 }}>
+                         <ColorfulText text="FREIBURG" />
                       </Typography>
                     </Box>
                   )}
@@ -327,12 +368,12 @@ function Header() {
                     fontFamily: 'comfortaa',
                     fontSize: isShrunk ? '0.78rem' : '0.9rem', 
                     fontWeight: isActive ? 'bold' : 400, 
-                    borderBottom: isActive ? `3px solid ${theme.palette.error.main}` : '3px solid transparent',
+                    borderBottom: isActive ? `3px solid #FFBF00` : '3px solid transparent',
                     borderRadius: '4px 4px 0 0', 
                     '&:hover': { 
                       backgroundColor: 'rgba(255, 255, 255, 0.08)',
                       color: theme.palette.common.white, 
-                      borderBottom: isActive ? `3px solid ${theme.palette.error.light}` : `3px solid rgba(255, 255, 255, 0.15)`,
+                      borderBottom: isActive ? `3px solid #00A99D` : `3px solid rgba(255, 255, 255, 0.15)`,
                     },
                     transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], {
                       duration: theme.transitions.duration.short, 
@@ -353,3 +394,4 @@ function Header() {
   );
 }
 export default Header;
+

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Box, Container, IconButton, Typography, useTheme } from '@mui/material';
+import { Box, Container, IconButton, Typography, useTheme, useMediaQuery } from '@mui/material';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import NewsCard from './NewsCard.js'; 
@@ -30,6 +30,7 @@ const newsData = [
 const NewsCarousel = () => {
   const theme = useTheme(); 
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handlePreviousCallback = React.useCallback(() => {
     if (newsData && newsData.length > 0) {
@@ -74,11 +75,10 @@ const NewsCarousel = () => {
   return (
     <Container maxWidth="xl" sx={{ my: 2, px: { xs: 1, sm: 2 } }}>
       <Typography 
-        variant='h4'
+        variant={isMobile ? 'h5' : 'h4'}
         sx={{ 
-            mb: 3, 
-            mt: 2, 
-            color: theme.palette.error.main, 
+            mb: 2, 
+            color: '#00A99D', 
             fontWeight: 700, 
             fontFamily: 'comfortaa',
             textAlign: 'center',
