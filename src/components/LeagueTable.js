@@ -101,18 +101,18 @@ const FormDisplay = ({ formArray }) => {
   const getFormStyle = (result, mobile = false) => {
     const baseStyle = {
       width: mobile ? '18%' : 25,
-      height: mobile ? 3 : 25, 
+      height: mobile ? 1.5 : 25, 
       fontSize: '0.7rem',
       margin: mobile ? '0 1%' : '0 2px',
       borderRadius: mobile ? '1px' : undefined
     };
     switch (result) {
       case 'S':
-        return { ...baseStyle, backgroundColor: theme.palette.success.main, color: theme.palette.common.white };
+        return { ...baseStyle, backgroundColor: theme.palette.success.light, color: theme.palette.common.white };
       case 'U':
-        return { ...baseStyle, backgroundColor: theme.palette.warning.main, color: theme.palette.common.black };
+        return { ...baseStyle, backgroundColor: theme.palette.warning.light, color: theme.palette.common.black };
       case 'N':
-        return { ...baseStyle, backgroundColor: theme.palette.error.main, color: theme.palette.common.white };
+        return { ...baseStyle, backgroundColor: theme.palette.error.light, color: theme.palette.common.white };
       default:
         return { ...baseStyle, backgroundColor: theme.palette.grey[700] };
     }
@@ -197,8 +197,8 @@ const LeagueTable = ({ title, form }) => {
                         <Avatar
                           alt={`${row.name} Logo`}
                           sx={{
-                            width: 22,
-                            height: 22,
+                            width: 20,
+                            height: 20,
                             mr: 0.75,
                             fontSize: '0.55rem', 
                             color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),

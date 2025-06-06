@@ -30,9 +30,11 @@ import logo from '../img/logo.png';
 
 const pages = [
   { text: 'Home', iconName: 'HomeIcon', path: '/' },
-  { text: 'Ergebnisse', iconName: 'TableViewIcon', path: '/#Ergebnisse' },
+  { text: 'Ergebnisse', iconName: 'TableViewIcon', path: '/ergebnisse' },
   { text: 'Teams', iconName: 'Diversity3Icon', path: '/teams' },
   { text: 'Historiker-Ecke', iconName: 'ScheduleIcon', path: '/historie' },
+  { text: 'Regeln', iconName: 'GavelIcon', path: '/regeln' },
+  { text: 'Plätze', iconName: 'ScheduleIcon', path: '/plaetze' },
   { text: 'Kontakt', iconName: 'PermContactCalendarIcon', path: '/kontakt' },
 ];
 
@@ -317,17 +319,17 @@ function Header() {
                     fontWeight: 600,
                     color: 'inherit',
                     transition: 'none', 
-                     ...(isShrunk ? 
-                        { 
-                            fontSize: theme.typography.body1.fontSize, 
-                            letterSpacing: '0.05rem', 
-                            alignItems:'center' 
-                        } : 
-                        { 
-                            flexDirection: 'column', 
-                            alignItems: 'center' 
-                        }
-                    ),
+                      ...(isShrunk ? 
+                          { 
+                              fontSize: theme.typography.body1.fontSize, 
+                              letterSpacing: '0.05rem', 
+                              alignItems:'center' 
+                          } : 
+                          { 
+                              flexDirection: 'column', 
+                              alignItems: 'center' 
+                          }
+                      ),
                   }}
                 >
                   {isShrunk ? (
@@ -340,7 +342,7 @@ function Header() {
                         BUNTE LIGA
                       </Typography>
                       <Typography component="div" variant="h5" sx={{ fontFamily: 'inherit', fontWeight: 'inherit', mb: 0.4 ,ml: 0.2, letterSpacing: '0.07em', mt: '-0.05em', whiteSpace:'nowrap', lineHeight:0.7 }}>
-                         <ColorfulText text="FREIBURG" />
+                          <ColorfulText text="FREIBURG" />
                       </Typography>
                     </Box>
                   )}
@@ -387,7 +389,7 @@ function Header() {
                     fontSize: isShrunk ? '0.78rem' : '0.9rem', 
                     fontWeight: isActive ? 'bold' : 400, 
                     borderBottom: isActive ? `3px solid #FFBF00` : '3px solid transparent',
-                    borderRadius: '4px 4px 0 0', 
+                    // borderRadius: '4px 4px 0 0', // Original war kommentiert
                     '&:hover': { 
                       backgroundColor: 'rgba(255, 255, 255, 0.08)',
                       color: theme.palette.common.white, 

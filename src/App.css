@@ -122,3 +122,11 @@ body {
 .navigation-card a:hover {
   opacity: 0.8;
 }
+
+.scroll-target-news {
+  scroll-margin-top: 100px; /* Passe diesen Wert an die Höhe deines Headers an */
+}
+
+.scroll-target {
+  scroll-margin-top: 80px; /* Passe diesen Wert an die Höhe deines Headers an */
+}

@@ -1,11 +1,14 @@
 import React from 'react';
+import { Box, Container, Typography, Link, Divider } from '@mui/material';
+import FixtureList from '../components/FixtureList';
+import LeagueTable from '../components/LeagueTable';
+
 
 const ResultsPage = () => {
   return (
     <div>
-      <h2>Ergebnisse und Tabellen</h2>
-      <p>Hier werden bald die Ergebnisse und Tabellen angezeigt.</p>
-      {/* Inhalt für Ergebnisse und Tabellen hier einfügen */}
+      <LeagueTable title="Liga-Tabelle" form={true}/>
+      <FixtureList title="Alle Spiele" />
     </div>
   );
 };

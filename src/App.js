@@ -8,7 +8,8 @@ import ResultsPage from './pages/ResultsPage';
 import ReservePage from './pages/ReservePage'; 
 import HistoryPage from './pages/HistoryPage'; 
 import ContactPage from './pages/ContactPage'; 
-import TeamsPage from './pages/TeamsPage';     
+import TeamsPage from './pages/TeamsPage';
+import TeamPage from './pages/TeamPage';       
 import ImpressumPage from './pages/ImpressumPage'; 
 import PrivacyPage from './pages/PrivacyPage'; 
 import '@fontsource/roboto/300.css';
@@ -16,6 +17,8 @@ import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import '@fontsource/comfortaa';
+import VenuesPage from './pages/VenuesPage';
+import RulesPage from './pages/RulesPage';
 
 function App() {
   return (
@@ -24,7 +27,7 @@ function App() {
       <Header />
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="*" element={<HomePage />} />
           <Route path="/ergebnisse" element={<ResultsPage />} />
           <Route path="/platzreservierung" element={<ReservePage />} />
           <Route path="/historie" element={<HistoryPage />} />
@@ -32,7 +35,9 @@ function App() {
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/impressum" element={<ImpressumPage />} />
           <Route path="/datenschutz" element={<PrivacyPage />} />
-          <Route path="*" element={<div><h2>404 - Seite nicht gefunden</h2><p>Die angeforderte Seite existiert nicht.</p></div>} />
+          <Route path="/plaetze" element={<VenuesPage />}/>
+          <Route path="/regeln" element={<RulesPage />}/>
+          <Route path="/team" element={<TeamPage />}/>
         </Routes>
       </main>
       <Footer />
