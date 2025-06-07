@@ -5,8 +5,10 @@ import type { Provider } from 'next-auth/providers';
 
 const providers: Provider[] = [
   Auth0({
+
     clientId: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
+    issuer: process.env.AUTH0_ISSUER_BASE_URL
   }),
 ];
 

@@ -1,9 +1,9 @@
 import * as React from 'react';
 import Typography from '@mui/material/Typography';
-import { useSession } from 'next-auth/react';
+import { auth } from '../../auth';
 
-export default function HomePage() {
-  const { data: session } = useSession();
+export default async function HomePage() {
+  const session = await auth();
 
   return (    
       <Typography>
@@ -11,5 +11,3 @@ export default function HomePage() {
       </Typography>
   );
 }
-
-HomePage.requireAuth = true;
