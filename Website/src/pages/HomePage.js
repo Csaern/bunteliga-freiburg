@@ -1,13 +1,56 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
 import NewsCarousel from '../components/News/News';
-import FixtureList from '../components/FixtureList';
+import DynamicFixtureList from '../components/DynamicFixtureList';
+import { db } from '../firebase';
 
 const HomePage = () => {
+  const [currentSeason, setCurrentSeason] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadCurrentSeason();
+  }, []);
+
+  const loadCurrentSeason = async () => {
+    try {
+      const seasonsSnap = await getDocs(collection(db, 'seasons'));
+      const seasons = seasonsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const current = seasons.find(s => s.isCurrent === true);
+      setCurrentSeason(current);
+    } catch (error) {
+      console.error('Fehler beim Laden der aktuellen Saison:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="homepage">
+        <NewsCarousel />
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          Lade Spiele...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="homepage">
       <NewsCarousel />
-        <FixtureList title="Neueste Ergebnisse" details={false}/>
-        <FixtureList title="Nächste Spiele"/>
+      <DynamicFixtureList 
+        title="Neueste Ergebnisse" 
+        details={false}
+        seasonId={currentSeason?.id}
+        showType="results"
+      />
+      <DynamicFixtureList 
+        title="Nächste Spiele"
+        details={true}
+        seasonId={currentSeason?.id}
+        showType="upcoming"
+      />
     </div>
   );
 };
