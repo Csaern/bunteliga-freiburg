@@ -1,9 +1,10 @@
-// src/components/AdminBoard.js
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, setDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { db, auth } from "../firebase";
 import { useAuth } from '../context/AuthProvider';
+import TeamLogoUpload from './TeamLogoUpload';
+import PleskLogoManager from './PleskLogoManager';
 
 const AdminBoard = () => {
   const [pitches, setPitches] = useState([]);
@@ -16,10 +17,9 @@ const AdminBoard = () => {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBooking, setEditingBooking] = useState(null);
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings', 'users', 'season', 'results'
+  const [activeTab, setActiveTab] = useState('bookings');
   const { isAdmin, currentUser } = useAuth();
 
-  // Formular-Daten
   const [formData, setFormData] = useState({
     date: '',
     time: '',
@@ -29,20 +29,18 @@ const AdminBoard = () => {
     isAvailable: true
   });
 
-  // Bulk-Zeitslot-Erstellung
   const [bulkFormData, setBulkFormData] = useState({
     startDate: '',
     endDate: '',
     startTime: '',
     endTime: '',
-    timeInterval: 60, // Minuten
+    timeInterval: 60,
     pitchId: '',
-    daysOfWeek: [1, 2, 3, 4, 5, 6, 0], // 0 = Sonntag, 1 = Montag, etc.
+    daysOfWeek: [1, 2, 3, 4, 5, 6, 0],
     isAvailable: true
   });
   const [showBulkForm, setShowBulkForm] = useState(false);
 
-  // Benutzerverwaltung
   const [userFormData, setUserFormData] = useState({
     email: '',
     password: '',
@@ -51,7 +49,6 @@ const AdminBoard = () => {
   });
   const [showUserForm, setShowUserForm] = useState(false);
 
-  // Automatisches Passwort generieren
   const generatePassword = () => {
     const length = 12;
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
@@ -62,11 +59,19 @@ const AdminBoard = () => {
     return password;
   };
 
-  // Saison-Management
   const [seasonFormData, setSeasonFormData] = useState({
     year: new Date().getFullYear(),
-    name: `Saison ${new Date().getFullYear()}`
+    name: `Saison`
   });
+
+  const [resultFormData, setResultFormData] = useState({
+    homeTeamId: '',
+    awayTeamId: '',
+    homeScore: '',
+    awayScore: ''
+  });
+  const [showResultForm, setShowResultForm] = useState(false);
+  const [usePleskLogos, setUsePleskLogos] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -74,10 +79,9 @@ const AdminBoard = () => {
 
   const fetchData = async () => {
     try {
-      const [pitchesSnap, teamsSnap, bookingsSnap, usersSnap, seasonSnap, resultsSnap] = await Promise.all([
+      const [pitchesSnap, teamsSnap, usersSnap, seasonSnap, resultsSnap] = await Promise.all([
         getDocs(collection(db, "pitches")),
         getDocs(collection(db, "teams")),
-        getDocs(collection(db, "bookings")),
         getDocs(collection(db, "users")),
         getDocs(collection(db, "seasons")),
         getDocs(collection(db, "results"))
@@ -85,17 +89,26 @@ const AdminBoard = () => {
 
       setPitches(pitchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setTeams(teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setBookings(bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setUsers(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setResults(resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       
-      // Saisons laden
       const seasonsData = seasonSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSeasons(seasonsData);
       
-      // Aktuelle Saison finden
       const current = seasonsData.find(s => s.isCurrent === true);
       setCurrentSeason(current);
+      
+      if (current) {
+        const bookingsQuery = query(collection(db, "bookings"), where('seasonId', '==', current.id));
+        const bookingsSnap = await getDocs(bookingsQuery);
+        setBookings(bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        
+        const resultsQuery = query(collection(db, "results"), where('seasonId', '==', current.id));
+        const resultsSnap = await getDocs(resultsQuery);
+        setResults(resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } else {
+        setBookings([]);
+        setResults([]);
+      }
       
       setLoading(false);
     } catch (error) {
@@ -110,23 +123,21 @@ const AdminBoard = () => {
     try {
       const bookingData = {
         ...formData,
+        seasonId: currentSeason?.id || null,
         createdAt: new Date(),
         updatedAt: new Date()
       };
 
       if (editingBooking) {
-        // Update existing booking
         await updateDoc(doc(db, "bookings", editingBooking.id), {
           ...bookingData,
           updatedAt: new Date()
         });
         setEditingBooking(null);
       } else {
-        // Add new booking
         await addDoc(collection(db, "bookings"), bookingData);
       }
 
-      // Reset form
       setFormData({
         date: '',
         time: '',
@@ -136,7 +147,7 @@ const AdminBoard = () => {
         isAvailable: true
       });
       setShowAddForm(false);
-      fetchData(); // Refresh data
+      fetchData();
       alert(editingBooking ? 'Buchung aktualisiert!' : 'Buchung hinzugefügt!');
     } catch (error) {
       console.error('Fehler beim Speichern:', error);
@@ -161,11 +172,29 @@ const AdminBoard = () => {
     if (window.confirm('Sind Sie sicher, dass Sie diese Buchung löschen möchten?')) {
       try {
         await deleteDoc(doc(db, "bookings", bookingId));
-        fetchData(); // Refresh data
+        fetchData();
         alert('Buchung gelöscht!');
       } catch (error) {
         console.error('Fehler beim Löschen:', error);
         alert('Fehler beim Löschen der Buchung!');
+      }
+    }
+  };
+
+  const handleRemoveTeamsFromBooking = async (bookingId) => {
+    if (window.confirm('Sind Sie sicher, dass Sie die Teams aus dieser Buchung entfernen möchten? Die Buchung wird wieder verfügbar.')) {
+      try {
+        await updateDoc(doc(db, 'bookings', bookingId), {
+          homeTeamId: null,
+          awayTeamId: null,
+          isAvailable: true,
+          updatedAt: serverTimestamp()
+        });
+        fetchData();
+        alert('Teams erfolgreich aus der Buchung entfernt!');
+      } catch (error) {
+        console.error('Fehler beim Entfernen der Teams:', error);
+        alert('Fehler beim Entfernen der Teams');
       }
     }
   };
@@ -187,7 +216,6 @@ const AdminBoard = () => {
       
       for (const date of dates) {
         for (const time of timeSlots) {
-          // Prüfe, ob bereits ein Slot für dieses Datum/Zeit/Platz existiert
           const existingBookings = bookings.filter(booking => 
             booking.date === date && 
             booking.time === time && 
@@ -200,6 +228,7 @@ const AdminBoard = () => {
               time: time,
               pitchId: bulkFormData.pitchId,
               isAvailable: bulkFormData.isAvailable,
+              seasonId: currentSeason?.id || null,
               createdAt: new Date(),
             });
             createdCount++;
@@ -219,7 +248,7 @@ const AdminBoard = () => {
         daysOfWeek: [1, 2, 3, 4, 5, 6, 0],
         isAvailable: true
       });
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
       console.error('Fehler beim Erstellen der Zeitslots:', error);
       alert('Fehler beim Erstellen der Zeitslots!');
@@ -264,15 +293,29 @@ const AdminBoard = () => {
     return pitch ? pitch.name : 'Unbekannt';
   };
 
-  // Benutzerverwaltung
   const handleCreateUser = async (e) => {
     e.preventDefault();
     
     try {
-      // Automatisches Passwort generieren, falls keines eingegeben wurde
+      if (!userFormData.email) {
+        alert('Bitte geben Sie eine E-Mail-Adresse ein.');
+        return;
+      }
+
+      const existingUsers = users.filter(u => u.email === userFormData.email);
+      if (existingUsers.length > 0) {
+        alert('Ein Benutzer mit dieser E-Mail-Adresse existiert bereits!');
+        return;
+      }
+
       const password = userFormData.password || generatePassword();
       
-      // Aktuelle Admin-Anmeldedaten speichern
+      console.log('Erstelle Benutzer mit Daten:', {
+        email: userFormData.email,
+        teamId: userFormData.teamId,
+        isAdmin: userFormData.isAdmin
+      });
+      
       const adminEmail = currentUser.email;
       const adminPassword = prompt('Bitte geben Sie Ihr Admin-Passwort ein, um den Vorgang abzuschließen:');
       
@@ -281,11 +324,11 @@ const AdminBoard = () => {
         return;
       }
       
-      // Neuen Benutzer erstellen
       const userCredential = await createUserWithEmailAndPassword(auth, userFormData.email, password);
       
-      // Benutzerdaten in Firestore speichern
-      await addDoc(collection(db, 'users'), {
+      console.log('Firebase Auth Benutzer erstellt:', userCredential.user.uid);
+      
+      const userData = {
         uid: userCredential.user.uid,
         email: userFormData.email,
         teamId: userFormData.teamId || null,
@@ -294,15 +337,20 @@ const AdminBoard = () => {
         displayName: userFormData.email,
         createdAt: serverTimestamp(),
         lastLogin: serverTimestamp(),
-      });
-
-      // Neuen Benutzer ausloggen
-      await signOut(auth);
+      };
       
-      // Administrator wieder anmelden
+      console.log('Speichere Benutzerdaten in Firestore:', userData);
+      await setDoc(doc(db, 'users', userCredential.user.uid), userData);
+      console.log('Benutzer erfolgreich in Firestore gespeichert mit UID:', userCredential.user.uid);
+
+      await signOut(auth);
+      console.log('Neuer Benutzer ausgeloggt');
+      
       await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+      console.log('Admin wieder angemeldet');
 
       alert(`Benutzer erfolgreich erstellt!\nEmail: ${userFormData.email}\nPasswort: ${password}`);
+      
       setUserFormData({
         email: '',
         password: '',
@@ -310,17 +358,31 @@ const AdminBoard = () => {
         isAdmin: false
       });
       setShowUserForm(false);
-      fetchData(); // Refresh data
+      
+      fetchData();
+      
     } catch (error) {
       console.error('Fehler beim Erstellen des Benutzers:', error);
-      alert('Fehler beim Erstellen des Benutzers: ' + error.message);
       
-      // Falls etwas schief geht, versuche den Admin wieder anzumelden
+      let errorMessage = 'Fehler beim Erstellen des Benutzers: ';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage += 'Diese E-Mail-Adresse wird bereits verwendet.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage += 'Das Passwort ist zu schwach.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage += 'Ungültige E-Mail-Adresse.';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      alert(errorMessage);
+      
       try {
         if (currentUser?.email) {
           const adminPassword = prompt('Fehler aufgetreten. Bitte geben Sie Ihr Admin-Passwort ein, um sich wieder anzumelden:');
           if (adminPassword) {
             await signInWithEmailAndPassword(auth, currentUser.email, adminPassword);
+            console.log('Admin nach Fehler wieder angemeldet');
           }
         }
       } catch (reAuthError) {
@@ -332,31 +394,61 @@ const AdminBoard = () => {
 
   const handleUpdateUser = async (userId, updates) => {
     try {
+      console.log('Aktualisiere Benutzer:', userId, 'mit Updates:', updates);
+      
+      const userToUpdate = users.find(u => u.id === userId);
+      if (!userToUpdate) {
+        alert('Benutzer nicht gefunden!');
+        return;
+      }
+      
+      console.log('Aktuelle Benutzerdaten:', userToUpdate);
+      console.log('Neue Daten:', updates);
+      
       await updateDoc(doc(db, 'users', userId), {
         ...updates,
         updatedAt: serverTimestamp()
       });
+      
+      console.log('Benutzer erfolgreich aktualisiert');
       alert('Benutzer aktualisiert!');
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
       console.error('Fehler beim Aktualisieren des Benutzers:', error);
-      alert('Fehler beim Aktualisieren des Benutzers!');
+      alert('Fehler beim Aktualisieren des Benutzers: ' + error.message);
     }
   };
 
-  // Saison-Management
+  const handleEditUser = (user) => {
+    const newEmail = prompt('Email bearbeiten:', user.email);
+    if (newEmail && newEmail !== user.email) {
+      handleUpdateUser(user.id, { email: newEmail });
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Sind Sie sicher, dass Sie diesen Benutzer löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+      try {
+        await deleteDoc(doc(db, 'users', userId));
+        fetchData();
+        alert('Benutzer erfolgreich gelöscht!');
+      } catch (error) {
+        console.error('Fehler beim Löschen des Benutzers:', error);
+        alert('Fehler beim Löschen des Benutzers: ' + error.message);
+      }
+    }
+  };
+
   const handleCreateSeason = async (e) => {
     e.preventDefault();
     
     try {
-      // Alle anderen Saisons als nicht aktuell markieren
       const seasonsSnap = await getDocs(collection(db, "seasons"));
       const updatePromises = seasonsSnap.docs.map(doc => 
         updateDoc(doc.ref, { isCurrent: false })
       );
       await Promise.all(updatePromises);
 
-      // Neue Saison erstellen
       await addDoc(collection(db, "seasons"), {
         ...seasonFormData,
         isCurrent: true,
@@ -368,7 +460,7 @@ const AdminBoard = () => {
         year: new Date().getFullYear(),
         name: `Saison ${new Date().getFullYear()}`
       });
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
       console.error('Fehler beim Erstellen der Saison:', error);
       alert('Fehler beim Erstellen der Saison!');
@@ -377,28 +469,25 @@ const AdminBoard = () => {
 
   const handleSetCurrentSeason = async (seasonId) => {
     try {
-      // Alle anderen Saisons als nicht aktuell markieren
       const seasonsSnap = await getDocs(collection(db, "seasons"));
       const updatePromises = seasonsSnap.docs.map(doc => 
         updateDoc(doc.ref, { isCurrent: false })
       );
       await Promise.all(updatePromises);
 
-      // Gewählte Saison als aktuell markieren
       await updateDoc(doc(db, "seasons", seasonId), {
         isCurrent: true,
         updatedAt: serverTimestamp()
       });
 
       alert('Aktuelle Saison aktualisiert!');
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
       console.error('Fehler beim Aktualisieren der Saison:', error);
       alert('Fehler beim Aktualisieren der Saison!');
     }
   };
 
-  // Ergebnis-Verwaltung
   const handleConfirmResult = async (resultId) => {
     try {
       await updateDoc(doc(db, "results", resultId), {
@@ -407,7 +496,7 @@ const AdminBoard = () => {
         confirmedAt: serverTimestamp()
       });
       alert('Ergebnis bestätigt!');
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
       console.error('Fehler beim Bestätigen des Ergebnisses:', error);
       alert('Fehler beim Bestätigen des Ergebnisses!');
@@ -422,11 +511,138 @@ const AdminBoard = () => {
         rejectedAt: serverTimestamp()
       });
       alert('Ergebnis abgelehnt!');
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
       console.error('Fehler beim Ablehnen des Ergebnisses:', error);
       alert('Fehler beim Ablehnen des Ergebnisses!');
     }
+  };
+
+  const handleEditResult = async (result) => {
+    const newHomeScore = prompt('Heim-Tore bearbeiten:', result.homeScore);
+    const newAwayScore = prompt('Auswärts-Tore bearbeiten:', result.awayScore);
+    
+    if (newHomeScore !== null && newAwayScore !== null) {
+      try {
+        await updateDoc(doc(db, 'results', result.id), {
+          homeScore: parseInt(newHomeScore),
+          awayScore: parseInt(newAwayScore),
+          editedBy: currentUser.uid,
+          editedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        fetchData();
+        alert('Ergebnis erfolgreich bearbeitet!');
+      } catch (error) {
+        console.error('Fehler beim Bearbeiten des Ergebnisses:', error);
+        alert('Fehler beim Bearbeiten des Ergebnisses: ' + error.message);
+      }
+    }
+  };
+
+  const handleDeleteResult = async (resultId) => {
+    if (window.confirm('Sind Sie sicher, dass Sie dieses Ergebnis löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+      try {
+        await deleteDoc(doc(db, 'results', resultId));
+        fetchData();
+        alert('Ergebnis erfolgreich gelöscht!');
+      } catch (error) {
+        console.error('Fehler beim Löschen des Ergebnisses:', error);
+        alert('Fehler beim Löschen des Ergebnisses: ' + error.message);
+      }
+    }
+  };
+
+  const handleBulkDeleteOldBookings = async () => {
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    
+    const oldBookings = bookings.filter(booking => {
+      const bookingDate = new Date(`${booking.date}T${booking.time}`);
+      return bookingDate < twoWeeksAgo;
+    });
+
+    if (oldBookings.length === 0) {
+      alert('Keine Buchungen gefunden, die älter als 2 Wochen sind.');
+      return;
+    }
+
+    const confirmMessage = `Es wurden ${oldBookings.length} Buchungen gefunden, die älter als 2 Wochen sind.\n\nDiese werden gelöscht:\n${oldBookings.map(b => `${b.date} ${b.time} - ${getTeamName(b.homeTeamId)} vs. ${getTeamName(b.awayTeamId)}`).join('\n')}\n\nSind Sie sicher, dass Sie diese Buchungen löschen möchten?`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        let deletedCount = 0;
+        for (const booking of oldBookings) {
+          await deleteDoc(doc(db, 'bookings', booking.id));
+          deletedCount++;
+        }
+        alert(`${deletedCount} alte Buchungen erfolgreich gelöscht!`);
+        fetchData();
+      } catch (error) {
+        console.error('Fehler beim Löschen der alten Buchungen:', error);
+        alert('Fehler beim Löschen der alten Buchungen: ' + error.message);
+      }
+    }
+  };
+
+  const handleCreateResult = async (e) => {
+    e.preventDefault();
+    
+    if (!currentSeason) {
+      alert('Keine aktuelle Saison gefunden!');
+      return;
+    }
+
+    if (resultFormData.homeTeamId === resultFormData.awayTeamId) {
+      alert('Heim- und Auswärtsmannschaft müssen unterschiedlich sein!');
+      return;
+    }
+
+    if (!resultFormData.homeScore || !resultFormData.awayScore) {
+      alert('Bitte geben Sie beide Ergebnisse ein!');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'results'), {
+        homeTeamId: resultFormData.homeTeamId,
+        awayTeamId: resultFormData.awayTeamId,
+        homeScore: parseInt(resultFormData.homeScore),
+        awayScore: parseInt(resultFormData.awayScore),
+        date: new Date().toISOString().split('T')[0],
+        time: '00:00',
+        seasonId: currentSeason.id,
+        reportedBy: currentUser.uid,
+        reportedAt: new Date(),
+        status: 'confirmed',
+        confirmedBy: currentUser.uid,
+        confirmedAt: new Date()
+      });
+
+      alert('Ergebnis erfolgreich erstellt und bestätigt!');
+      
+      setResultFormData({
+        homeTeamId: '',
+        awayTeamId: '',
+        homeScore: '',
+        awayScore: ''
+      });
+      setShowResultForm(false);
+      fetchData();
+    } catch (error) {
+      console.error('Fehler beim Erstellen des Ergebnisses:', error);
+      alert('Fehler beim Erstellen des Ergebnisses!');
+    }
+  };
+
+  const handleLogoUpdated = (teamId, logoUrl) => {
+    setTeams(prevTeams => 
+      prevTeams.map(team => 
+        team.id === teamId 
+          ? { ...team, logoUrl } 
+          : team
+      )
+    );
   };
 
   if (!isAdmin) {
@@ -456,10 +672,11 @@ const AdminBoard = () => {
             color: 'white', 
             border: 'none', 
             borderRadius: '5px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            fontWeight: 'bold'
           }}
         >
-          Buchungsverwaltung
+          📅 Buchungsverwaltung
         </button>
         
         <button 
@@ -470,10 +687,11 @@ const AdminBoard = () => {
             color: 'white', 
             border: 'none', 
             borderRadius: '5px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            fontWeight: 'bold'
           }}
         >
-          Benutzerverwaltung
+          👥 Benutzerverwaltung
         </button>
         
         <button 
@@ -484,10 +702,11 @@ const AdminBoard = () => {
             color: 'white', 
             border: 'none', 
             borderRadius: '5px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            fontWeight: 'bold'
           }}
         >
-          Saison-Management
+          🏆 Saison-Management
         </button>
         
         <button 
@@ -498,10 +717,26 @@ const AdminBoard = () => {
             color: 'white', 
             border: 'none', 
             borderRadius: '5px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            fontWeight: 'bold'
           }}
         >
-          Ergebnis-Verwaltung
+          ⚽ Ergebnis-Verwaltung
+        </button>
+        
+        <button 
+          onClick={() => setActiveTab('teams')}
+          style={{ 
+            padding: '10px 20px', 
+            backgroundColor: activeTab === 'teams' ? '#007bff' : '#6c757d', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          🏆 Teams & Logos
         </button>
       </div>
 
@@ -564,6 +799,20 @@ const AdminBoard = () => {
           }}
         >
           {showBulkForm ? 'Bulk-Formular schließen' : 'Zeitslots in Bulk erstellen'}
+        </button>
+        
+        <button 
+          onClick={handleBulkDeleteOldBookings}
+          style={{ 
+            padding: '10px 20px', 
+            backgroundColor: '#dc3545', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '5px',
+            cursor: 'pointer'
+          }}
+        >
+          Alte Buchungen löschen
         </button>
       </div>
 
@@ -887,7 +1136,6 @@ const AdminBoard = () => {
             <tbody>
               {bookings
                 .sort((a, b) => {
-                  // Sortiere nach Datum und Uhrzeit
                   const dateA = new Date(`${a.date} ${a.time}`);
                   const dateB = new Date(`${b.date} ${b.time}`);
                   return dateA - dateB;
@@ -955,11 +1203,27 @@ const AdminBoard = () => {
                         color: 'white', 
                         border: 'none', 
                         borderRadius: '3px',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        marginRight: '5px'
                       }}
                     >
                       Löschen
                     </button>
+                    {(booking.homeTeamId || booking.awayTeamId) && (
+                      <button
+                        onClick={() => handleRemoveTeamsFromBooking(booking.id)}
+                        style={{ 
+                          padding: '5px 10px', 
+                          backgroundColor: '#ffc107', 
+                          color: '#000', 
+                          border: 'none', 
+                          borderRadius: '3px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Teams entfernen
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1119,11 +1383,39 @@ const AdminBoard = () => {
                       </td>
                       <td style={{ border: '1px solid #ccc', padding: '8px' }}>
                         <button
+                          onClick={() => handleEditUser(user)}
+                          style={{ 
+                            padding: '5px 10px', 
+                            backgroundColor: '#007bff', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            marginRight: '5px'
+                          }}
+                        >
+                          Bearbeiten
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          style={{ 
+                            padding: '5px 10px', 
+                            backgroundColor: '#dc3545', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            marginRight: '5px'
+                          }}
+                        >
+                          Löschen
+                        </button>
+                        <button
                           onClick={() => handleUpdateUser(user.id, { isAdmin: !user.isAdmin })}
                           style={{ 
                             padding: '5px 10px', 
-                            backgroundColor: user.isAdmin ? '#dc3545' : '#28a745', 
-                            color: 'white', 
+                            backgroundColor: user.isAdmin ? '#ffc107' : '#28a745', 
+                            color: user.isAdmin ? '#000' : 'white', 
                             border: 'none', 
                             borderRadius: '3px',
                             cursor: 'pointer',
@@ -1134,8 +1426,24 @@ const AdminBoard = () => {
                         </button>
                         <select
                           value={user.teamId || ''}
-                          onChange={(e) => handleUpdateUser(user.id, { teamId: e.target.value || null })}
-                          style={{ padding: '5px' }}
+                          onChange={async (e) => {
+                            const newTeamId = e.target.value || null;
+                            console.log('Aktualisiere Team für Benutzer:', user.email, 'Altes Team:', user.teamId, 'Neues Team:', newTeamId);
+                            
+                            if (newTeamId === user.teamId) {
+                              console.log('Keine Änderung - Team ist bereits zugewiesen');
+                              return;
+                            }
+                            
+                            try {
+                              await handleUpdateUser(user.id, { teamId: newTeamId });
+                              console.log('Team-Zuweisung erfolgreich aktualisiert');
+                            } catch (error) {
+                              console.error('Fehler bei Team-Zuweisung:', error);
+                              alert('Fehler bei der Team-Zuweisung: ' + error.message);
+                            }
+                          }}
+                          style={{ padding: '5px', minWidth: '150px' }}
                         >
                           <option value="">Kein Team</option>
                           {teams.map(team => (
@@ -1175,17 +1483,7 @@ const AdminBoard = () => {
                   style={{ marginLeft: '10px', padding: '5px' }}
                 />
               </div>
-              
-              <div style={{ marginBottom: '10px' }}>
-                <label>Saison Name:</label>
-                <input
-                  type="text"
-                  value={seasonFormData.name}
-                  onChange={(e) => setSeasonFormData({...seasonFormData, name: e.target.value})}
-                  required
-                  style={{ marginLeft: '10px', padding: '5px', width: '300px' }}
-                />
-              </div>
+        
               
               <div>
                 <button 
@@ -1211,18 +1509,16 @@ const AdminBoard = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ccc' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8f9fa' }}>
-                    <th style={{ border: '1px solid #ccc', padding: '8px', color: '#000000' }}>Name</th>
-                    <th style={{ border: '1px solid #ccc', padding: '8px', color: '#000000' }}>Jahr</th>
+                    <th style={{ border: '1px solid #ccc', padding: '8px', color: '#000000' }}>Jahr ↓</th>
                     <th style={{ border: '1px solid #ccc', padding: '8px', color: '#000000' }}>Status</th>
                     <th style={{ border: '1px solid #ccc', padding: '8px', color: '#000000' }}>Aktionen</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {seasons.map(season => (
+                  {seasons
+                    .sort((a, b) => a.year - b.year) // Sortiere nach Jahr (neueste zuerst)
+                    .map(season => (
                     <tr key={season.id}>
-                      <td style={{ border: '1px solid #ccc', padding: '8px' }}>
-                        {season.name}
-                      </td>
                       <td style={{ border: '1px solid #ccc', padding: '8px' }}>
                         {season.year}
                       </td>
@@ -1265,8 +1561,128 @@ const AdminBoard = () => {
         <div>
           <h3>Ergebnis-Verwaltung</h3>
           <p style={{ color: '#666', marginBottom: '20px' }}>
-            Hier können Sie gemeldete Ergebnisse bestätigen oder ablehnen.
+            Hier können Sie gemeldete Ergebnisse bestätigen oder ablehnen, sowie neue Ergebnisse erstellen.
           </p>
+
+          {/* Button zum Erstellen neuer Ergebnisse */}
+          <div style={{ marginBottom: '20px' }}>
+            <button 
+              onClick={() => setShowResultForm(!showResultForm)}
+              style={{ 
+                padding: '10px 20px', 
+                backgroundColor: '#28a745', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              {showResultForm ? 'Formular schließen' : 'Neues Ergebnis erstellen'}
+            </button>
+          </div>
+
+          {/* Formular zum Erstellen neuer Ergebnisse */}
+          {showResultForm && (
+            <div style={{ 
+              border: '1px solid #ccc', 
+              padding: '20px', 
+              marginBottom: '20px',
+              borderRadius: '5px',
+              backgroundColor: '#f9f9f9',
+              color: '#000000'
+            }}>
+              <h4>Neues Ergebnis erstellen</h4>
+              <form onSubmit={handleCreateResult}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px' }}>
+                  
+                  <div>
+                    <label>Heim-Mannschaft:</label>
+                    <select
+                      value={resultFormData.homeTeamId}
+                      onChange={(e) => setResultFormData({...resultFormData, homeTeamId: e.target.value})}
+                      required
+                      style={{ width: '100%', padding: '5px', marginTop: '5px' }}
+                    >
+                      <option value="">Team auswählen</option>
+                      {teams.map(team => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label>Auswärts-Mannschaft:</label>
+                    <select
+                      value={resultFormData.awayTeamId}
+                      onChange={(e) => setResultFormData({...resultFormData, awayTeamId: e.target.value})}
+                      required
+                      style={{ width: '100%', padding: '5px', marginTop: '5px' }}
+                    >
+                      <option value="">Team auswählen</option>
+                      {teams.map(team => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label>Heim-Tore:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={resultFormData.homeScore}
+                      onChange={(e) => setResultFormData({...resultFormData, homeScore: e.target.value})}
+                      required
+                      style={{ width: '100%', padding: '5px', marginTop: '5px' }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label>Auswärts-Tore:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={resultFormData.awayScore}
+                      onChange={(e) => setResultFormData({...resultFormData, awayScore: e.target.value})}
+                      required
+                      style={{ width: '100%', padding: '5px', marginTop: '5px' }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <button 
+                    type="submit"
+                    style={{ 
+                      padding: '10px 20px', 
+                      backgroundColor: '#28a745', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      marginRight: '10px'
+                    }}
+                  >
+                    Ergebnis erstellen
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setShowResultForm(false)}
+                    style={{ 
+                      padding: '10px 20px', 
+                      backgroundColor: '#6c757d', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '5px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ccc' }}>
@@ -1285,9 +1701,8 @@ const AdminBoard = () => {
               <tbody>
                 {results
                   .sort((a, b) => {
-                    // Sortiere nach Datum und Uhrzeit (neueste zuerst)
-                    const dateA = new Date(`${a.date}T${a.time}`);
-                    const dateB = new Date(`${b.date}T${b.time}`);
+                    const dateA = a.reportedAt ? new Date(a.reportedAt.seconds * 1000) : new Date(`${a.date}T${a.time}`);
+                    const dateB = b.reportedAt ? new Date(b.reportedAt.seconds * 1000) : new Date(`${b.date}T${b.time}`);
                     return dateB - dateA;
                   })
                   .map(result => (
@@ -1321,36 +1736,72 @@ const AdminBoard = () => {
                         {users.find(u => u.id === result.reportedBy)?.email || 'Unbekannt'}
                       </td>
                       <td style={{ border: '1px solid #ccc', padding: '8px' }}>
+                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                          {result.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleConfirmResult(result.id)}
+                                style={{ 
+                                  padding: '5px 10px', 
+                                  backgroundColor: '#28a745', 
+                                  color: 'white', 
+                                  border: 'none', 
+                                  borderRadius: '3px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Bestätigen
+                              </button>
+                              <button
+                                onClick={() => handleRejectResult(result.id)}
+                                style={{ 
+                                  padding: '5px 10px', 
+                                  backgroundColor: '#dc3545', 
+                                  color: 'white', 
+                                  border: 'none', 
+                                  borderRadius: '3px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Ablehnen
+                              </button>
+                            </>
+                          )}
+                          {result.status === 'confirmed' && (
+                            <>
+                              <button
+                                onClick={() => handleEditResult(result)}
+                                style={{ 
+                                  padding: '5px 10px', 
+                                  backgroundColor: '#007bff', 
+                                  color: 'white', 
+                                  border: 'none', 
+                                  borderRadius: '3px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Bearbeiten
+                              </button>
+                              <button
+                                onClick={() => handleDeleteResult(result.id)}
+                                style={{ 
+                                  padding: '5px 10px', 
+                                  backgroundColor: '#dc3545', 
+                                  color: 'white', 
+                                  border: 'none', 
+                                  borderRadius: '3px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Löschen
+                              </button>
+                            </>
+                          )}
+                        </div>
                         {result.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleConfirmResult(result.id)}
-                              style={{ 
-                                padding: '5px 10px', 
-                                backgroundColor: '#28a745', 
-                                color: 'white', 
-                                border: 'none', 
-                                borderRadius: '3px',
-                                cursor: 'pointer',
-                                marginRight: '5px'
-                              }}
-                            >
-                              Bestätigen
-                            </button>
-                            <button
-                              onClick={() => handleRejectResult(result.id)}
-                              style={{ 
-                                padding: '5px 10px', 
-                                backgroundColor: '#dc3545', 
-                                color: 'white', 
-                                border: 'none', 
-                                borderRadius: '3px',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Ablehnen
-                            </button>
-                          </>
+                          <span style={{ color: '#ff9800', fontStyle: 'italic' }}>
+                            Wartet auf Bestätigung durch Gegner
+                          </span>
                         )}
                         {result.status !== 'pending' && (
                           <span style={{ color: '#666', fontStyle: 'italic' }}>
@@ -1363,6 +1814,211 @@ const AdminBoard = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Teams & Logos Verwaltung */}
+      {activeTab === 'teams' && (
+        <div>
+          <h2 style={{ color: '#000000' }}>Teams & Logo-Verwaltung</h2>
+          
+          {/* Logo-Upload-Methode wählen */}
+          <div style={{
+            marginBottom: '20px',
+            padding: '15px',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px',
+            border: '1px solid #dee2e6'
+          }}>
+            <h3 style={{ 
+              margin: '0 0 15px 0', 
+              color: '#333',
+              fontFamily: 'comfortaa'
+            }}>
+              Logo-Upload-Methode wählen:
+            </h3>
+            
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                cursor: 'pointer',
+                fontFamily: 'comfortaa'
+              }}>
+                <input
+                  type="radio"
+                  name="logoMethod"
+                  checked={!usePleskLogos}
+                  onChange={() => setUsePleskLogos(false)}
+                />
+                <span>Firebase Storage (Direkt-Upload)</span>
+              </label>
+              
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                cursor: 'pointer',
+                fontFamily: 'comfortaa'
+              }}>
+                <input
+                  type="radio"
+                  name="logoMethod"
+                  checked={usePleskLogos}
+                  onChange={() => setUsePleskLogos(true)}
+                />
+                <span>Plesk File Manager (URL-basiert)</span>
+              </label>
+            </div>
+            
+            {usePleskLogos && (
+              <div style={{
+                marginTop: '15px',
+                padding: '10px',
+                backgroundColor: '#e3f2fd',
+                borderRadius: '4px',
+                border: '1px solid #bbdefb'
+              }}>
+                <p style={{
+                  margin: '0 0 8px 0',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#1976d2',
+                  fontFamily: 'comfortaa'
+                }}>
+                  📁 Plesk-Anleitung:
+                </p>
+                <div style={{ fontSize: '12px', color: '#666', fontFamily: 'comfortaa' }}>
+                  1. Laden Sie Logos über Plesk File Manager in <code>/Website/public/logos/</code> hoch<br />
+                  2. Kopieren Sie die URL des hochgeladenen Logos<br />
+                  3. Fügen Sie die URL in das entsprechende Team ein
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+            gap: '20px',
+            marginTop: '20px'
+          }}>
+            {teams.map(team => (
+              <div 
+                key={team.id}
+                style={{
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  backgroundColor: '#f9f9f9'
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '15px'
+                }}>
+                  {/* Aktuelles Team-Logo/Avatar */}
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    backgroundColor: team.logoUrl ? 'transparent' : (team.logoColor || '#00A99D'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '15px',
+                    overflow: 'hidden',
+                    border: `2px solid ${team.logoColor || '#00A99D'}`
+                  }}>
+                    {team.logoUrl ? (
+                      <img 
+                        src={team.logoUrl} 
+                        alt={`${team.name} Logo`}
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover' 
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div style={{
+                      display: team.logoUrl ? 'none' : 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: '100%',
+                      color: 'white',
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      fontFamily: 'comfortaa'
+                    }}>
+                      {team.name.charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 style={{ 
+                      margin: '0 0 5px 0', 
+                      color: '#333',
+                      fontFamily: 'comfortaa'
+                    }}>
+                      {team.name}
+                    </h3>
+                    <p style={{ 
+                      margin: 0, 
+                      fontSize: '12px', 
+                      color: '#666',
+                      fontFamily: 'comfortaa'
+                    }}>
+                      Team-ID: {team.id}
+                    </p>
+                    {team.logoSource && (
+                      <p style={{ 
+                        margin: '5px 0 0 0', 
+                        fontSize: '10px', 
+                        color: '#00A99D',
+                        fontFamily: 'comfortaa',
+                        fontWeight: 'bold'
+                      }}>
+                        Logo: {team.logoSource === 'plesk' ? 'Plesk' : 'Firebase'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Logo-Upload-Komponente */}
+                {usePleskLogos ? (
+                  <PleskLogoManager 
+                    team={team} 
+                    onLogoUpdated={handleLogoUpdated}
+                  />
+                ) : (
+                  <TeamLogoUpload 
+                    team={team} 
+                    onLogoUpdated={handleLogoUpdated}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {teams.length === 0 && (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px',
+              color: '#666',
+              fontFamily: 'comfortaa'
+            }}>
+              <p>Keine Teams gefunden.</p>
+              <p>Erstellen Sie zuerst Teams in der Datenbank.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

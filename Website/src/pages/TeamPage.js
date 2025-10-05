@@ -25,12 +25,10 @@ const teamData = {
   memberSince: '2010',
 };
 
-// Die Team-Komponente wurde überarbeitet.
 const TeamCard = ({ team }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  // Daten für die Anzeige in einer strukturierten Form
   const details = [
       { label: 'Teamname', value: team.name },
       { label: 'Kontakt', value: team.contact },
@@ -39,7 +37,6 @@ const TeamCard = ({ team }) => {
 
   return (
     <Box>
-      {/* Das Logo wird jetzt außerhalb der Paper-Komponente gerendert und ist immer zentriert */}
       <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
         <Avatar
           sx={{
@@ -57,7 +54,6 @@ const TeamCard = ({ team }) => {
         </Avatar>
       </Box>
 
-      {/* Die Paper-Komponente enthält nur noch die Team-Details */}
       <Paper
         sx={{
           p: { xs: 2.5, sm: 4 },
@@ -67,7 +63,6 @@ const TeamCard = ({ team }) => {
         }}
       >
         {isMobile ? (
-          // Mobile Ansicht: Gestapelte Liste
           <Box>
             {details.map((detail) => (
               <Box key={detail.label} sx={{ mb: 2 }}>
@@ -100,7 +95,6 @@ const TeamCard = ({ team }) => {
             ))}
           </Box>
         ) : (
-          // Desktop Ansicht: Tabelle
           <TableContainer>
             <Table aria-label={`Daten für ${team.name}`}>
               <TableBody>

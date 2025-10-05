@@ -16,7 +16,6 @@ import {
 import GavelIcon from '@mui/icons-material/Gavel';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 
-// Daten für die Spielregeln
 const gameRulesData = [
   {
     id: 1,

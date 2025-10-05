@@ -138,19 +138,6 @@ const AdminDashboard = () => {
           textAlign: 'center',
           color: '#000000'
         }}>
-          <h3 style={{ margin: '0 0 10px 0', color: '#ffc107' }}>Ausstehende Ergebnisse</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '10px 0' }}>{stats.pendingResults}</p>
-          <p style={{ margin: 0, color: '#666' }}>Warten auf Bestätigung</p>
-        </div>
-
-        <div style={{ 
-          padding: '20px', 
-          backgroundColor: '#f8f9fa', 
-          border: '1px solid #dee2e6',
-          borderRadius: '8px',
-          textAlign: 'center',
-          color: '#000000'
-        }}>
           <h3 style={{ margin: '0 0 10px 0', color: '#17a2b8' }}>Buchungen</h3>
           <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '10px 0' }}>{stats.totalBookings}</p>
           <p style={{ margin: 0, color: '#666' }}>Gesamt Buchungen</p>
@@ -171,19 +158,6 @@ const AdminDashboard = () => {
           }}>
             Vollständige Verwaltung
           </Link>
-          
-          {stats.pendingResults > 0 && (
-            <Link to="/admin" style={{
-              padding: '12px 20px',
-              backgroundColor: '#ffc107',
-              color: '#000',
-              borderRadius: '6px',
-              textDecoration: 'none',
-              display: 'inline-block'
-            }}>
-              Ergebnisse bestätigen ({stats.pendingResults})
-            </Link>
-          )}
         </div>
       </div>
 

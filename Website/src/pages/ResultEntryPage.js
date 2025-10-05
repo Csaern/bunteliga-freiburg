@@ -1,6 +1,5 @@
-// src/pages/ResultEntryPage.js
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthProvider';
@@ -10,16 +9,14 @@ const ResultEntryPage = () => {
   const navigate = useNavigate();
   const [teams, setTeams] = useState([]);
   const [currentSeason, setCurrentSeason] = useState(null);
+  const [availableGames, setAvailableGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const [resultForm, setResultForm] = useState({
-    homeTeamId: '',
-    awayTeamId: '',
+    gameId: '',
     homeScore: '',
     awayScore: '',
-    date: '',
-    time: '',
     seasonId: ''
   });
 
@@ -29,7 +26,6 @@ const ResultEntryPage = () => {
       return;
     }
 
-    // Nur Teams können Ergebnisse melden
     if (isAdmin) {
       navigate('/dashboard');
       return;
@@ -40,18 +36,45 @@ const ResultEntryPage = () => {
 
   const loadData = async () => {
     try {
-      // Teams laden
       const teamsSnap = await getDocs(collection(db, 'teams'));
-      setTeams(teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const teamsData = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTeams(teamsData);
 
-      // Aktuelle Saison laden
       const seasonsSnap = await getDocs(collection(db, 'seasons'));
       const seasons = seasonsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const current = seasons.find(s => s.isCurrent === true);
       setCurrentSeason(current);
 
-      if (current) {
+      if (current && teamId) {
         setResultForm(prev => ({ ...prev, seasonId: current.id }));
+        
+        const bookingsQuery = query(collection(db, 'bookings'), where('seasonId', '==', current.id));
+        const bookingsSnap = await getDocs(bookingsQuery);
+        const bookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(booking => 
+            booking.homeTeamId && booking.awayTeamId && 
+            !booking.isAvailable &&
+            (booking.homeTeamId === teamId || booking.awayTeamId === teamId)
+          );
+
+        const resultsSnap = await getDocs(collection(db, 'results'));
+        const results = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const availableGames = bookings.filter(booking => {
+
+          return !results.some(result => 
+            result.homeTeamId === booking.homeTeamId &&
+            result.awayTeamId === booking.awayTeamId &&
+            result.date === booking.date &&
+            result.time === booking.time
+          );
+        }).map(booking => ({
+          ...booking,
+          homeTeamName: teamsData.find(t => t.id === booking.homeTeamId)?.name || 'Unbekannt',
+          awayTeamName: teamsData.find(t => t.id === booking.awayTeamId)?.name || 'Unbekannt'
+        }));
+
+        setAvailableGames(availableGames);
       }
     } catch (error) {
       console.error('Fehler beim Laden der Daten:', error);
@@ -68,8 +91,8 @@ const ResultEntryPage = () => {
       return;
     }
 
-    if (resultForm.homeTeamId === resultForm.awayTeamId) {
-      alert('Heim- und Auswärtsmannschaft müssen unterschiedlich sein!');
+    if (!resultForm.gameId) {
+      alert('Bitte wählen Sie ein Spiel aus!');
       return;
     }
 
@@ -78,41 +101,37 @@ const ResultEntryPage = () => {
       return;
     }
 
-    // Prüfen, ob das Team an dem Spiel beteiligt ist
-    if (resultForm.homeTeamId !== teamId && resultForm.awayTeamId !== teamId) {
-      alert('Sie können nur Ergebnisse für Spiele Ihres Teams melden!');
+    const selectedGame = availableGames.find(game => game.id === resultForm.gameId);
+    if (!selectedGame) {
+      alert('Ausgewähltes Spiel nicht gefunden!');
       return;
     }
 
     setSubmitting(true);
 
     try {
-      // Ergebnis in die Datenbank speichern
       await addDoc(collection(db, 'results'), {
-        homeTeamId: resultForm.homeTeamId,
-        awayTeamId: resultForm.awayTeamId,
+        homeTeamId: selectedGame.homeTeamId,
+        awayTeamId: selectedGame.awayTeamId,
         homeScore: parseInt(resultForm.homeScore),
         awayScore: parseInt(resultForm.awayScore),
-        date: resultForm.date,
-        time: resultForm.time,
+        date: selectedGame.date,
+        time: selectedGame.time,
         seasonId: resultForm.seasonId,
         reportedBy: currentUser.uid,
         reportedAt: new Date(),
-        status: 'pending' // Wird vom Admin bestätigt
+        status: 'pending'
       });
 
       alert('Ergebnis erfolgreich gemeldet! Es wird vom Administrator überprüft.');
       
-      // Formular zurücksetzen
       setResultForm({
-        homeTeamId: '',
-        awayTeamId: '',
+        gameId: '',
         homeScore: '',
         awayScore: '',
-        date: '',
-        time: '',
         seasonId: resultForm.seasonId
       });
+      loadData();
     } catch (error) {
       console.error('Fehler beim Speichern des Ergebnisses:', error);
       alert('Fehler beim Speichern des Ergebnisses!');
@@ -120,7 +139,6 @@ const ResultEntryPage = () => {
       setSubmitting(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -142,60 +160,129 @@ const ResultEntryPage = () => {
   }
 
   return (
-    <div>
-      <main style={{ minHeight: '80vh', padding: '20px' }}>
-        <h1>Ergebnis melden</h1>
-        <p style={{ color: '#666', marginBottom: '20px' }}>
-          Aktuelle Saison: <strong>{currentSeason.name} ({currentSeason.year})</strong>
+    <div style={{ 
+      minHeight: '80vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      padding: '20px',
+      background: 'linear-gradient(135deg, rgba(0,169,157,0.1) 0%, rgba(0,0,0,0.8) 100%)'
+    }}>
+      <div style={{
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        padding: '40px',
+        borderRadius: '12px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        width: '100%',
+        maxWidth: '600px',
+        color: '#000000'
+      }}>
+        <h1 style={{ 
+          textAlign: 'center', 
+          marginBottom: '10px',
+          color: '#00A99D',
+          fontFamily: 'comfortaa',
+          fontSize: '2rem',
+          fontWeight: 'bold'
+        }}>
+          Ergebnis melden
+        </h1>
+        
+        <p style={{ 
+          textAlign: 'center',
+          color: '#666', 
+          marginBottom: '30px',
+          fontFamily: 'comfortaa',
+          fontSize: '16px'
+        }}>
+          Aktuelle Saison: <strong style={{ color: '#00A99D' }}>{currentSeason.name} ({currentSeason.year})</strong>
         </p>
 
         <div style={{ 
-          border: '1px solid #ccc', 
-          padding: '20px', 
-          borderRadius: '5px',
-          backgroundColor: '#f9f9f9',
-          maxWidth: '600px',
+          border: '2px solid #e9ecef', 
+          padding: '30px', 
+          borderRadius: '10px',
+          backgroundColor: '#f8f9fa',
           color: '#000000'
         }}>
-          <h3>Spielergebnis eintragen</h3>
+          <h3 style={{ 
+            textAlign: 'center',
+            marginBottom: '25px',
+            color: '#333',
+            fontFamily: 'comfortaa',
+            fontSize: '1.3rem'
+          }}>
+            Spielergebnis eintragen
+          </h3>
+          
           <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Heim-Mannschaft:
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: 'bold',
+                color: '#333',
+                fontFamily: 'comfortaa'
+              }}>
+                Verfügbares Spiel auswählen:
               </label>
               <select
-                value={resultForm.homeTeamId}
-                onChange={(e) => setResultForm({...resultForm, homeTeamId: e.target.value})}
+                value={resultForm.gameId}
+                onChange={(e) => setResultForm({...resultForm, gameId: e.target.value})}
                 required
-                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontFamily: 'comfortaa',
+                  backgroundColor: '#fff'
+                }}
               >
-                <option value="">Mannschaft auswählen</option>
-                {teams.map(team => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
+                <option value="">Spiel auswählen</option>
+                {availableGames.map(game => (
+                  <option key={game.id} value={game.id}>
+                    {new Date(game.date).toLocaleDateString('de-DE')} {game.time} - {game.homeTeamName} vs. {game.awayTeamName}
+                  </option>
                 ))}
               </select>
             </div>
 
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Auswärts-Mannschaft:
-              </label>
-              <select
-                value={resultForm.awayTeamId}
-                onChange={(e) => setResultForm({...resultForm, awayTeamId: e.target.value})}
-                required
-                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-              >
-                <option value="">Mannschaft auswählen</option>
-                {teams.map(team => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </select>
-            </div>
+            {resultForm.gameId && (
+              <div style={{ 
+                marginBottom: '20px', 
+                padding: '15px', 
+                backgroundColor: '#e9ecef', 
+                borderRadius: '8px',
+                border: '1px solid #dee2e6'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#333', fontFamily: 'comfortaa' }}>
+                  Spiel-Details:
+                </h4>
+                {(() => {
+                  const selectedGame = availableGames.find(game => game.id === resultForm.gameId);
+                  return selectedGame ? (
+                    <div style={{ color: '#666', fontFamily: 'comfortaa' }}>
+                      <p><strong>Datum:</strong> {new Date(selectedGame.date).toLocaleDateString('de-DE')}</p>
+                      <p><strong>Uhrzeit:</strong> {selectedGame.time}</p>
+                      <p><strong>Heim:</strong> {selectedGame.homeTeamName}</p>
+                      <p><strong>Auswärts:</strong> {selectedGame.awayTeamName}</p>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '8px', 
+                  fontWeight: 'bold',
+                  color: '#333',
+                  fontFamily: 'comfortaa'
+                }}>
                   Heim-Tore:
                 </label>
                 <input
@@ -204,11 +291,25 @@ const ResultEntryPage = () => {
                   value={resultForm.homeScore}
                   onChange={(e) => setResultForm({...resultForm, homeScore: e.target.value})}
                   required
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontFamily: 'comfortaa',
+                  backgroundColor: '#fff'
+                }}
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '8px', 
+                  fontWeight: 'bold',
+                  color: '#333',
+                  fontFamily: 'comfortaa'
+                }}>
                   Auswärts-Tore:
                 </label>
                 <input
@@ -217,54 +318,43 @@ const ResultEntryPage = () => {
                   value={resultForm.awayScore}
                   onChange={(e) => setResultForm({...resultForm, awayScore: e.target.value})}
                   required
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontFamily: 'comfortaa',
+                  backgroundColor: '#fff'
+                }}
                 />
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                  Datum:
-                </label>
-                <input
-                  type="date"
-                  value={resultForm.date}
-                  onChange={(e) => setResultForm({...resultForm, date: e.target.value})}
-                  required
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                  Uhrzeit:
-                </label>
-                <input
-                  type="time"
-                  value={resultForm.time}
-                  onChange={(e) => setResultForm({...resultForm, time: e.target.value})}
-                  required
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                />
-              </div>
-            </div>
 
-            <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: '4px' }}>
-              <strong>Hinweis:</strong> Sie können nur Ergebnisse für Spiele Ihres Teams melden. 
-              Das Ergebnis wird vom Administrator überprüft, bevor es in der Tabelle angezeigt wird.
-            </div>
+            {availableGames.length === 0 ? (
+              <div style={{ marginBottom: '15px', padding: '15px', backgroundColor: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: '4px' }}>
+                <strong>Keine Spiele verfügbar:</strong> Es gibt derzeit keine Spiele, für die Sie ein Ergebnis melden können. 
+                Alle Spiele Ihres Teams haben bereits ein Ergebnis oder sind noch nicht bestätigt.
+              </div>
+            ) : (
+              <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: '4px' }}>
+                <strong>Hinweis:</strong> Sie können nur Ergebnisse für Spiele Ihres Teams melden. 
+                Das Ergebnis wird vom Administrator überprüft, bevor es in der Tabelle angezeigt wird.
+              </div>
+            )}
 
             <div>
               <button 
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || availableGames.length === 0}
                 style={{ 
                   padding: '10px 20px', 
-                  backgroundColor: submitting ? '#6c757d' : '#28a745', 
+                  backgroundColor: (submitting || availableGames.length === 0) ? '#6c757d' : '#28a745', 
                   color: 'white', 
                   border: 'none', 
                   borderRadius: '5px',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  cursor: (submitting || availableGames.length === 0) ? 'not-allowed' : 'pointer',
                   marginRight: '10px'
                 }}
               >
@@ -287,7 +377,7 @@ const ResultEntryPage = () => {
             </div>
           </form>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

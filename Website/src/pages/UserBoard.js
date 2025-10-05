@@ -1,4 +1,3 @@
-// src/pages/UserBoard.js
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
@@ -23,13 +22,11 @@ const UserBoard = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        // Teams laden (Map für Name-Auflösung)
         const teamsSnap = await getDocs(collection(db, 'teams'));
         const map = {};
         teamsSnap.docs.forEach(d => { map[d.id] = d.data().name; });
         setTeamsMap(map);
 
-        // Teamname
         if (teamId) {
           const thisName = map[teamId];
           if (thisName) {
@@ -37,7 +34,6 @@ const UserBoard = () => {
           }
         }
 
-        // Spiele (pending/confirmed, zukünftig) für dieses Team
         const today = new Date();
         const bookingsSnap = await getDocs(collection(db, 'bookings'));
         const list = bookingsSnap.docs

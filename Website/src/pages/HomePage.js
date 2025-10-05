@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import NewsCarousel from '../components/News/News';
 import DynamicFixtureList from '../components/DynamicFixtureList';
+import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import { db } from '../firebase';
 
 const HomePage = () => {
@@ -39,6 +40,11 @@ const HomePage = () => {
   return (
     <div className="homepage">
       <NewsCarousel />
+      <DynamicLeagueTable 
+        title="Aktuelle Tabelle" 
+        form={false} 
+        seasonId={currentSeason?.id}
+      />
       <DynamicFixtureList 
         title="Neueste Ergebnisse" 
         details={false}

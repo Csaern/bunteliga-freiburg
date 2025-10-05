@@ -1,0 +1,19 @@
+// Firebase Storage Security Rules
+// Diese Regeln müssen in der Firebase Console unter Storage > Rules eingefügt werden
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Team-Logos: Nur authentifizierte Benutzer können hochladen
+    match /team-logos/{allPaths=**} {
+      allow read: if true; // Jeder kann Logos lesen/anzeigen
+      allow write: if request.auth != null; // Nur angemeldete Benutzer können hochladen
+    }
+    
+    // Benutzer-Avatars: Nur der eigene Benutzer kann hochladen
+    match /user-avatars/{userId}/{allPaths=**} {
+      allow read: if true; // Jeder kann Avatars lesen/anzeigen
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

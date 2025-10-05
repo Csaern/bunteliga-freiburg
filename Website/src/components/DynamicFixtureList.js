@@ -47,7 +47,7 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   );
 };
 
-const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all' }) => {
+const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [fixtures, setFixtures] = useState([]);
@@ -63,7 +63,10 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all' 
         const teamData = doc.data();
         teamsMap[doc.id] = {
           name: teamData.name,
-          logoColor: teamData.logoColor || '#666666'
+          logoColor: teamData.logoColor || '#666666',
+          logoUrl: teamData.logoUrl,
+          description: teamData.description,
+          foundedYear: teamData.foundedYear
         };
       });
       setTeams(teamsMap);
@@ -76,17 +79,34 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all' 
       const resultsSnap = await getDocs(resultsQuery);
       const results = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(result => result.status === 'confirmed')
+        .filter(result => {
+          // Wenn userTeamId angegeben ist, nur Spiele der eigenen Mannschaft anzeigen
+          if (userTeamId) {
+            return result.homeTeamId === userTeamId || result.awayTeamId === userTeamId;
+          }
+          return true;
+        })
         .sort((a, b) => {
-          // Sortiere nach Datum und Uhrzeit (neueste zuerst)
-          const dateA = new Date(`${a.date}T${a.time}`);
-          const dateB = new Date(`${b.date}T${b.time}`);
-          return dateB - dateA;
+          // Sortiere nach gemeldet/bestätigt Datum (neueste zuerst)
+          const dateA = a.reportedAt ? new Date(a.reportedAt.seconds * 1000) : new Date(`${a.date}T${a.time}`);
+          const dateB = b.reportedAt ? new Date(b.reportedAt.seconds * 1000) : new Date(`${b.date}T${b.time}`);
+          return dateB - dateA; // Neueste zuerst (absteigend)
         });
 
-      // Buchungen laden (für zukünftige Spiele)
-      const bookingsSnap = await getDocs(collection(db, 'bookings'));
+      // Buchungen laden (für zukünftige Spiele) - nur für aktuelle Saison
+      let bookingsQuery = collection(db, 'bookings');
+      if (seasonId) {
+        bookingsQuery = query(collection(db, 'bookings'), where('seasonId', '==', seasonId));
+      }
+      const bookingsSnap = await getDocs(bookingsQuery);
+      const today = new Date();
       const bookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(booking => booking.homeTeamId && booking.awayTeamId && !booking.isAvailable)
+        .filter(booking => {
+          // Nur zukünftige Spiele anzeigen
+          const gameDate = new Date(`${booking.date}T${booking.time}`);
+          return gameDate >= today;
+        })
         .filter(booking => {
           // Prüfe, ob für dieses Spiel bereits ein Ergebnis existiert
           return !results.some(result => 
@@ -130,7 +150,6 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all' 
           homeScore: null,
           awayScore: null,
           isPast: false,
-          location: 'Unbekannt'
         })));
       }
 
@@ -278,17 +297,19 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all' 
                 <StyledTableCell>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
                     <Avatar 
-                      alt={`${teams[fixture.homeTeamId]?.name || 'Unbekannt'} Logo`} 
+                      alt={`${teams[fixture.homeTeamId]?.name || 'Unbekannt'} Logo`}
+                      src={teams[fixture.homeTeamId]?.logoUrl}
                       sx={{ 
                         width: isMobile ? 22 : 20, 
                         height: isMobile ? 22 : 20, 
                         mb: 0.5, 
                         fontSize: isMobile ? '0.7rem' : '0.7rem', 
                         color: theme.palette.getContrastText(teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]), 
-                        backgroundColor: teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700] 
+                        backgroundColor: teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700],
+                        border: teams[fixture.homeTeamId]?.logoUrl ? `1px solid ${teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
                       }}
                     >
-                      {(teams[fixture.homeTeamId]?.name || 'U').substring(0,1).toUpperCase()}
+                      {!teams[fixture.homeTeamId]?.logoUrl && (teams[fixture.homeTeamId]?.name || 'U').substring(0,1).toUpperCase()}
                     </Avatar>
                     <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width:'100%' }}>
                       {teams[fixture.homeTeamId]?.name || 'Unbekannt'}
@@ -318,17 +339,19 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all' 
                 <StyledTableCell>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
                     <Avatar 
-                      alt={`${teams[fixture.awayTeamId]?.name || 'Unbekannt'} Logo`} 
+                      alt={`${teams[fixture.awayTeamId]?.name || 'Unbekannt'} Logo`}
+                      src={teams[fixture.awayTeamId]?.logoUrl}
                       sx={{ 
                         width: isMobile ? 22 : 20, 
                         height: isMobile ? 22 : 20, 
                         mb: 0.5, 
                         fontSize: isMobile ? '0.7rem' : '0.7rem', 
                         color: theme.palette.getContrastText(teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]), 
-                        backgroundColor: teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700] 
+                        backgroundColor: teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700],
+                        border: teams[fixture.awayTeamId]?.logoUrl ? `1px solid ${teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
                       }}
                     >
-                      {(teams[fixture.awayTeamId]?.name || 'U').substring(0,1).toUpperCase()}
+                      {!teams[fixture.awayTeamId]?.logoUrl && (teams[fixture.awayTeamId]?.name || 'U').substring(0,1).toUpperCase()}
                     </Avatar>
                     <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width:'100%' }}>
                       {teams[fixture.awayTeamId]?.name || 'Unbekannt'}

@@ -14,21 +14,28 @@ const BookingOverview = () => {
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [currentSeason, setCurrentSeason] = useState(null);
   const { currentUser, teamId, role } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
       // Abrufen aller Daten
-        const [pitchesSnap, teamsSnap, bookingsSnap] = await Promise.all([
+        const [pitchesSnap, teamsSnap, bookingsSnap, seasonsSnap] = await Promise.all([
         getDocs(collection(db, "pitches")),
         getDocs(collection(db, "teams")),
         getDocs(collection(db, "bookings")),
+        getDocs(collection(db, "seasons")),
       ]);
 
         const pitches = pitchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const teams = teamsSnap.docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc.data().name }), {});
       const bookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Aktuelle Saison finden
+      const seasons = seasonsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const current = seasons.find(s => s.isCurrent === true);
+      setCurrentSeason(current);
 
         // Gruppieren der Buchungen nach Datum und dann nach Platz
       const groupedBookings = {};
@@ -65,6 +72,12 @@ const BookingOverview = () => {
       return;
     }
     
+    // Prüfe, ob aktuelle Saison vorhanden ist
+    if (!currentSeason) {
+      alert("Keine aktuelle Saison gefunden! Bitte kontaktieren Sie einen Administrator.");
+      return;
+    }
+    
     try {
       // Prüfe, ob bereits eine Buchung für diesen Slot existiert
       const existingBookings = data.groupedBookings[selectedSlot.date]?.[selectedSlot.pitchId] || [];
@@ -78,6 +91,7 @@ const BookingOverview = () => {
           isAvailable: false,
           status: 'pending_away_confirm',
           userId: currentUser?.uid || 'anonymous',
+          seasonId: currentSeason.id,
           updatedAt: new Date(),
         });
       } else {
@@ -91,6 +105,7 @@ const BookingOverview = () => {
           isAvailable: false,
           status: 'pending_away_confirm',
           userId: currentUser?.uid || 'anonymous',
+          seasonId: currentSeason.id,
           contactName: contactName || (currentUser?.displayName || ''),
           contactEmail: contactEmail || (currentUser?.email || ''),
           contactPhone: contactPhone || '',

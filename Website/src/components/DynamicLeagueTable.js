@@ -87,7 +87,7 @@ const FormDisplay = ({ formArray }) => {
   );
 };
 
-const DynamicLeagueTable = ({ title, form, seasonId }) => {
+const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [tableData, setTableData] = useState([]);
@@ -117,6 +117,9 @@ const DynamicLeagueTable = ({ title, form, seasonId }) => {
           teamId: team.id,
           name: team.name,
           logoColor: team.logoColor || '#666666',
+          logoUrl: team.logoUrl, // Logo-URL hinzufügen
+          description: team.description,
+          foundedYear: team.foundedYear,
           played: 0,
           won: 0,
           drawn: 0,
@@ -280,7 +283,10 @@ const DynamicLeagueTable = ({ title, form, seasonId }) => {
                 key={row.teamId}
                 sx={{
                   '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
-                  ...(row.rank === 1 && { backgroundColor: 'rgba(71, 163, 163, 0.27)' }),
+                  ...(userTeamId && row.teamId === userTeamId && { 
+                    backgroundColor: 'rgba(0, 169, 157, 0.3)',
+                    border: '2px solid #00A99D'
+                  }),
                 }}
               >
                 <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }}>{row.rank}</StyledTableCell>
@@ -290,15 +296,19 @@ const DynamicLeagueTable = ({ title, form, seasonId }) => {
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.3, width: '100%' }}>
                         <Avatar
                           alt={`${row.name} Logo`}
+                          src={row.logoUrl}
                           sx={{
                             width: 20,
                             height: 20,
                             mr: 0.75,
                             fontSize: '0.55rem', 
                             color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
-                            backgroundColor: row.logoColor || theme.palette.grey[700]
+                            backgroundColor: row.logoColor || theme.palette.grey[700],
+                            border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none'
                           }}
-                        >{row.name.substring(0, 1).toUpperCase()}</Avatar>
+                        >
+                          {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}
+                        </Avatar>
                         <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.65rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
                           {row.name}
                         </Typography>
@@ -309,15 +319,19 @@ const DynamicLeagueTable = ({ title, form, seasonId }) => {
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Avatar
                         alt={`${row.name} Logo`}
+                        src={row.logoUrl}
                         sx={{
                           width: 20,
                           height: 20,
                           mr: 1,
                           fontSize: '0.7rem',
                           color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
-                          backgroundColor: row.logoColor || theme.palette.grey[700]
+                          backgroundColor: row.logoColor || theme.palette.grey[700],
+                          border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none'
                         }}
-                      >{row.name.substring(0, 1).toUpperCase()}</Avatar>
+                      >
+                        {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}
+                      </Avatar>
                       <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {row.name}
                       </Typography>

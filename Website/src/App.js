@@ -26,6 +26,9 @@ import UserBoard from './pages/UserBoard';
 import DashboardPage from './pages/DashboardPage';
 import ResultEntryPage from './pages/ResultEntryPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import TeamDetailPage from './pages/TeamDetailPage';
+import ResultConfirmationPage from './pages/ResultConfirmationPage';
+import GameManagementPage from './pages/GameManagementPage';
 
 function App() {
   return (
@@ -51,6 +54,9 @@ function App() {
             <Route path="/plaetze" element={<VenuesPage />} />
             <Route path="/regeln" element={<RulesPage />} />
             <Route path="/team" element={<TeamPage />} />
+            <Route path="/team/:teamId" element={<TeamDetailPage />} />
+            <Route path="/ergebnis-bestaetigen" element={<ResultConfirmationPage />} />
+            <Route path="/spiel-verwaltung" element={<GameManagementPage />} />
           </Routes>
         </main>
         <Footer />
