@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useParams } from 'react-router-dom'; // useParams importieren
 import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -21,14 +21,24 @@ import VenuesPage from './pages/VenuesPage';
 import RulesPage from './pages/RulesPage';
 import BookingOverview from './components/BookingOverview';
 import LoginPage from './pages/LoginPage';
-import AdminPage from './pages/AdminPage';
+// AdminPage und AdminDashboardPage werden nicht mehr direkt benötigt,
+// stattdessen verwenden wir AdminBoard
+import AdminBoard from './pages/AdminBoard';
 import UserBoard from './pages/UserBoard';
 import DashboardPage from './pages/DashboardPage';
 import ResultEntryPage from './pages/ResultEntryPage';
-import AdminDashboardPage from './pages/AdminDashboardPage';
 import TeamDetailPage from './pages/TeamDetailPage';
 import ResultConfirmationPage from './pages/ResultConfirmationPage';
 import GameManagementPage from './pages/GameManagementPage';
+
+// Eine kleine Helfer-Komponente, um den URL-Parameter an das AdminBoard zu übergeben
+function AdminBoardWrapper() {
+  // Holt den 'tab'-Teil aus der URL (z.B. 'bookings', 'users')
+  const { tab } = useParams();
+  // Übergibt den Tab an das AdminBoard. Wenn kein Tab da ist, wird 'bookings' als Standard verwendet.
+  return <AdminBoard initialTab={tab || 'bookings'} />;
+}
+
 
 function App() {
   return (
@@ -41,8 +51,13 @@ function App() {
             <Route path="/ergebnisse" element={<ResultsPage />} />
             <Route path="/platzreservierung" element={<BookingOverview />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
+            
+            {/* --- NEUE ADMIN ROUTEN --- */}
+            {/* Diese Route fängt alles ab, was mit /admin/ beginnt */}
+            <Route path="/admin/:tab" element={<AdminBoardWrapper />} />
+            {/* Dies ist ein Fallback, falls jemand nur /admin aufruft */}
+            <Route path="/admin" element={<AdminBoardWrapper />} />
+
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/ergebnis-melden" element={<ResultEntryPage />} />
             <Route path="/board" element={<UserBoard />} />

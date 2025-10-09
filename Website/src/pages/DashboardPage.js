@@ -28,12 +28,9 @@ const DashboardPage = () => {
     }
     
     // Administratoren automatisch zum Admin-Dashboard weiterleiten
-    if (isAdmin) {
-      navigate('/admin-dashboard');
-      return;
-    }
-  }, [currentUser, isAdmin, navigate]);
 
+  }, [currentUser, isAdmin, navigate]);
+  
   useEffect(() => {
       const load = async () => {
         try {

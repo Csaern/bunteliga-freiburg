@@ -38,15 +38,8 @@ const ResultsPage = () => {
 
   return (
     <div>
-      {currentSeason && (
-        <Box sx={{ textAlign: 'center', mb: 2 }}>
-          <Typography variant="h6" color="primary">
-            {currentSeason.name} ({currentSeason.year})
-          </Typography>
-        </Box>
-      )}
       <DynamicLeagueTable 
-        title="Liga-Tabelle" 
+        title={`Liga-Tabelle ${currentSeason.year}`}
         form={true} 
         seasonId={currentSeason?.id}
       />

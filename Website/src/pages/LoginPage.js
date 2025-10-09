@@ -3,49 +3,47 @@ import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthProvider';
-import BookingOverview from '../components/BookingOverview';
 import { Navigate } from 'react-router-dom';
+import { Container, Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { currentUser } = useAuth(); // Lese den aktuellen User-Status
-
-  const handleSignUp = async (e) => {
-    e.preventDefault();
-    alert("Registrierung ist deaktiviert. Benutzer können nur vom Administrator erstellt werden.");
-  };
+  const [error, setError] = useState('');
+  const { currentUser } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError(''); // Reset error on new attempt
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      console.log('Login erfolgreich für:', cred.user.email, 'UID:', cred.user.uid);
       
       const udoc = await getDoc(doc(db, 'users', cred.user.uid));
-      console.log('Benutzer-Dokument existiert:', udoc.exists());
       
       if (!udoc.exists()) {
         console.error('Benutzer-Dokument nicht gefunden für UID:', cred.user.uid);
-        alert('Benutzer-Dokument nicht gefunden. Bitte wenden Sie sich an den Administrator.');
+        setError('Benutzer-Dokument nicht gefunden. Bitte wenden Sie sich an den Administrator.');
         await signOut(auth);
         return;
       }
       
-      console.log('Benutzer-Dokument gefunden:', udoc.data());
       await setDoc(doc(db, 'users', cred.user.uid), {
         lastLogin: serverTimestamp(),
       }, { merge: true });
-      console.log('LastLogin aktualisiert');
       
     } catch (error) {
       console.error('Login-Fehler:', error);
-      alert("Fehler beim Login: " + error.message);
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          setError('Ungültige E-Mail-Adresse oder falsches Passwort.');
+          break;
+        default:
+          setError('Fehler beim Login: ' + error.message);
+          break;
+      }
     }
-  };
-
-  const handleLogout = () => {
-    signOut(auth);
   };
 
   if (currentUser) {
@@ -53,140 +51,145 @@ const LoginPage = () => {
   }
 
   return (
-    <div style={{ 
-      minHeight: '80vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      padding: '20px',
-      background: 'linear-gradient(135deg, rgba(0,169,157,0.1) 0%, rgba(0,0,0,0.8) 100%)'
-    }}>
-      <div style={{
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        padding: '40px',
-        borderRadius: '12px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        width: '100%',
-        maxWidth: '400px',
-        color: '#000000'
-      }}>
-        <h1 style={{ 
-          textAlign: 'center', 
-          marginBottom: '30px',
-          color: '#00A99D',
-          fontFamily: 'comfortaa',
-          fontSize: '2rem',
-          fontWeight: 'bold'
-        }}>
+    <Container
+      component="main"
+      maxWidth="xs"
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '80vh',
+      }}
+    >
+      <Paper
+        elevation={8}
+        sx={{
+          p: { xs: 3, md: 4 },
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          width: '100%',
+          backgroundColor: 'rgba(20, 20, 20, 0.9)',
+          backdropFilter: 'blur(5px)',
+          borderRadius: 3,
+        }}
+      >
+        <Typography
+          component="h1"
+          variant="h5"
+          sx={{
+            fontFamily: 'comfortaa',
+            fontWeight: 700,
+            color: '#00A99D',
+            textTransform: 'uppercase',
+            mb: 3,
+          }}
+        >
           Anmeldung
-        </h1>
+        </Typography>
         
-        <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block',
-              marginBottom: '8px',
-              fontWeight: 'bold',
-              color: '#333',
-              fontFamily: 'comfortaa'
-            }}>
-              Email:
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="E-Mail eingeben"
-              style={{ 
-                width: '100%', 
-                padding: '12px', 
-                border: '2px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontFamily: 'comfortaa',
-                transition: 'border-color 0.3s ease',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#00A99D'}
-              onBlur={(e) => e.target.style.borderColor = '#ddd'}
-            />
-          </div>
-          
-          <div style={{ marginBottom: '25px' }}>
-            <label style={{ 
-              display: 'block',
-              marginBottom: '8px',
-              fontWeight: 'bold',
-              color: '#333',
-              fontFamily: 'comfortaa'
-            }}>
-              Passwort:
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="Passwort eingeben"
-              style={{ 
-                width: '100%', 
-                padding: '12px', 
-                border: '2px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontFamily: 'comfortaa',
-                transition: 'border-color 0.3s ease',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#00A99D'}
-              onBlur={(e) => e.target.style.borderColor = '#ddd'}
-            />
-          </div>
-          
-          <button 
-            type="submit" 
-            style={{ 
-              width: '100%', 
-              padding: '14px', 
-              backgroundColor: '#00A99D', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '8px', 
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              fontFamily: 'comfortaa',
-              transition: 'background-color 0.3s ease',
-              boxShadow: '0 4px 12px rgba(0,169,157,0.3)'
+        <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1, width: '100%' }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="email"
+            label="E-Mail-Adresse"
+            name="email"
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            sx={{
+              '& label.Mui-focused': { color: '#00A99D' },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': { borderColor: 'grey.700' },
+                '&:hover fieldset': { borderColor: 'grey.500' },
+                '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+              },
+              input: {
+                color: 'grey.100',
+                '&:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 100px #141414 inset',
+                  WebkitTextFillColor: '#e0e0e0',
+                },
+              },
+              label: { color: 'grey.400' },
             }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#008A7B'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#00A99D'}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Passwort"
+            type="password"
+            id="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            sx={{
+              '& label.Mui-focused': { color: '#00A99D' },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': { borderColor: 'grey.700' },
+                '&:hover fieldset': { borderColor: 'grey.500' },
+                '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+              },
+              input: {
+                color: 'grey.100',
+                '&:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 100px #141414 inset',
+                  WebkitTextFillColor: '#e0e0e0',
+                },
+              },
+              label: { color: 'grey.400' },
+            }}
+          />
+          {error && (
+            <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
+              {error}
+            </Alert>
+          )}
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{
+              mt: 3,
+              mb: 2,
+              py: 1.5,
+              fontFamily: 'comfortaa',
+              fontWeight: 'bold',
+              backgroundColor: '#00A99D',
+              '&:hover': {
+                backgroundColor: '#00897B', // Etwas dunklerer Ton für den Hover-Effekt
+              },
+            }}
           >
             Anmelden
-          </button>
-        </form>
+          </Button>
+        </Box>
         
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px',
-          border: '1px solid #e9ecef'
-        }}>
-          <p style={{ 
-            margin: 0, 
-            color: '#666',
-            fontSize: '14px',
-            fontFamily: 'comfortaa'
-          }}>
+        <Box 
+          sx={{ 
+            textAlign: 'center', 
+            mt: 3,
+            p: 2,
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            borderRadius: 2,
+            width: '100%'
+          }}
+        >
+          <Typography variant="body2" sx={{ color: 'grey.400', fontFamily: 'comfortaa' }}>
             Bunteliga Freiburg<br />
-            <small>Vereinsmanagement System</small>
-          </p>
-        </div>
-      </div>
-    </div>
+            <Typography variant="caption" sx={{ color: 'grey.500' }}>
+              Vereinsmanagement System
+            </Typography>
+          </Typography>
+        </Box>
+      </Paper>
+    </Container>
   );
 };
 
