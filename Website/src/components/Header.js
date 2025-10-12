@@ -68,6 +68,12 @@ const adminPages = [
   { text: 'Teams', path: '/admin/teams', iconName: 'StyleIcon' },
 ];
 
+const teamboardPages = [
+  { text: 'Übersicht', path: '/dashboard', iconName: 'DashboardIcon' },
+  { text: 'Platz buchen', path: '/platzreservierung', iconName: 'EventIcon' },
+  { text: 'Ergebnis melden', path: '/ergebnis-melden', iconName: 'InsightsIcon' },
+];
+
 const iconMap = {
   HomeIcon: HomeIcon,
   TableViewIcon: TableViewIcon,
@@ -130,6 +136,8 @@ function Header() {
   const [isShrunk, setIsShrunk] = React.useState(false);
   const [adminMenuAnchorEl, setAdminMenuAnchorEl] = React.useState(null);
   const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = React.useState(false);
+  const [teamboardMenuAnchorEl, setTeamboardMenuAnchorEl] = React.useState(null);
+  const [mobileTeamboardMenuOpen, setMobileTeamboardMenuOpen] = React.useState(false);
 
   const { currentUser, isAdmin } = useAuth();
 
@@ -144,6 +152,10 @@ function Header() {
   const handleAdminMenuClose = () => setAdminMenuAnchorEl(null);
   const handleMobileAdminMenuToggle = () => setMobileAdminMenuOpen(!mobileAdminMenuOpen);
 
+  const handleTeamboardMenuOpen = (event) => setTeamboardMenuAnchorEl(event.currentTarget);
+  const handleTeamboardMenuClose = () => setTeamboardMenuAnchorEl(null);
+  const handleMobileTeamboardMenuToggle = () => setMobileTeamboardMenuOpen(!mobileTeamboardMenuOpen);
+
   React.useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
@@ -156,6 +168,8 @@ function Header() {
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
+  const isTeamboardActive = teamboardPages.some(page => location.pathname.startsWith(page.path));
+
   const drawerContent = (
     <Box
       sx={{
@@ -166,8 +180,8 @@ function Header() {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        overflowY: 'auto', // KORREKTUR: Macht den Drawer scrollbar
-        '&::-webkit-scrollbar': { display: 'none' }, // KORREKTUR: Versteckt Scrollbar
+        overflowY: 'auto',
+        '&::-webkit-scrollbar': { display: 'none' },
         msOverflowStyle: 'none',
         scrollbarWidth: 'none',
       }}
@@ -180,23 +194,37 @@ function Header() {
       <Divider sx={{ borderColor: theme.palette.grey[850] }} />
 
       <List>
-        {/* KORREKTUR: Teamboard Link oben für eingeloggte User */}
         {currentUser && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link} to="/dashboard" onClick={handleDrawerToggle}
-              sx={{
-                backgroundColor: location.pathname.startsWith('/dashboard') ? 'rgba(255, 191, 0, 0.2)' : 'transparent',
-                borderRadius: theme.shape.borderRadius, margin: theme.spacing(0.5, 1),
-              }}
-            >
-              <ListItemIcon sx={{ color: theme.palette.common.white, minWidth: 'auto', mr: 1.5 }}><DashboardIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Teamboard" primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.common.white, fontFamily: 'comfortaa' }} />
-            </ListItemButton>
-          </ListItem>
+          <>
+            <ListItem disablePadding>
+              <ListItemButton onClick={handleMobileTeamboardMenuToggle} sx={{ margin: theme.spacing(0.5, 1) }}>
+                <ListItemIcon sx={{ color: theme.palette.common.white, minWidth: 'auto', mr: 1.5 }}><DashboardIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primary="Teamboard" primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.common.white, fontFamily: 'comfortaa' }} />
+                {mobileTeamboardMenuOpen ? <ExpandLess sx={{ color: 'white' }} /> : <ExpandMore sx={{ color: 'white' }} />}
+              </ListItemButton>
+            </ListItem>
+            <Collapse in={mobileTeamboardMenuOpen} timeout="auto" unmountOnExit>
+              <List component="div" disablePadding>
+                {teamboardPages.map((page) => {
+                  const isActive = location.pathname === page.path;
+                  return (
+                    <ListItem key={page.text} disablePadding sx={{ pl: 4 }}>
+                      <ListItemButton component={Link} to={page.path} onClick={handleDrawerToggle}
+                        sx={{
+                          backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent',
+                          borderRadius: theme.shape.borderRadius, margin: theme.spacing(0.5, 1),
+                        }}
+                      >
+                        <ListItemText primary={page.text} primaryTypographyProps={{ fontFamily: 'comfortaa', fontSize: '0.9rem', color: isActive ? '#FFBF00' : 'inherit' }} />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Collapse>
+          </>
         )}
 
-        {/* KORREKTUR: Admin Menü direkt danach */}
         {isAdmin && (
           <>
             <ListItem disablePadding>
@@ -214,7 +242,7 @@ function Header() {
                     <ListItem key={page.text} disablePadding sx={{ pl: 4 }}>
                       <ListItemButton component={Link} to={page.path} onClick={handleDrawerToggle}
                         sx={{
-                          backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent', // KORREKTUR: Gelber Hintergrund
+                          backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent',
                           borderRadius: theme.shape.borderRadius, margin: theme.spacing(0.5, 1),
                         }}
                       >
@@ -228,7 +256,6 @@ function Header() {
           </>
         )}
 
-        {/* Allgemeine Seiten */}
         {pages.map((pageItem) => {
           const IconComponent = iconMap[pageItem.iconName] || iconMap.DefaultIcon;
           const isActive = location.pathname === pageItem.path;
@@ -236,7 +263,7 @@ function Header() {
             <ListItem key={pageItem.text} disablePadding>
               <ListItemButton component={Link} to={pageItem.path} onClick={handleDrawerToggle}
                 sx={{
-                  backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent', // KORREKTUR: Gelber Hintergrund
+                  backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent',
                   '&:hover': { backgroundColor: theme.palette.grey[800] },
                   borderRadius: theme.shape.borderRadius, margin: theme.spacing(0.5, 1),
                 }}
@@ -251,7 +278,6 @@ function Header() {
         })}
       </List>
 
-      {/* Login/Logout-Link am Ende des Drawers */}
       <Box sx={{ marginTop: 'auto' }}>
         <Divider sx={{ borderColor: theme.palette.grey[850], mt: 1, mb: 1 }} />
         <ListItem disablePadding>
@@ -281,7 +307,6 @@ function Header() {
     <AppBar position="sticky" sx={{ backgroundColor: appBarBackgroundColor, backdropFilter: appBarBlur, boxShadow: isShrunk ? theme.shadows[4] : theme.shadows[1], borderBottom: `1px solid ${theme.palette.grey[900]}` }}>
       <Container maxWidth="xl">
         <Toolbar disableGutters sx={{ position: 'relative', minHeight: { xs: isShrunk ? 48 : 70, md: isShrunk ? 50 : 90 }, transition: theme.transitions.create(['min-height'], { duration: theme.transitions.duration.short }), py: { xs: isShrunk ? 0.25 : 0.5, md: isShrunk ? 0.25 : 0.5 } }}>
-          {/* Desktop Logo & Title */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', flexGrow: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }} onClick={() => navigate('/')}>
               <img src={logo} alt="Bunte Liga Freiburg Logo" style={{ height: isShrunk ? `${shrunkLogoHeight}px` : `${initialLogoHeight}px`, width: 'auto', maxHeight: isShrunk ? shrunkLogoHeight : initialLogoHeight, objectFit: 'contain', transition: 'height 0.3s ease-in-out, max-height 0.3s ease-in-out' }} />
@@ -298,14 +323,12 @@ function Header() {
             </Box>
           </Box>
 
-          {/* Mobile Menu Icon */}
           <Box sx={{ display: { xs: 'flex', md: 'none' }, zIndex: 1301 }}>
             <IconButton size="large" aria-label="Menü öffnen" onClick={handleDrawerToggle} color="inherit">
               <MenuIcon sx={{ fontSize: isShrunk ? '1.6rem' : '1.85rem', transition: 'font-size 0.3s ease-in-out' }} />
             </IconButton>
           </Box>
 
-          {/* Mobile Logo & Title */}
           <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', pointerEvents: 'auto' }} onClick={() => navigate('/')}>
               <img src={logo} alt="Bunte Liga Freiburg Logo Mobile" style={{ height: `${isShrunk ? mobileShrunkLogoHeight : mobileInitialLogoHeight}px`, width: 'auto', maxHeight: isShrunk ? mobileShrunkLogoHeight : mobileInitialLogoHeight, objectFit: 'contain', transition: 'none' }} />
@@ -327,7 +350,6 @@ function Header() {
             {drawerContent}
           </Drawer>
 
-          {/* Desktop Navigation */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-end', alignItems: 'center', flexShrink: 0 }}>
             {pages.map((pageItem) => {
               const isActive = location.pathname === pageItem.path;
@@ -340,16 +362,23 @@ function Header() {
               );
             })}
 
-            {/* KORREKTUR: Teamboard als direkter Link */}
             {currentUser && (
-              <Button onClick={() => navigate('/dashboard')}
-                sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: location.pathname.startsWith('/dashboard') ? '#FFBF00' : 'rgba(255, 255, 255, 0.75)', display: 'block', fontFamily: 'comfortaa', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: location.pathname.startsWith('/dashboard') ? 'bold' : 400, borderBottom: location.pathname.startsWith('/dashboard') ? `3px solid #FFBF00` : '3px solid transparent', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: theme.palette.common.white, borderBottom: `3px solid rgba(255, 255, 255, 0.15)` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
-              >
-                Teamboard
-              </Button>
+              <>
+                <Button id="teamboard-menu-button" onClick={handleTeamboardMenuOpen}
+                  sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: isTeamboardActive ? '#FFBF00' : 'rgba(255, 255, 255, 0.75)', display: 'block', fontFamily: 'comfortaa', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: isTeamboardActive ? 'bold' : 400, borderBottom: isTeamboardActive ? `3px solid #FFBF00` : '3px solid transparent', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: theme.palette.common.white, borderBottom: `3px solid rgba(255, 255, 255, 0.15)` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
+                >
+                  Teamboard
+                </Button>
+                <Menu id="teamboard-menu" anchorEl={teamboardMenuAnchorEl} open={Boolean(teamboardMenuAnchorEl)} onClose={handleTeamboardMenuClose} MenuListProps={{ 'aria-labelledby': 'teamboard-menu-button' }} PaperProps={{ sx: { backgroundColor: '#333', color: 'white' } }}>
+                  {teamboardPages.map((page) => (
+                    <MenuItem key={page.text} onClick={() => { handleTeamboardMenuClose(); navigate(page.path); }} sx={{ fontFamily: 'comfortaa', '&:hover': { backgroundColor: 'rgba(255, 191, 0, 0.2)' } }}>
+                      {page.text}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </>
             )}
 
-            {/* KORREKTUR: Admin Dropdown mit gelber Hervorhebung */}
             {isAdmin && (
               <>
                 <Button id="admin-menu-button" aria-controls={Boolean(adminMenuAnchorEl) ? 'admin-menu' : undefined} aria-haspopup="true" aria-expanded={Boolean(adminMenuAnchorEl) ? 'true' : undefined} onClick={handleAdminMenuOpen}
@@ -367,7 +396,6 @@ function Header() {
               </>
             )}
 
-            {/* KORREKTUR: Login/Logout Buttons mit neuem Styling */}
             <Box sx={{ ml: 1 }}>
               {currentUser ? (
                 <Button onClick={handleLogout} variant="contained"

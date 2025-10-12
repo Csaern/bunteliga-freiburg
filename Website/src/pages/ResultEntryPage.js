@@ -25,14 +25,8 @@ const ResultEntryPage = () => {
       navigate('/login');
       return;
     }
-
-    if (isAdmin) {
-      navigate('/dashboard');
-      return;
-    }
-
     loadData();
-  }, [currentUser, navigate, isAdmin]);
+  }, [currentUser, navigate]);
 
   const loadData = async () => {
     try {

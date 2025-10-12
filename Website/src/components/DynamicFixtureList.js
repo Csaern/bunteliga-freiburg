@@ -107,21 +107,14 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           const gameDate = new Date(`${booking.date}T${booking.time}`);
           return gameDate >= today;
         })
-        .filter(booking => {
-          // Prüfe, ob für dieses Spiel bereits ein Ergebnis existiert
-          return !results.some(result => 
-            result.homeTeamId === booking.homeTeamId &&
-            result.awayTeamId === booking.awayTeamId &&
-            result.date === booking.date &&
-            result.time === booking.time
-          );
-        })
         .sort((a, b) => {
           // Sortiere nach Datum und Uhrzeit (älteste zuerst für zukünftige Spiele)
           const dateA = new Date(`${a.date}T${a.time}`);
           const dateB = new Date(`${b.date}T${b.time}`);
           return dateA - dateB;
         });
+
+        console.log('Bookings:', bookings);
 
       // Kombiniere Ergebnisse und Buchungen basierend auf showType
       let allFixtures = [];
@@ -168,7 +161,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     } finally {
       setLoading(false);
     }
-  }, [seasonId, showType]);
+  }, [seasonId, showType, userTeamId]);
 
   useEffect(() => {
     loadFixtures();

@@ -40,17 +40,18 @@ const HomePage = () => {
   return (
     <div className="homepage">
       <NewsCarousel />
-      <DynamicLeagueTable 
-        title="Aktuelle Tabelle" 
-        form={false} 
-        seasonId={currentSeason?.id}
-      />
-      <DynamicFixtureList 
+       <DynamicFixtureList 
         title="Neueste Ergebnisse" 
         details={false}
         seasonId={currentSeason?.id}
         showType="results"
       />
+      <DynamicLeagueTable 
+        title="Aktuelle Tabelle" 
+        form={false} 
+        seasonId={currentSeason?.id}
+      />
+     
       <DynamicFixtureList 
         title="Nächste Spiele"
         details={true}

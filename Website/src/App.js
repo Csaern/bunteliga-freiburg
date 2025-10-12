@@ -47,15 +47,12 @@ function App() {
         <Header />
         <main className="main-content">
           <Routes>
-            <Route path="*" element={<HomePage />} />
             <Route path="/ergebnisse" element={<ResultsPage />} />
             <Route path="/platzreservierung" element={<BookingOverview />} />
             <Route path="/login" element={<LoginPage />} />
             
             {/* --- NEUE ADMIN ROUTEN --- */}
-            {/* Diese Route fängt alles ab, was mit /admin/ beginnt */}
             <Route path="/admin/:tab" element={<AdminBoardWrapper />} />
-            {/* Dies ist ein Fallback, falls jemand nur /admin aufruft */}
             <Route path="/admin" element={<AdminBoardWrapper />} />
 
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -72,6 +69,9 @@ function App() {
             <Route path="/team/:teamId" element={<TeamDetailPage />} />
             <Route path="/ergebnis-bestaetigen" element={<ResultConfirmationPage />} />
             <Route path="/spiel-verwaltung" element={<GameManagementPage />} />
+
+            {/* Die Catch-all Route muss immer am Ende stehen */}
+            <Route path="*" element={<HomePage />} />
           </Routes>
         </main>
         <Footer />
