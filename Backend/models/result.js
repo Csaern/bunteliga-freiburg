@@ -48,9 +48,9 @@ class Result {
     /**
      * @type {string}
      * Der Lebenszyklus eines Ergebnisses:
-     * 'pending': Ein Team hat das Ergebnis gemeldet, wartet auf Bestätigung des Gegners.
-     * 'confirmed': Das gegnerische Team hat das Ergebnis bestätigt. Es zählt zur Tabelle.
-     * 'rejected': Das gegnerische Team hat das Ergebnis abgelehnt. Admin-Intervention nötig.
+     * 'pending': Ein Team hat gemeldet, wartet auf Bestätigung.
+     * 'confirmed': Gegner hat bestätigt. Zählt zur Tabelle.
+     * 'disputed': Gegner hat abgelehnt. Admin-Intervention nötig.
      */
     this.status = 'pending';
 
@@ -59,9 +59,11 @@ class Result {
     this.confirmedByUserId = null;
     this.confirmedAt = null;
 
+    // Felder für Ablehnung / Disput
     this.rejectedByTeamId = null;
     this.rejectedByUserId = null;
     this.rejectedAt = null;
+    this.rejectionReason = null; // NEU: Grund für die Ablehnung
   }
 
   /**
@@ -87,6 +89,7 @@ class Result {
       rejectedByTeamId: this.rejectedByTeamId,
       rejectedByUserId: this.rejectedByUserId,
       rejectedAt: this.rejectedAt,
+      rejectionReason: this.rejectionReason, // NEU
       // reportedAt, createdAt, updatedAt werden vom Service gesetzt.
     };
   }

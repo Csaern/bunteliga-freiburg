@@ -2,13 +2,6 @@ class Booking {
   /**
    * Erstellt eine neue Buchungs-Instanz.
    * @param {object} data - Die Daten für die neue Buchung.
-   * @param {string} data.date - Das Datum des Spiels.
-   * @param {string} data.time - Die Uhrzeit des Spiels.
-   * @param {string} data.pitchId - Die ID des Platzes.
-   * @param {string} data.seasonId - Die ID der Saison.
-   * @param {string} data.createdBy - Die UID des Erstellers.
-   * @param {string|null} [data.homeTeamId=null] - Die ID des Heimteams.
-   * @param {string|null} [data.awayTeamId=null] - Die ID des Auswärtsteams.
    */
   constructor({
     date,
@@ -24,43 +17,42 @@ class Booking {
       throw new Error('Datum, Zeit, Platz-ID, Saison-ID und Ersteller sind erforderlich.');
     }
 
-    // 2. Zuweisung der Eigenschaften
+    // 2. Zuweisung der Kerndaten
     this.date = date;
     this.time = time;
     this.pitchId = pitchId;
     this.seasonId = seasonId;
-    this.createdBy = createdBy; // UID des Users, der den Slot erstellt/gebucht hat
+    this.createdBy = createdBy;
     this.homeTeamId = homeTeamId;
     this.awayTeamId = awayTeamId;
 
     /**
      * @type {string}
      * Der Lebenszyklus einer Buchung:
-     * 'available': Freier Slot, von Admin erstellt.
+     * 'available': Freier Slot.
      * 'pending_away_confirm': Heimteam hat gebucht, wartet auf Gegner.
-     * 'confirmed': Auswärtsteam hat bestätigt, Spiel ist fix.
-     * 'denied': Auswärtsteam hat die Anfrage abgelehnt.
-     * 'cancelled': Ein Team hat ein bereits bestätigtes Spiel storniert.
+     * 'confirmed': Spiel ist fix.
+     * 'cancellation_pending': Ein Team hat eine Stornierung beantragt.
+     * 'denied': Auswärtsteam hat die ursprüngliche Anfrage abgelehnt.
+     * 'cancelled': Spiel wurde erfolgreich storniert.
      * 'played': Spiel wurde gespielt.
      */
     this.status = 'available';
-
-    // 3. Felder für den Ablehnungs-/Stornierungsprozess
-    
-    /** @type {string|null} */
-    this.deniedByTeamId = null; // Team-ID, das die Anfrage abgelehnt hat.
-
-    /** @type {Date|null} */
-    this.deniedAt = null; // Zeitstempel der Ablehnung.
-
-    /** @type {string|null} */
-    this.cancelledByTeamId = null; // Team-ID, das das bestätigte Spiel storniert hat.
-
-    /** @type {Date|null} */
-    this.cancelledAt = null; // Zeitstempel der Stornierung.
-
-    // Kompatibilitätsfeld für das Frontend
     this.isAvailable = !homeTeamId && !awayTeamId;
+
+    // 3. Felder für den Ablehnungs- & Stornierungsprozess
+    this.deniedByTeamId = null;
+    this.deniedAt = null;
+    this.denialReason = null;
+
+    this.cancelledByTeamId = null;
+    this.cancelledAt = null;
+
+    this.cancellationRequestedByTeamId = null;
+    this.cancellationRequestedAt = null;
+    this.cancellationRequestReason = null;
+
+    this.cancellationRejectionReason = null;
   }
 
   /**
@@ -78,11 +70,19 @@ class Booking {
       awayTeamId: this.awayTeamId,
       status: this.status,
       isAvailable: this.isAvailable,
+
       deniedByTeamId: this.deniedByTeamId,
       deniedAt: this.deniedAt,
+      denialReason: this.denialReason,
+
       cancelledByTeamId: this.cancelledByTeamId,
       cancelledAt: this.cancelledAt,
-      // createdAt, updatedAt etc. werden vom Service gesetzt.
+
+      cancellationRequestedByTeamId: this.cancellationRequestedByTeamId,
+      cancellationRequestedAt: this.cancellationRequestedAt,
+      cancellationRequestReason: this.cancellationRequestReason,
+
+      cancellationRejectionReason: this.cancellationRejectionReason,
     };
   }
 }

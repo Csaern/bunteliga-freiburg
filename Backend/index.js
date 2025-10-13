@@ -18,8 +18,9 @@ const { checkAuth, checkCaptain, checkAdmin } = require('./middleware/authMiddle
 // --- Routen importieren ---
 const seasonRoutes = require('./routes/seasonRoutes'); // Die neue Routen-Datei importieren
 const teamRoutes = require('./routes/teamRoutes'); // NEU
-// const pitchRoutes = require('./routes/pitchRoutes'); // <-- DIESE ZEILE AUSKOMMENTIEREN
+const pitchRoutes = require('./routes/pitchRoutes'); // <-- DIESE ZEILE AUSKOMMENTIEREN
 const bookingRoutes = require('./routes/bookingRoutes'); // NEU
+const resultRoutes = require('./routes/resultRoutes'); // NEU
 const userService = require('./services/userService'); // Falls du User-Routen hier hast
 
 const db = getFirestore();
@@ -47,8 +48,9 @@ app.get('/', (req, res) => {
 // Alle Anfragen an '/api/seasons' werden an unseren neuen, sicheren Router weitergeleitet.
 app.use('/api/seasons', seasonRoutes);
 app.use('/api/teams', teamRoutes);
-// app.use('/api/pitches', pitchRoutes); // <-- DIESE ZEILE AUCH AUSKOMMENTIEREN
+app.use('/api/pitches', pitchRoutes);
 app.use('/api/bookings', bookingRoutes); // NEU
+app.use('/api/results', resultRoutes); // NEU
 
 
 // 5. Den Server starten

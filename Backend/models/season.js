@@ -9,8 +9,19 @@ class Season {
    * @param {Array<{id: string, name: string}>} [data.teams=[]] - Optional: Eine Liste der teilnehmenden Teams.
    * @param {string} [data.status='planning'] - Optional: Der Status der Saison (z.B. 'planning', 'active', 'finished').
    * @param {number} [data.maxDenials=3] - Optional: Maximale Anzahl an Ablehnungen.
+   * @param {number} [data.cancellationDeadlineDays=3] - Optional: Tage vor dem Spiel für eine fristgerechte Stornierung.
+   * @param {number} [data.forfeitWinScore=3] - Optional: Tore für das gewinnende Team.
+   * @param {number} [data.forfeitLossScore=0] - Optional: Tore für das verlierende Team.
+   * @param {string} [data.playMode='double_round_robin'] - Optional: Der Spielmodus (z.B. 'double_round_robin').
+   * @param {number} [data.minGamesPlayed=0] - Optional: Minimale Anzahl an gespielten Spielen.
+   * @param {number} [data.pointsForWin=3] - Optional: Punkte für einen Sieg.
+   * @param {number} [data.pointsForDraw=1] - Optional: Punkte für ein Unentschieden.
+   * @param {number} [data.pointsForLoss=0] - Optional: Punkte für eine Niederlage.
+   * @param {Array<string>} [data.rankingCriteria=['points', 'goalDifference', 'goalsScored', 'headToHead']] - Optional: Kriterien zur Tabellen-Sortierung.
+   * @param {string} [data.tieBreakingMode='playoff_game'] - Optional: Modus zur Entscheidung bei Punktgleichheit.
+   * @param {Array<number>} [data.tieBreakerForPositions=[1]] - Optional: Positionen, für die ein Tie-Breaker gespielt wird.
    */
-  constructor({ name, startDate, endDate, teams = [], status = 'planning', createdBy, maxDenials = 3 }) {
+  constructor({ name, startDate, endDate, teams = [], status = 'planning', createdBy, maxDenials = 3, cancellationDeadlineDays = 3, forfeitWinScore = 3, forfeitLossScore = 0, playMode = 'double_round_robin', minGamesPlayed = 0, pointsForWin = 3, pointsForDraw = 1, pointsForLoss = 0, rankingCriteria = ['points', 'goalDifference', 'goalsScored', 'headToHead'], tieBreakingMode = 'playoff_game', tieBreakerForPositions = [1] }) {
     // 1. Validierung
     if (!name || !startDate || !endDate || !createdBy) {
       throw new Error('Name, Start-/Enddatum und Ersteller sind erforderlich.');
@@ -30,6 +41,17 @@ class Season {
     this.status = status;
     this.createdBy = createdBy;
     this.maxDenials = maxDenials;
+    this.cancellationDeadlineDays = cancellationDeadlineDays; 
+    this.forfeitWinScore = forfeitWinScore; // NEU
+    this.forfeitLossScore = forfeitLossScore; // NEU
+    this.playMode = playMode;
+    this.minGamesPlayed = minGamesPlayed;
+    this.pointsForWin = pointsForWin;
+    this.pointsForDraw = pointsForDraw;
+    this.pointsForLoss = pointsForLoss;
+    this.rankingCriteria = rankingCriteria;
+    this.tieBreakingMode = tieBreakingMode;
+    this.tieBreakerForPositions = tieBreakerForPositions;
 
     /**
      * @type {Array<{id: string, name: string, status: 'active' | 'inactive'}>}
@@ -68,6 +90,18 @@ class Season {
       status: this.status,
       createdBy: this.createdBy,
       maxDenials: this.maxDenials,
+      cancellationDeadlineDays: this.cancellationDeadlineDays, 
+      forfeitWinScore: this.forfeitWinScore, // NEU
+      forfeitLossScore: this.forfeitLossScore, // NEU
+      playMode: this.playMode,
+      minGamesPlayed: this.minGamesPlayed,
+      pointsForWin: this.pointsForWin,
+      pointsForDraw: this.pointsForDraw,
+      pointsForLoss: this.pointsForLoss,
+      rankingCriteria: this.rankingCriteria,
+      tieBreakingMode: this.tieBreakingMode,
+      tieBreakerForPositions: this.tieBreakerForPositions,
+
       isFinished: this.isFinished,
       finishedAt: this.finishedAt,
       finishedBy: this.finishedBy,

@@ -1,0 +1,97 @@
+const express = require('express');
+const router = express.Router();
+const resultService = require('../services/resultService');
+const { checkAuth, checkAdmin } = require('../middleware/authMiddleware');
+const { checkCaptainOfActingTeam } = require('../middleware/permissionMiddleware');
+
+// --- ADMIN ROUTEN ---
+
+// Ein Team meldet ein Ergebnis für ein Spiel
+// POST /api/results/report/:bookingId
+router.post('/report/:bookingId', checkAuth, async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        const resultData = {
+            ...req.body,
+            reportedByUserId: req.user.uid,
+        };
+        const result = await resultService.reportResult(bookingId, resultData);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Ein Team reagiert auf ein gemeldetes Ergebnis
+// POST /api/results/:resultId/action
+router.post('/:resultId/action', checkAuth, async (req, res) => {
+    try {
+        const { resultId } = req.params;
+        const { actingTeamId, action, reason } = req.body;
+        const result = await resultService.handleResultAction(resultId, actingTeamId, req.user.uid, action, reason);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Alle strittigen Ergebnisse abrufen
+router.get('/disputed', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const results = await resultService.getDisputedResults();
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// NEU: Alle Ergebnisse einer Saison abrufen (für das Adminboard)
+// GET /api/results/season/:seasonId
+router.get('/season/:seasonId', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { seasonId } = req.params;
+        const results = await resultService.getResultsForSeason(seasonId);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Ein Ergebnis durch einen Admin final entscheiden
+router.post('/:id/admin-override', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { homeScore, awayScore } = req.body;
+        const result = await resultService.adminOverrideResult(id, { homeScore, awayScore }, req.user.uid);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// --- TEAM ROUTEN ---
+
+// Alle Ergebnisse des eigenen Teams abrufen (für das Teamboard)
+router.get('/team/:teamId', checkAuth, async (req, res) => {
+    try {
+        const { teamId } = req.params;
+        const results = await resultService.getResultsForTeam(teamId);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// NEU: Ein Ergebnis korrigieren/aktualisieren
+// PUT /api/results/:resultId
+router.put('/:resultId', checkAuth, async (req, res) => {
+    try {
+        const { resultId } = req.params;
+        const updatedResult = await resultService.updateResult(resultId, req.body, req.user);
+        res.status(200).json(updatedResult);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+module.exports = router;

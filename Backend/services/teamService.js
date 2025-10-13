@@ -3,7 +3,24 @@ const Team = require('../models/team');
 const db = admin.firestore();
 const teamsCollection = db.collection('teams');
 const seasonsCollection = db.collection('seasons');
-const resultsCollection = db.collection('results'); // Referenz zur Results-Collection hinzufügen
+const resultsCollection = db.collection('results');
+
+async function getTeamById(teamId) {
+  const doc = await teamsCollection.doc(teamId).get();
+  if (!doc.exists) {
+    throw new Error('Team nicht gefunden.');
+  }
+  return { id: doc.id, ...doc.data() };
+}
+
+/**
+ * Ruft alle Teams aus der Datenbank ab, sortiert nach Namen.
+ */
+async function getAllTeams() {
+  const snapshot = await teamsCollection.orderBy('name').get();
+  if (snapshot.empty) return [];
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
 
 async function createTeam(teamData) {
   const newTeam = new Team(teamData);
@@ -101,4 +118,6 @@ module.exports = {
   updateTeamAndPropagateNameChange,
   deleteTeam,
   updateTeamLogo,
+  getTeamById, // Sicherstellen, dass die Funktion exportiert wird
+  getAllTeams, // NEU
 };

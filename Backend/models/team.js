@@ -53,7 +53,7 @@ class Team {
 
     // 4. Strukturelle Eigenschaften hinzufügen
     // Der Ersteller wird automatisch zum ersten Kapitän des Teams.
-    this.captains = [createdBy]; 
+    this.captainIds = [createdBy]; 
   }
 
   /**
@@ -74,7 +74,7 @@ class Team {
       logoUrl: this.logoUrl,
       logoColor: this.logoColor,
       socialMedia: this.socialMedia,
-      captains: this.captains,
+      captainIds: this.captainIds,
       // Felder wie createdAt und updatedAt werden vom Service mit serverTimestamp() hinzugefügt.
     };
   }

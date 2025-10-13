@@ -1,6 +1,7 @@
 const admin = require('firebase-admin');
 const User = require('../models/user'); // Das neue Model importieren
 const db = admin.firestore();
+const teamsCollection = db.collection('teams');
 
 /**
  * Erstellt einen neuen Benutzer in Firebase Auth und einen passenden Eintrag in der Firestore 'users' Collection.
@@ -77,8 +78,81 @@ async function deleteUser(uid) {
   ]);
 }
 
+async function addCaptainToTeam(userId, teamId) {
+  const teamRef = teamsCollection.doc(teamId);
+  const user = await admin.auth().getUser(userId);
+
+  // 1. Füge die User-ID zum 'captainIds'-Array im Team-Dokument hinzu
+  await teamRef.update({
+    captainIds: admin.firestore.FieldValue.arrayUnion(userId)
+  });
+
+  // 2. Setze den Custom Claim für den Benutzer, damit er Berechtigungen erhält
+  await admin.auth().setCustomUserClaims(userId, { ...user.customClaims, teamId: teamId });
+
+  return { message: `Benutzer ${user.email} wurde erfolgreich zum Kapitän von Team ${teamId} ernannt.` };
+}
+
+async function removeCaptainFromTeam(userId, teamId) {
+  const teamRef = teamsCollection.doc(teamId);
+  const user = await admin.auth().getUser(userId);
+
+  // 1. Entferne die User-ID aus dem 'captainIds'-Array
+  await teamRef.update({
+    captainIds: admin.firestore.FieldValue.arrayRemove(userId)
+  });
+
+  // 2. Entferne den Custom Claim, um die Berechtigungen zu entziehen
+  const { teamId: _, ...remainingClaims } = user.customClaims;
+  await admin.auth().setCustomUserClaims(userId, remainingClaims);
+
+  return { message: `Benutzer ${user.email} ist nicht länger Kapitän von Team ${teamId}.` };
+}
+
+/**
+ * Ruft eine Liste aller Benutzer aus Firebase Auth ab.
+ */
+async function getAllUsers() {
+    const userRecords = await admin.auth().listUsers(1000); // Holt bis zu 1000 Benutzer
+    return userRecords.users.map(user => ({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        disabled: user.disabled,
+        customClaims: user.customClaims || {}, // Stellt sicher, dass Claims immer ein Objekt sind
+    }));
+}
+
+/**
+ * Aktualisiert die Rolle eines Benutzers durch Setzen von Custom Claims.
+ * @param {string} uid - Die UID des Benutzers.
+ * @param {object} roles - Ein Objekt mit den Rollen, z.B. { admin: true }
+ */
+async function updateUserRole(uid, roles) {
+    const user = await admin.auth().getUser(uid);
+    // Setze die neuen Claims, behalte aber bestehende bei (falls es andere gibt)
+    await admin.auth().setCustomUserClaims(uid, { ...user.customClaims, ...roles });
+    return { message: `Rollen für Benutzer ${user.email} erfolgreich aktualisiert.` };
+}
+
+/**
+ * Deaktiviert oder reaktiviert einen Benutzer in Firebase Auth.
+ * @param {string} uid - Die UID des Benutzers.
+ * @param {boolean} disabled - true zum Deaktivieren, false zum Reaktivieren.
+ */
+async function setUserDisabledStatus(uid, disabled) {
+    await admin.auth().updateUser(uid, { disabled });
+    const status = disabled ? 'deaktiviert' : 'reaktiviert';
+    return { message: `Benutzer wurde erfolgreich ${status}.` };
+}
+
 module.exports = {
   createUser,
   updateUser,
   deleteUser,
+  addCaptainToTeam,
+  removeCaptainFromTeam,
+  getAllUsers,
+  updateUserRole,
+  setUserDisabledStatus, // NEU
 };
