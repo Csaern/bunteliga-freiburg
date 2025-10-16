@@ -53,6 +53,20 @@ router.post('/bulk-create', checkAuth, checkAdmin, async (req, res) => {
 
 // --- TEAM/KAPITÄN ROUTEN ---
 
+// NEU: Alle ausstehenden Spielanfragen für mein Team abrufen
+// GET /api/bookings/team/pending
+router.get('/team/pending', checkAuth, async (req, res) => {
+    try {
+        const teamId = req.user.teamId;
+        if (!teamId) return res.status(200).json([]);
+        
+        const pendingBookings = await bookingService.getBookingsByStatusForTeam(teamId, 'pending_away_confirm');
+        res.status(200).json(pendingBookings);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // Eine individuelle Buchung erstellen
 router.post('/custom', checkAuth, async (req, res) => {
     try {

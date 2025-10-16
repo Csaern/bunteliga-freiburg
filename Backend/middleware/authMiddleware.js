@@ -1,63 +1,55 @@
 const admin = require('firebase-admin');
-const { getFirestore } = require('firebase-admin/firestore');
+const db = admin.firestore();
 
-// Holt die bereits in index.js initialisierte Firestore-Instanz
-const db = getFirestore();
-
+/**
+ * Überprüft den Firebase ID Token und hängt ein vollständiges Benutzerobjekt an den Request an.
+ * Das Benutzerobjekt ist eine Mischung aus den Auth-Claims und dem Firestore-Dokument.
+ */
 const checkAuth = async (req, res, next) => {
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-    const idToken = req.headers.authorization.split('Bearer ')[1];
-    try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
-      req.user = decodedToken;
-      next();
-    } catch (error) {
-      console.error('Fehler bei der Token-Verifizierung:', error);
-      res.status(403).send('Unauthorized: Invalid Token');
-    }
-  } else {
-    res.status(401).send('Unauthorized: No Token Provided');
+  if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Unauthorized: No token provided.' });
   }
-};
 
-const checkCaptain = async (req, res, next) => {
-  const uid = req.user.uid;
-  const teamId = req.params.teamId || req.body.teamId;
-
-  if (!teamId) {
-    return res.status(400).send('Bad Request: Team ID is missing.');
-  }
+  const idToken = req.headers.authorization.split('Bearer ')[1];
 
   try {
-    const teamDoc = await db.collection('teams').doc(teamId).get();
-    if (!teamDoc.exists) {
-      return res.status(404).send('Not Found: Team not found.');
+    // 1. Verifiziere den Token von Firebase Auth
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+
+    // 2. Hole das zugehörige Benutzerdokument aus Firestore
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+
+    let userProfile = {};
+    if (userDoc.exists) {
+      userProfile = userDoc.data();
     }
 
-    const teamData = teamDoc.data();
-    if (teamData.captains && teamData.captains.includes(uid)) {
-      next();
-    } else {
-      res.status(403).send('Forbidden: You are not a captain of this team.');
-    }
+    // 3. Kombiniere beides. Die Auth-Daten (besonders die Claims) sind die Wahrheit!
+    // Sie überschreiben alles, was eventuell in Firestore steht.
+    req.user = {
+      ...userProfile,   // Daten aus der DB (teamId, role, etc.)
+      ...decodedToken,  // Daten aus dem Token (uid, email, und der wichtige 'admin'-Claim)
+    };
+
+    // Zum Debuggen, um das finale Objekt zu sehen
+    console.log('Final user object attached to request:', req.user);
+
+    return next();
   } catch (error) {
-    console.error('Error in checkCaptain middleware:', error);
-    res.status(500).send('Internal Server Error');
+    console.error('Error verifying auth token:', error);
+    return res.status(403).json({ message: 'Unauthorized: Invalid token.' });
   }
 };
 
+/**
+ * Überprüft, ob der authentifizierte Benutzer Admin-Rechte hat.
+ * Muss immer NACH checkAuth aufgerufen werden.
+ */
 const checkAdmin = (req, res, next) => {
-  // Prüft, ob der Benutzer durch checkAuth verifiziert wurde UND den admin-Claim hat.
   if (req.user && req.user.admin === true) {
-    next(); // Ja, ist ein Admin, weiter zur Route.
-  } else {
-    res.status(403).send('Forbidden: Requires admin privileges.');
+    return next();
   }
+  res.status(403).json({ message: 'Forbidden: Requires admin privileges.' });
 };
 
-// Die Funktionen exportieren, damit sie in anderen Dateien verwendet werden können
-module.exports = {
-  checkAuth,
-  checkCaptain,
-  checkAdmin, // checkAdmin hier hinzufügen
-};
+module.exports = { checkAuth, checkAdmin };

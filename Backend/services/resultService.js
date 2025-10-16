@@ -232,6 +232,28 @@ async function adminOverrideResult(resultId, scores, adminUid) {
   return { message: 'Ergebnis wurde durch Admin final festgelegt.' };
 }
 
+/**
+ * Ruft Ergebnisse für ein bestimmtes Team mit einem bestimmten Status ab.
+ */
+async function getResultsByStatusForTeam(teamId, status) {
+  // Ein Team muss auf ein Ergebnis reagieren, wenn es nicht der Melder war.
+  const snapshot = await resultsCollection
+    .where('status', '==', status)
+    // Firestore kann leider nicht auf "ungleich" filtern.
+    // Wir holen alle 'pending' und filtern im Code.
+    .get();
+
+  if (snapshot.empty) return [];
+  
+  const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  // Filtere serverseitig, um nur die Ergebnisse zu liefern, bei denen das Team reagieren muss.
+  return results.filter(result => 
+    (result.homeTeamId === teamId && result.reportedBy !== result.homeTeamId) ||
+    (result.awayTeamId === teamId && result.reportedBy !== result.awayTeamId)
+  );
+}
+
 module.exports = {
   createForfeitResult,
   reportResult,
@@ -242,4 +264,5 @@ module.exports = {
   getResultsForSeason, // NEU
   updateResult, // NEU
   adminOverrideResult, // NEU
+  getResultsByStatusForTeam, // NEU
 };

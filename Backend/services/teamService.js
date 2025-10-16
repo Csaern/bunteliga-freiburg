@@ -1,5 +1,4 @@
 const admin = require('firebase-admin');
-const Team = require('../models/team');
 const db = admin.firestore();
 const teamsCollection = db.collection('teams');
 const seasonsCollection = db.collection('seasons');

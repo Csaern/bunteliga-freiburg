@@ -71,6 +71,20 @@ router.post('/:id/admin-override', checkAuth, checkAdmin, async (req, res) => {
 
 // --- TEAM ROUTEN ---
 
+// NEU: Alle ausstehenden Ergebnisbestätigungen für mein Team abrufen
+// GET /api/results/team/pending
+router.get('/team/pending', checkAuth, async (req, res) => {
+    try {
+        const teamId = req.user.teamId;
+        if (!teamId) return res.status(200).json([]);
+
+        const pendingResults = await resultService.getResultsByStatusForTeam(teamId, 'pending');
+        res.status(200).json(pendingResults);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // Alle Ergebnisse des eigenen Teams abrufen (für das Teamboard)
 router.get('/team/:teamId', checkAuth, async (req, res) => {
     try {

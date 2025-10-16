@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 const Booking = require('../models/booking');
 const db = admin.firestore();
 const bookingsCollection = db.collection('bookings');
-const seasonsCollection = db.collection('seasons');
+const seasonsCollection = db.collection('seasons'); // Fügen Sie dies am Anfang hinzu
 const pitchesCollection = db.collection('pitches');
 const teamsCollection = db.collection('teams'); // Stellen Sie sicher, dass diese Zeile vorhanden ist
 const resultService = require('./resultService');
@@ -387,6 +387,13 @@ async function createCustomBooking(bookingData, user) {
     }
   }
 
+  // NEUE SICHERHEITSPRÜFUNG
+  const seasonDoc = await seasonsCollection.doc(seasonId).get();
+  if (!seasonDoc.exists || seasonDoc.data().status !== 'active') {
+      throw new Error('Buchungen sind in dieser Saison nicht (mehr) möglich.');
+  }
+  // ENDE SICHERHEITSPRÜFUNG
+
   // 3. Erstelle das neue Booking-Objekt mit dem korrekten initialen Status
   const newBookingData = {
     ...bookingData,
@@ -416,6 +423,20 @@ async function adminCancelBooking(bookingId, reason, adminUid) {
   return { message: 'Spiel wurde durch Admin erfolgreich storniert.' };
 }
 
+/**
+ * Ruft Buchungen für ein bestimmtes Team mit einem bestimmten Status ab.
+ */
+async function getBookingsByStatusForTeam(teamId, status) {
+  const snapshot = await bookingsCollection
+    .where('awayTeamId', '==', teamId) // Wichtig: Man reagiert auf Anfragen als Auswärtsteam
+    .where('status', '==', status)
+    .orderBy('date', 'asc')
+    .get();
+  
+  if (snapshot.empty) return [];
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
 module.exports = {
   bulkCreateAvailableSlots,
   requestBookingSlot,
@@ -426,4 +447,5 @@ module.exports = {
   getBookingsForSeason,
   createCustomBooking, // NEU
   adminCancelBooking, // NEU
+  getBookingsByStatusForTeam, // NEU
 };

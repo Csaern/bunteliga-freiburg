@@ -27,14 +27,14 @@ const db = getFirestore();
 
 // 2. Eine Express-Anwendung erstellen
 const app = express();
+app.use(cors({
+  origin: 'http://localhost:3000' 
+}));
+
+app.use(express.json());
 
 // 3. Den Port definieren
 const port = 3001;
-
-// --- Middleware hinzufügen ---
-app.use(cors());
-app.use(express.json());
-// ---------------------------
 
 
 // --- Routen-Definitionen ---

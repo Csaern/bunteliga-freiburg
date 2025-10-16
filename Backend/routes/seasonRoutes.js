@@ -74,6 +74,17 @@ router.get('/:id', checkAuth, async (req, res) => {
     }
 });
 
+// NEU: Route zum Aktualisieren einer Saison
+router.put('/:id', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await seasonService.updateSeason(id, req.body);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
 // Route für die LIVE-Tabelle (ohne finale Regeln)
 // GET /api/seasons/:id/table
 router.get('/:id/table', checkAuth, async (req, res) => {
@@ -98,12 +109,34 @@ router.get('/:id/provisional-table', checkAuth, async (req, res) => {
     }
 });
 
-// NEU: Route zum finalen Beenden einer Saison (nur Admins)
-// POST /api/seasons/:id/finish
-router.post('/:id/finish', checkAuth, checkAdmin, async (req, res) => {
+// NEU: Eine Saison beenden
+router.put('/:id/finish', checkAuth, checkAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await seasonService.finishSeason(id, req.user.uid);
+        const adminUid = req.user.uid; // UID aus dem Token holen
+        const result = await seasonService.finishSeason(id, adminUid);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// NEU: Eine Saison als die aktuell aktive festlegen
+router.post('/:id/set-current', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await seasonService.setCurrentSeason(id);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(500).json({ message: 'Fehler beim Festlegen der aktiven Saison.', error: error.message });
+    }
+});
+
+// NEU: Eine Saison archivieren
+router.put('/:id/archive', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await seasonService.archiveSeason(id);
         res.status(200).json(result);
     } catch (error) {
         res.status(400).json({ message: error.message });

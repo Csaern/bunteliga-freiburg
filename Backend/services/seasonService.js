@@ -8,12 +8,30 @@ const teamsCollection = db.collection('teams'); // Referenz zur Teams-Collection
 const tableService = require('./tableService');
 
 /**
- * Ruft ALLE Saisons aus der Datenbank ab, sortiert nach Erstellungsdatum.
+ * Ruft ALLE Saisons aus der Datenbank ab und formatiert die Daten für die API-Antwort.
  */
 async function getAllSeasons() {
-  const snapshot = await seasonsCollection.orderBy('createdAt', 'desc').get();
+  const snapshot = await seasonsCollection.orderBy('name', 'desc').get();
   if (snapshot.empty) return [];
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  // HIER IST DIE KORREKTUR:
+  // Wir mappen über die Dokumente und konvertieren Timestamps manuell.
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+
+    // Wandle Firestore Timestamps explizit in ISO Strings um.
+    // Das ist das Standardformat, das JSON versteht und das Frontend verarbeiten kann.
+    const formattedData = {
+      ...data,
+      startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate().toISOString() : null,
+      endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate().toISOString() : null,
+      // Wir formatieren auch andere Timestamps, um konsistent zu sein
+      createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate().toISOString() : null,
+      updatedAt: data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate().toISOString() : null,
+    };
+
+    return { id: doc.id, ...formattedData };
+  });
 }
 
 /**
@@ -46,6 +64,14 @@ async function createSeason(seasonData) {
     if (missingTeams.length > 0) {
       throw new Error(`Folgende Teams wurden nicht in der Datenbank gefunden: ${missingTeams.join(', ')}`);
     }
+  }
+
+  // KORREKTUR: Datums-Strings in Timestamps umwandeln, um 400 Bad Request zu vermeiden
+  if (seasonData.startDate && typeof seasonData.startDate === 'string') {
+    seasonData.startDate = admin.firestore.Timestamp.fromDate(new Date(seasonData.startDate));
+  }
+  if (seasonData.endDate && typeof seasonData.endDate === 'string') {
+    seasonData.endDate = admin.firestore.Timestamp.fromDate(new Date(seasonData.endDate));
   }
 
   const newSeason = new Season(seasonData);
@@ -165,12 +191,68 @@ async function updateSeason(seasonId, updateData) {
     delete allowedUpdates.id;
     delete allowedUpdates.createdBy;
     
+    // HIER IST DIE KORREKTUR:
+    // Wir stellen sicher, dass Datums-Strings immer als Timestamps gespeichert werden.
+    if (allowedUpdates.startDate && typeof allowedUpdates.startDate === 'string') {
+        allowedUpdates.startDate = admin.firestore.Timestamp.fromDate(new Date(allowedUpdates.startDate));
+    }
+    if (allowedUpdates.endDate && typeof allowedUpdates.endDate === 'string') {
+        allowedUpdates.endDate = admin.firestore.Timestamp.fromDate(new Date(allowedUpdates.endDate));
+    }
+    
     allowedUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await seasonRef.update(allowedUpdates);
     return { message: 'Saison erfolgreich aktualisiert.' };
 }
 
-// Exportiere nur die benötigten Funktionen. 'addTeamToSeason' wurde entfernt.
+/**
+ * Setzt eine bestimmte Saison als die aktuell aktive.
+ * Stellt sicher, dass nur eine Saison gleichzeitig aktiv sein kann.
+ * @param {string} seasonId Die ID der Saison, die aktiv werden soll.
+ */
+async function setCurrentSeason(seasonId) {
+    const batch = db.batch();
+
+    // 1. Finde die aktuell aktive Saison (falls vorhanden) und deaktiviere sie
+    const currentActiveSnapshot = await seasonsCollection.where('isCurrent', '==', true).get();
+    currentActiveSnapshot.forEach(doc => {
+        const docRef = seasonsCollection.doc(doc.id);
+        batch.update(docRef, { isCurrent: false });
+    });
+
+    // 2. Setze die neue Saison als aktiv
+    const newActiveRef = seasonsCollection.doc(seasonId);
+    batch.update(newActiveRef, { isCurrent: true, status: 'active' }); // Setzt auch den Status auf 'active'
+
+    await batch.commit();
+    return { message: `Saison ${seasonId} wurde als aktiv gesetzt.` };
+}
+
+/**
+ * Archiviert eine Saison. Kann nur auf beendete Saisons angewendet werden.
+ * @param {string} seasonId Die ID der zu archivierenden Saison.
+ */
+async function archiveSeason(seasonId) {
+    const seasonRef = seasonsCollection.doc(seasonId);
+    const doc = await seasonRef.get();
+
+    if (!doc.exists) {
+        throw new Error('Saison nicht gefunden.');
+    }
+
+    if (doc.data().status !== 'finished') {
+        throw new Error('Nur beendete Saisons können archiviert werden.');
+    }
+
+    await seasonRef.update({
+        status: 'archived',
+        isCurrent: false, // Sicherheitsmaßnahme
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { message: `Saison ${seasonId} wurde erfolgreich archiviert.` };
+}
+
 module.exports = {
   createSeason,
   updateSeason,
@@ -179,4 +261,6 @@ module.exports = {
   getTeamsBySeason,
   getAllSeasons, // NEU
   getSeasonById, // NEU
+  setCurrentSeason, // NEU
+  archiveSeason, // NEU
 };
