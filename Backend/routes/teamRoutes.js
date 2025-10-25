@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const teamService = require('../services/teamService');
-const seasonService = require('../services/seasonService'); // NEU
-const userService = require('../services/userService'); // userService importieren
+const userService = require('../services/userService');
 const { checkAuth, checkAdmin } = require('../middleware/authMiddleware');
-const { upload, uploadToFirebase } = require('../middleware/uploadMiddleware');
+const { upload } = require('../middleware/uploadMiddleware');
+const sharp = require('sharp'); // NEU: Bildverarbeitung importieren
+const path = require('path');   // NEU: Für die Pfad-Verarbeitung
+const fs = require('fs');       // NEU: Für das Dateisystem
 
 // NEU: Alle Teams abrufen (ÖFFENTLICH)
 // GET /api/teams
@@ -17,15 +19,42 @@ router.get('/', async (req, res) => {
     }
 });
 
+// NEU: Ruft automatisch die Teams der AKTIVEN Saison ab.
+// GET /api/teams/active-season
+router.get('/active-season', async (req, res) => {
+    try {
+        const teams = await teamService.getTeamsForActiveSeason();
+        res.status(200).json(teams);
+    } catch (error) {
+        // Wenn keine aktive Saison gefunden wird, ist das ein valider Fehler
+        res.status(error.message === 'Keine aktive Saison gefunden.' ? 404 : 500).json({ message: error.message });
+    }
+});
+
 // NEU: Alle Teams einer bestimmten Saison abrufen (ÖFFENTLICH)
 // GET /api/teams/season/:seasonId
 router.get('/season/:seasonId', async (req, res) => {
     try {
         const { seasonId } = req.params;
-        const teams = await seasonService.getTeamsBySeason(seasonId);
+        // KORREKTUR: Ruft jetzt die korrekte Funktion aus dem teamService auf.
+        // Dies behebt den "seasonService is not defined" Fehler endgültig.
+        const teams = await teamService.getTeamsForSeason(seasonId);
         res.status(200).json(teams);
     } catch (error) {
+        console.error('Fehler in GET /api/teams/season/:seasonId:', error);
         res.status(error.message === 'Saison nicht gefunden.' ? 404 : 500).json({ message: error.message });
+    }
+});
+
+// NEU: Ruft die potenziellen Gegner für ein bestimmtes Team ab.
+// GET /api/teams/:teamId/potential-opponents
+router.get('/:teamId/potential-opponents', async (req, res) => {
+    try {
+        const { teamId } = req.params;
+        const opponents = await teamService.getPotentialOpponents(teamId);
+        res.status(200).json(opponents);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 });
 
@@ -57,39 +86,17 @@ router.post('/', checkAuth, async (req, res) => {
     }
 });
 
-// Route zum Aktualisieren von Team-Details (Admin oder Kapitän)
+// Ein Team aktualisieren (Admin oder Kapitän)
 // PUT /api/teams/:teamId
-router.put('/:id', checkAuth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const user = req.user;
-        const updateData = req.body;
-
-        // Fall 1: Der Benutzer ist ein Admin
-        // Admins dürfen alles bearbeiten, inklusive des Namens.
-        if (user.admin) {
-            const result = await teamService.updateTeam(id, updateData);
-            return res.status(200).json(result);
-        }
-
-        // Fall 2: Der Benutzer ist ein Teamkapitän
-        const team = await teamService.getTeamById(id);
-        if (team.captainId === user.uid) {
-            // WICHTIG: Kapitäne dürfen den Teamnamen ('name') nicht ändern.
-            // Wir entfernen das Feld aus den Update-Daten, falls es gesendet wurde.
-            if (updateData.name) {
-                delete updateData.name;
-            }
-            const result = await teamService.updateTeam(id, updateData);
-            return res.status(200).json(result);
-        }
-
-        // Fall 3: Keine Berechtigung
-        return res.status(403).json({ message: 'Du hast keine Berechtigung, dieses Team zu bearbeiten.' });
-
-    } catch (error) {
-        res.status(error.message === 'Team nicht gefunden.' ? 404 : 400).json({ message: error.message });
-    }
+router.put('/:teamId', checkAuth, async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    // KORREKTUR: Ruft jetzt die korrekte Service-Funktion auf, die alles propagiert.
+    const result = await teamService.updateTeam(teamId, req.body);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
 });
 
 // Route zum Löschen eines Teams (Nur Admins)
@@ -104,28 +111,36 @@ router.delete('/:teamId', checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
-// Route zum Hochladen eines Team-Logos (Admin oder Kapitän)
-// POST /api/teams/:teamId/logo
+// KORREKTUR: Route zum Hochladen und Verarbeiten eines Team-Logos
 router.post(
   '/:teamId/logo',
   checkAuth,
-  checkAdmin,
   upload.single('teamLogo'),
-  uploadToFirebase('team-logos'),
   async (req, res) => {
     try {
-      if (!req.file || !req.file.firebaseUrl) {
-        return res.status(400).json({ message: 'Keine Datei hochgeladen oder Upload fehlgeschlagen.' });
+      if (!req.file) {
+        return res.status(400).json({ message: 'Keine Datei hochgeladen.' });
       }
       
       const { teamId } = req.params;
-      const logoUrl = req.file.firebaseUrl;
+      const outputFilename = `${teamId}-${Date.now()}.webp`;
+      const outputPath = path.join(__dirname, '..', 'uploads', 'team-logos', outputFilename);
 
-      const result = await teamService.updateTeamLogo(teamId, logoUrl);
-      res.status(200).json(result);
+      // Bildverarbeitung: Skalieren, in WebP konvertieren und speichern
+      await sharp(req.file.buffer)
+        .resize({ width: 128, height: 128, fit: 'inside' }) // Skaliert auf max. 128px, behält Seitenverhältnis
+        .webp({ quality: 80 }) // Konvertiert zu WebP mit 80% Qualität
+        .toFile(outputPath);
+
+      // Relativen Pfad für die Datenbank und das Frontend erstellen
+      const relativePath = `/uploads/team-logos/${outputFilename}`;
+
+      const updatedTeam = await teamService.updateTeamLogo(teamId, relativePath);
+      res.status(200).json(updatedTeam);
 
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      console.error('Fehler beim Logo-Upload:', error);
+      res.status(500).json({ message: 'Fehler bei der Bildverarbeitung.' });
     }
   }
 );

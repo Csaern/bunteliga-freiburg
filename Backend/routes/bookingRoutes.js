@@ -1,142 +1,91 @@
 const express = require('express');
 const router = express.Router();
-const bookingService = require('../services/bookingService');
-const resultService = require('../services/resultService');
-const { checkAuth, checkAdmin } = require('../middleware/authMiddleware');
-const { checkCaptainOfActingTeam } = require('../middleware/permissionMiddleware');
+const BookingService = require('../services/bookingService');
+const BookingController = require('../controllers/bookingController');
+const { checkAuth, checkAdmin, checkCaptainOfActingTeam } = require('../middleware/authMiddleware');
 
-// --- ÖFFENTLICHE ROUTEN ---
+// --- ADMIN ROUTEN ---
 
-// Die nächsten 5 anstehenden Spiele abrufen
-router.get('/upcoming', async (req, res) => {
+// Holt alle Buchungen für eine Saison
+router.get('/season/:seasonId', checkAuth, checkAdmin, async (req, res) => {
     try {
-        const upcomingBookings = await bookingService.getUpcomingBookings();
-        res.status(200).json(upcomingBookings);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Die 5 letzten Spielergebnisse abrufen
-router.get('/recent', async (req, res) => {
-    try {
-        const recentResults = await resultService.getRecentResults();
-        res.status(200).json(recentResults);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Alle Spiele einer Saison abrufen, optional nach Team gefiltert
-router.get('/season/:seasonId', async (req, res) => {
-    try {
-        const { seasonId } = req.params;
-        const { teamId } = req.query;
-        const bookings = await bookingService.getBookingsForSeason(seasonId, teamId);
+        const bookings = await BookingService.getBookingsForSeason(req.params.seasonId);
         res.status(200).json(bookings);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
 
-// --- ADMIN ROUTEN ---
-
-// Leere Spieltermine für eine Saison erstellen
-router.post('/bulk-create', checkAuth, checkAdmin, async (req, res) => {
+// NEU: Prüft Termine für die Bulk-Erstellung auf Kollisionen
+router.post('/bulk-check', checkAuth, checkAdmin, async (req, res) => {
     try {
-        const result = await bookingService.bulkCreateAvailableSlots(req.body, req.user.uid);
-        res.status(201).json(result);
+        const checkResult = await BookingService.bulkCheckSlots(req.body);
+        res.status(200).json(checkResult);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
 });
 
-// --- TEAM/KAPITÄN ROUTEN ---
-
-// NEU: Alle ausstehenden Spielanfragen für mein Team abrufen
-// GET /api/bookings/team/pending
-router.get('/team/pending', checkAuth, async (req, res) => {
+// Erstellt massenhaft verfügbare Slots
+router.post('/bulk-create', checkAuth, checkAdmin, async (req, res) => {
     try {
-        const teamId = req.user.teamId;
-        if (!teamId) return res.status(200).json([]);
-        
-        const pendingBookings = await bookingService.getBookingsByStatusForTeam(teamId, 'pending_away_confirm');
-        res.status(200).json(pendingBookings);
+        const createdBookings = await BookingService.bulkCreateAvailableSlots(req.body, req.user);
+        res.status(201).json(createdBookings);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Admin löscht eine Buchung
+router.delete('/admin/:bookingId', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        await BookingService.adminDeleteBooking(req.params.bookingId);
+        res.status(204).send();
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Admin erstellt eine einzelne Buchung
+router.post('/admin/create', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const newBooking = await BookingService.adminCreateBooking(req.body, req.user);
+        res.status(201).json(newBooking);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Admin aktualisiert eine einzelne Buchung
+router.put('/admin/:bookingId', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const updatedBooking = await BookingService.adminUpdateBooking(req.params.bookingId, req.body);
+        res.status(200).json(updatedBooking);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Einzelnen Zeitslot auf Kollision prüfen (ADMIN)
+router.post('/check-single', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const result = await BookingService.checkSingleSlot(req.body);
+        res.status(200).json(result);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
 
-// Eine individuelle Buchung erstellen
-router.post('/custom', checkAuth, async (req, res) => {
-    try {
-        const newBooking = await bookingService.createCustomBooking(req.body, req.user);
-        res.status(201).json(newBooking);
-    } catch (error) {
-        if (error.message.includes('Du kannst') || error.message.includes('Du bist kein Kapitän')) {
-            return res.status(403).json({ message: error.message });
-        }
-        res.status(400).json({ message: error.message });
-    }
-});
+// NEU: Buchung erstellen und dabei eine alte überschreiben (ADMIN)
+router.post('/create-with-overwrite', checkAuth, checkAdmin, BookingController.createBookingWithOverwrite);
 
-// Einen verfügbaren Spieltermin anfragen
-router.post('/:id/request', checkAuth, checkCaptainOfActingTeam, async (req, res) => {
+// Eine einzelne Buchung aktualisieren (ADMIN)
+router.put('/:id', checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { id } = req.params;
-        const { homeTeamId, awayTeamId } = req.body;
-        const result = await bookingService.requestBookingSlot(id, homeTeamId, awayTeamId, req.user.uid);
+        const result = await BookingService.updateBooking(req.params.id, req.body);
         res.status(200).json(result);
     } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
-
-// Auf eine Spielanfrage reagieren (annehmen/ablehnen)
-router.post('/:id/action', checkAuth, checkCaptainOfActingTeam, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { actingTeamId, action, reason } = req.body;
-        const result = await bookingService.handleBookingAction(id, actingTeamId, action, reason);
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
-
-// Eine Stornierung einleiten
-router.post('/:id/initiate-cancellation', checkAuth, checkCaptainOfActingTeam, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { actingTeamId, reason } = req.body;
-        const result = await bookingService.initiateCancellation(id, actingTeamId, reason);
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
-
-// Auf einen Stornierungsantrag antworten
-router.post('/:id/respond-cancellation', checkAuth, checkCaptainOfActingTeam, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { actingTeamId, response, reason } = req.body;
-        const result = await bookingService.respondToCancellationRequest(id, actingTeamId, response, reason);
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
-
-// Ein Spiel durch einen Admin final stornieren
-router.post('/:id/admin-cancel', checkAuth, checkAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { reason } = req.body;
-        const result = await bookingService.adminCancelBooking(id, reason, req.user.uid);
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 });
 

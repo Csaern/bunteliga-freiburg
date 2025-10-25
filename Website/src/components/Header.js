@@ -40,6 +40,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import InsightsIcon from '@mui/icons-material/Insights';
 import StyleIcon from '@mui/icons-material/Style';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import StadiumIcon from '@mui/icons-material/Stadium';
 
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -66,6 +67,7 @@ const adminPages = [
   { text: 'Saisons', path: '/admin/season', iconName: 'EmojiEventsIcon' },
   { text: 'Ergebnisse', path: '/admin/results', iconName: 'InsightsIcon' },
   { text: 'Teams', path: '/admin/teams', iconName: 'StyleIcon' },
+  { text: 'Plätze', path: '/admin/pitches', iconName: 'StadiumIcon' },
 ];
 
 const teamboardPages = [
@@ -91,6 +93,7 @@ const iconMap = {
   InsightsIcon: InsightsIcon,
   StyleIcon: StyleIcon,
   DashboardIcon: DashboardIcon,
+  StadiumIcon: StadiumIcon,
 };
 
 const drawerWidth = 240;

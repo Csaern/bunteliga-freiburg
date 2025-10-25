@@ -14,6 +14,38 @@ router.get('/', checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
+// NEU: Einen neuen Benutzer erstellen (NUR ADMINS)
+router.post('/', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const newUser = await userService.createUser(req.body);
+        res.status(201).json(newUser);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// NEU: Einen Benutzer aktualisieren (NUR ADMINS)
+router.put('/:uid', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { uid } = req.params;
+        await userService.updateUser(uid, req.body);
+        res.status(200).json({ message: 'Benutzer erfolgreich aktualisiert.' });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// NEU: Einen Benutzer löschen (NUR ADMINS)
+router.delete('/:uid', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { uid } = req.params;
+        await userService.deleteUser(uid);
+        res.status(200).json({ message: 'Benutzer erfolgreich gelöscht.' });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
 // Die Rolle eines Benutzers ändern (NUR ADMINS)
 // PUT /api/users/:uid/role
 router.put('/:uid/role', checkAuth, checkAdmin, async (req, res) => {

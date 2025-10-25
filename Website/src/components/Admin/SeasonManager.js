@@ -138,6 +138,19 @@ const SeasonManager = () => {
         e.preventDefault();
         try {
             const dataToSend = { ...formData, teams: formData.teams.map(t => ({ id: t.id, name: t.name })) };
+
+            // FINALE KORREKTUR: Sende ein vollständiges, unmissverständliches ISO-Datum (UTC).
+            if (dataToSend.startDate && typeof dataToSend.startDate === 'string') {
+                dataToSend.startDate = `${dataToSend.startDate}T00:00:00.000Z`;
+            } else {
+                dataToSend.startDate = null;
+            }
+            if (dataToSend.endDate && typeof dataToSend.endDate === 'string') {
+                dataToSend.endDate = `${dataToSend.endDate}T00:00:00.000Z`;
+            } else {
+                dataToSend.endDate = null;
+            }
+
             if (modalMode === 'edit') {
                 await seasonApiService.updateSeason(selectedSeason.id, dataToSend);
             } else {
@@ -337,17 +350,17 @@ const SeasonManager = () => {
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
-                                        <Tooltip title={hasActiveSeason && season.status === 'planning' ? "Es läuft bereits eine Saison" : "Saison aktivieren"}>
+                                        <Tooltip title={season.status === 'planning' ? "Saison aktivieren" : "Nur Saisons in Planung können aktiviert werden"}>
                                             <span>
-                                                <IconButton onClick={() => handleActionRequest('activate', season.id)} disabled={season.status !== 'planning' || hasActiveSeason}>
-                                                    <PlayCircleOutlineIcon sx={{ color: season.status === 'planning' && !hasActiveSeason ? 'success.light' : 'grey.800' }} />
+                                                <IconButton onClick={() => handleActionRequest('activate', season.id)} disabled={season.status !== 'planning'}>
+                                                    <PlayCircleOutlineIcon sx={{ color: season.status === 'planning' ? 'success.light' : 'grey.800' }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
                                         <Tooltip title="Saison archivieren">
                                             <span>
-                                                <IconButton onClick={() => handleActionRequest('archive', season.id)} disabled={season.status !== 'finished'}>
-                                                    <ArchiveOutlinedIcon sx={{ color: season.status === 'finished' ? 'error.light' : 'grey.800' }} />
+                                                <IconButton onClick={() => handleActionRequest('archive', season.id)} disabled={season.status !== 'finished' && season.status !== 'planning'}>
+                                                    <ArchiveOutlinedIcon sx={{ color: season.status === 'finished' || season.status === 'planning' ? 'error.light' : 'grey.800' }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>

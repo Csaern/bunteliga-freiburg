@@ -4,6 +4,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthProvider';
+import TeamManager from './TeamManager'; // Importiere den TeamManager
+import teamApiService from '../services/teamApiService'; // Importiere den API-Service für Teams
+import { Box } from '@mui/material';
 
 const AdminDashboard = () => {
   const { currentUser, isAdmin } = useAuth();
@@ -15,10 +18,13 @@ const AdminDashboard = () => {
     currentSeason: null
   });
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0); // Zustand für den aktiven Tab
+  const [teams, setTeams] = useState([]); // Zustand für die Teams
 
   useEffect(() => {
     if (isAdmin) {
       loadStats();
+      fetchData(); // Daten beim Laden des Dashboards abrufen
     }
   }, [isAdmin]);
 
@@ -54,6 +60,16 @@ const AdminDashboard = () => {
       console.error('Fehler beim Laden der Statistiken:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Annahme: Du hast hier eine fetchData-Funktion, die Teams und andere Daten lädt
+  const fetchData = async () => {
+    try {
+      const teamsData = await teamApiService.getAllTeams();
+      setTeams(teamsData);
+    } catch (error) {
+      console.error('Fehler beim Laden der Teams:', error);
     }
   };
 
@@ -185,6 +201,14 @@ const AdminDashboard = () => {
             Saison verwalten
           </Link>
         </div>
+      )}
+
+      {/* TeamManager-Komponente für die Verwaltung von Teams */}
+      {activeTab === 1 && (
+        <TeamManager 
+          teams={teams} 
+          fetchData={fetchData} // KORREKTUR: Die fetchData-Funktion als Prop übergeben
+        />
       )}
     </div>
   );

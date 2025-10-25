@@ -1,11 +1,13 @@
+const admin = require('firebase-admin');
+
 class Booking {
   /**
    * Erstellt eine neue Buchungs-Instanz.
    * @param {object} data - Die Daten für die neue Buchung.
    */
   constructor({
-    date,
-    time,
+    date, // Erwartet jetzt ein JavaScript Date-Objekt
+    duration, // NEU: Dauer des Slots in Minuten
     pitchId,
     seasonId,
     createdBy,
@@ -13,30 +15,19 @@ class Booking {
     awayTeamId = null,
   }) {
     // 1. Validierung
-    if (!date || !time || !pitchId || !seasonId || !createdBy) {
-      throw new Error('Datum, Zeit, Platz-ID, Saison-ID und Ersteller sind erforderlich.');
+    if (!date || !duration || !pitchId || !seasonId || !createdBy) {
+      throw new Error('Datum, Dauer, Platz-ID, Saison-ID und Ersteller sind erforderlich.');
     }
 
     // 2. Zuweisung der Kerndaten
-    this.date = date;
-    this.time = time;
+    this.date = date; // Ist ein JS Date-Objekt
+    this.duration = duration; // z.B. 90 oder 120
     this.pitchId = pitchId;
     this.seasonId = seasonId;
     this.createdBy = createdBy;
     this.homeTeamId = homeTeamId;
     this.awayTeamId = awayTeamId;
 
-    /**
-     * @type {string}
-     * Der Lebenszyklus einer Buchung:
-     * 'available': Freier Slot.
-     * 'pending_away_confirm': Heimteam hat gebucht, wartet auf Gegner.
-     * 'confirmed': Spiel ist fix.
-     * 'cancellation_pending': Ein Team hat eine Stornierung beantragt.
-     * 'denied': Auswärtsteam hat die ursprüngliche Anfrage abgelehnt.
-     * 'cancelled': Spiel wurde erfolgreich storniert.
-     * 'played': Spiel wurde gespielt.
-     */
     this.status = 'available';
     this.isAvailable = !homeTeamId && !awayTeamId;
 
@@ -61,8 +52,9 @@ class Booking {
    */
   toFirestoreObject() {
     return {
-      date: this.date,
-      time: this.time,
+      // KORREKTUR: Konvertiert das JS-Datum in einen echten Firestore Timestamp
+      date: admin.firestore.Timestamp.fromDate(this.date),
+      duration: this.duration, // NEU
       pitchId: this.pitchId,
       seasonId: this.seasonId,
       createdBy: this.createdBy,

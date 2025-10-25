@@ -1,14 +1,10 @@
 import { auth } from '../firebase';
 
-const API_BASE_URL = 'http://localhost:3001'; // Deine Backend-URL
+// KORREKTUR: Wir exportieren die URL, damit sie in der ganzen App verfügbar ist.
+export const API_BASE_URL = 'http://localhost:3001'; // Deine Backend-URL
 
 /**
- * Ein zentraler Client für alle API-Anfragen an unser Backend.
- * Er kümmert sich automatisch um die Authentifizierung.
- * @param {string} endpoint - Der API-Endpunkt (z.B. '/api/seasons').
- * @param {string} method - Die HTTP-Methode ('GET', 'POST', 'PUT', etc.).
- * @param {object} [body] - Das Datenobjekt für POST/PUT-Anfragen.
- * @returns {Promise<any>} - Die JSON-Antwort vom Server.
+ * Ein zentraler Client für alle JSON-API-Anfragen.
  */
 export const apiClient = async (endpoint, method = 'GET', body = null) => {
     const user = auth.currentUser;
@@ -35,14 +31,45 @@ export const apiClient = async (endpoint, method = 'GET', body = null) => {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
 
     if (!response.ok) {
-        // Versuche, eine Fehlermeldung vom Backend zu parsen
         const errorData = await response.json().catch(() => ({ message: 'Unbekannter Serverfehler' }));
         throw new Error(errorData.message || `Fehler: ${response.statusText}`);
     }
 
-    // Wenn die Antwort leer ist (z.B. bei 204 No Content), gib ein Erfolgs-Objekt zurück
     if (response.status === 204) {
         return { success: true };
+    }
+
+    return response.json();
+};
+
+/**
+ * NEU: Ein spezialisierter Client für API-Anfragen mit FormData (z.B. Datei-Uploads).
+ */
+export const apiClientFormData = async (endpoint, method = 'POST', formData) => {
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('Nicht authentifiziert. Bitte neu einloggen.');
+    }
+
+    const token = await user.getIdToken();
+
+    // WICHTIG: 'Content-Type' wird hier absichtlich NICHT gesetzt.
+    // Der Browser fügt es automatisch mit der korrekten "boundary" hinzu.
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+    };
+
+    const config = {
+        method,
+        headers,
+        body: formData, // FormData wird direkt als Body übergeben
+    };
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unbekannter Serverfehler' }));
+        throw new Error(errorData.message || `Fehler: ${response.statusText}`);
     }
 
     return response.json();

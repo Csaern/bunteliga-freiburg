@@ -16,12 +16,15 @@ async function createUser(userData) {
     email: email,
     password: password,
     displayName: displayName,
-    emailVerified: true, // Wir können annehmen, dass der Admin die E-Mail verifiziert hat
+    emailVerified: true, 
   });
 
-  // 2. Custom Claim für Admin-Rolle setzen (falls zutreffend)
-  if (isAdmin) {
-    await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
+  // 2. Custom Claims für Admin-Rolle und Team-ID setzen
+  const claims = {};
+  if (isAdmin) claims.admin = true;
+  if (teamId) claims.teamId = teamId;
+  if (Object.keys(claims).length > 0) {
+      await admin.auth().setCustomUserClaims(userRecord.uid, claims);
   }
 
   // 3. Benutzerdokument in Firestore mit dem Model erstellen
@@ -48,20 +51,29 @@ async function createUser(userData) {
 async function updateUser(uid, updates) {
   const { teamId, isAdmin } = updates;
 
-  // 1. Custom Claim aktualisieren, falls sich die Admin-Rolle ändert
-  const currentUserClaims = (await admin.auth().getUser(uid)).customClaims;
-  if (isAdmin && !currentUserClaims?.admin) {
-    await admin.auth().setCustomUserClaims(uid, { admin: true });
-  } else if (!isAdmin && currentUserClaims?.admin) {
-    await admin.auth().setCustomUserClaims(uid, { admin: false }); // Oder {} zum Entfernen
+  // 1. Custom Claims aktualisieren
+  const user = await admin.auth().getUser(uid);
+  const currentClaims = user.customClaims || {};
+  
+  const newClaims = { ...currentClaims, admin: !!isAdmin };
+
+  if (teamId) {
+      newClaims.teamId = teamId;
+  } else {
+      delete newClaims.teamId; // Wichtig: Claim entfernen, wenn kein Team zugewiesen ist
+  }
+  
+  // Nur setzen, wenn sich die Claims geändert haben
+  if (JSON.stringify(currentClaims) !== JSON.stringify(newClaims)) {
+      await admin.auth().setCustomUserClaims(uid, newClaims);
   }
 
   // 2. Firestore-Dokument aktualisieren
   const userDocRef = db.collection('users').doc(uid);
   await userDocRef.update({
-    teamId: teamId,
-    isAdmin: isAdmin,
-    role: isAdmin ? 'admin' : 'team',
+    teamId: teamId || null, // Stellt sicher, dass null statt "" gespeichert wird
+    isAdmin: !!isAdmin,
+    role: isAdmin ? 'admin' : (teamId ? 'team' : 'user'),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 }
@@ -110,17 +122,37 @@ async function removeCaptainFromTeam(userId, teamId) {
 }
 
 /**
- * Ruft eine Liste aller Benutzer aus Firebase Auth ab.
+ * Ruft eine Liste aller Benutzer ab und reichert sie mit dem Team-Namen an.
  */
 async function getAllUsers() {
-    const userRecords = await admin.auth().listUsers(1000); // Holt bis zu 1000 Benutzer
-    return userRecords.users.map(user => ({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        disabled: user.disabled,
-        customClaims: user.customClaims || {}, // Stellt sicher, dass Claims immer ein Objekt sind
-    }));
+    // 1. Alle Teams für ein schnelles Nachschlagen der Namen abrufen
+    const teamsSnapshot = await teamsCollection.get();
+    const teamsMap = new Map();
+    teamsSnapshot.forEach(doc => {
+        teamsMap.set(doc.id, doc.data().name);
+    });
+
+    // 2. Alle Benutzer aus Firebase Auth abrufen
+    const listUsersResult = await admin.auth().listUsers(1000);
+    
+    // 3. Daten aus Auth mit dem aufgelösten Team-Namen anreichern
+    const enrichedUsers = listUsersResult.users.map(userRecord => {
+        const customClaims = userRecord.customClaims || {};
+        const teamId = customClaims.teamId || null;
+
+        return {
+            uid: userRecord.uid,
+            email: userRecord.email,
+            displayName: userRecord.displayName,
+            disabled: userRecord.disabled,
+            isAdmin: customClaims.admin || false,
+            teamId: teamId,
+            teamName: teamId ? teamsMap.get(teamId) || null : null, // Team-Namen direkt hier auflösen
+            customClaims: customClaims,
+        };
+    });
+
+    return enrichedUsers;
 }
 
 /**

@@ -35,8 +35,8 @@ class Season {
 
     // 2. Eigenschaften zuweisen
     this.name = name;
-    this.startDate = new Date(startDate);
-    this.endDate = new Date(endDate);
+    this.startDate = startDate; // KORREKTUR: Keine Konvertierung mehr hier
+    this.endDate = endDate;     // KORREKTUR: Keine Konvertierung mehr hier
     this.teams = teams;
     this.status = status;
     this.createdBy = createdBy;
@@ -73,7 +73,7 @@ class Season {
     this.finishedAt = null;
     this.finishedBy = null;
     this.isCurrent = false; 
-    this.createdAt = new Date();
+    this.createdAt = null; // Wird im Service gesetzt
   }
 
   /**
@@ -106,7 +106,7 @@ class Season {
       finishedAt: this.finishedAt,
       finishedBy: this.finishedBy,
       isCurrent: this.isCurrent,
-      createdAt: this.createdAt,
+      // createdAt wird im Service gesetzt, nicht hier
     };
   }
 }

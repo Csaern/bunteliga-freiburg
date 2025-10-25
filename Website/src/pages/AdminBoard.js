@@ -10,9 +10,10 @@ import UserManager from '../components/Admin/UserManager';
 import SeasonManager from '../components/Admin/SeasonManager';
 import ResultManager from '../components/Admin/ResultManager';
 import TeamManager from '../components/Admin/TeamManager';
+import PitchManager from '../components/Admin/PitchManager';
 
 const AdminBoard = ({ initialTab = 'bookings' }) => {
-    const [pitches, setPitches] = useState([]);
+    // HINWEIS: Der 'pitches'-State wird hier nicht mehr benötigt.
     const [teams, setTeams] = useState([]);
     const [bookings, setBookings] = useState([]);
     const [users, setUsers] = useState([]);
@@ -58,46 +59,55 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
     }, [bookings, results]);
 
     const fetchData = async () => {
-        setLoading(true);
         try {
-            // Lade ALLE relevanten Daten-Kollektionen parallel
-            const [pitchesSnap, teamsSnap, usersSnap, seasonSnap, bookingsSnap, resultsSnap] = await Promise.all([
-                getDocs(collection(db, "pitches")),
-                getDocs(collection(db, "teams")),
-                getDocs(collection(db, "users")),
-                getDocs(collection(db, "seasons")),
-                getDocs(collection(db, "bookings")), // Lade ALLE Buchungen, ohne Filter
-                getDocs(collection(db, "results"))   // Lade ALLE Ergebnisse, ohne Filter
+            setLoading(true);
+            const usersCollection = collection(db, "users");
+            const teamsCollection = collection(db, "teams");
+            const bookingsCollection = collection(db, "bookings");
+            // HINWEIS: Die Abfrage für 'pitches' wird entfernt.
+            const seasonsCollection = query(collection(db, "seasons"));
+            const resultsCollection = collection(db, "results");
+
+            const [
+                usersSnapshot,
+                teamsSnapshot,
+                bookingsSnapshot,
+                seasonsSnapshot,
+                resultsSnapshot
+            ] = await Promise.all([
+                getDocs(usersCollection),
+                getDocs(teamsCollection),
+                getDocs(bookingsCollection),
+                getDocs(seasonsCollection),
+                getDocs(resultsCollection)
             ]);
 
-            const pitchesData = pitchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const teamsData = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const usersData = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const seasonsData = seasonSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const allBookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const allResults = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const usersData = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const teamsData = teamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const bookingsData = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // HINWEIS: Das Setzen des 'pitches'-State wird entfernt.
+            const seasonsData = seasonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Setze die States mit den kompletten Datenlisten
-            setPitches(pitchesData);
-            setTeams(teamsData);
             setUsers(usersData);
+            setTeams(teamsData);
+            setBookings(bookingsData);
             setSeasons(seasonsData);
-            setBookings(allBookings);
-            setResults(allResults);
+            setResults(resultsData);
 
-            const current = seasonsData.find(s => s.isCurrent === true);
+            const current = seasonsData.find(s => s.isCurrent);
             setCurrentSeason(current);
 
-        } catch (error) {
-            console.error('Fehler beim Laden der Daten:', error);
+        } catch (err) {
+            console.error("Fehler beim Laden der Admin-Daten:", err);
         } finally {
             setLoading(false);
         }
     };
 
     const getTeamName = (teamId) => teams.find(t => t.id === teamId)?.name || 'Unbekannt';
-    const getPitchName = (pitchId) => pitches.find(p => p.id === pitchId)?.name || 'Unbekannt';
-
+    // HINWEIS: getPitchName wird hier nicht mehr benötigt, da BookingManager das selbst lösen muss.
+    
     if (!isAdmin) {
         return (
             <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -118,7 +128,8 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
     const renderActiveTab = () => {
         switch (activeTab) {
             case 'bookings':
-                return <BookingManager bookings={bookingsForCurrentSeason} pitches={pitches} teams={teams} currentSeason={currentSeason} fetchData={fetchData} getTeamName={getTeamName} getPitchName={getPitchName} />;
+                // HINWEIS: 'pitches' wird hier nicht mehr übergeben.
+                return <BookingManager bookings={bookingsForCurrentSeason} teams={teams} currentSeason={currentSeason} fetchData={fetchData} getTeamName={getTeamName} />;
             case 'users':
                 return <UserManager users={users} teams={teams} fetchData={fetchData} currentUser={currentUser} getTeamName={getTeamName} />;
             case 'season':
@@ -127,6 +138,11 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
                 return <ResultManager results={resultsForCurrentSeason} teams={teams} users={users} currentSeason={currentSeason} currentUser={currentUser} fetchData={fetchData} getTeamName={getTeamName} />;
             case 'teams':
                 return <TeamManager teams={teams} onTeamsUpdate={setTeams} />;
+            // KORREKTUR: Der PitchManager wird jetzt korrekt aufgerufen.
+            // Er lädt seine Plätze selbst über die API.
+            // Er erhält die 'teams'-Liste nur, um die Teamnamen anzuzeigen.
+            case 'pitches':
+                return <PitchManager teams={teams} />;
             default:
                 return null;
         }

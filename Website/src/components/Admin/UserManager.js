@@ -1,13 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { db, auth } from "../../firebase";
-import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Switch, InputAdornment, FormControlLabel, Alert, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Switch, InputAdornment, FormControlLabel, Alert, useTheme, useMediaQuery, CircularProgress, Snackbar } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { ReusableModal } from '../Helpers/modalUtils';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';
+import * as userApiService from '../../services/userApiService'; // NEU
 
-const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
+// NEU: Status-Indikator für die mobile Ansicht
+const StatusIndicator = ({ isAdmin }) => (
+    <Box
+        sx={{
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            backgroundColor: isAdmin ? '#FFBF00' : 'grey.600', // Gelb für Admin, Grau für normal
+            mr: 2,
+            flexShrink: 0,
+        }}
+    />
+);
+
+const UserManager = ({ teams, getTeamName }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -31,18 +43,41 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
         },
     };
 
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState('view'); // 'create', 'view', 'edit'
     const [selectedUser, setSelectedUser] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [formData, setFormData] = useState({ email: '', password: '', teamId: '', isAdmin: false });
+    const [formData, setFormData] = useState({ email: '', password: '', teamId: '', isAdmin: false, displayName: '' });
     const [searchTerm, setSearchTerm] = useState('');
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const fetchedUsers = await userApiService.getAllUsers();
+            // Die Anreicherung passiert jetzt im Backend. Wir fügen nur noch die 'id' hinzu.
+            const usersWithId = fetchedUsers.map(u => ({ ...u, id: u.uid }));
+            setUsers(usersWithId);
+        } catch (err) {
+            setNotification({ open: true, message: 'Fehler beim Laden der Benutzer.', severity: 'error' });
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     useEffect(() => {
         if (selectedUser) {
             setFormData({
                 email: selectedUser.email || '',
-                password: '', // Password is not fetched, so it's always empty in the form
+                displayName: selectedUser.displayName || '',
+                password: '',
                 teamId: selectedUser.teamId || '',
                 isAdmin: selectedUser.isAdmin || false,
             });
@@ -51,7 +86,7 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
 
     const handleOpenCreateModal = () => {
         setSelectedUser(null);
-        setFormData({ email: '', password: '', teamId: '', isAdmin: false });
+        setFormData({ email: '', password: '', teamId: '', isAdmin: false, displayName: '' });
         setModalMode('create');
         setIsModalOpen(true);
     };
@@ -68,6 +103,13 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
         setSelectedUser(null);
     };
 
+    const handleNotificationClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setNotification({ ...notification, open: false });
+    };
+
     const generatePassword = () => {
         const length = 12;
         const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
@@ -80,77 +122,52 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (modalMode === 'edit' && selectedUser) {
-            // Update logic
-            await handleUpdateUser(selectedUser.id, {
-                teamId: formData.teamId || null,
-                isAdmin: formData.isAdmin,
-                role: formData.isAdmin ? 'admin' : 'team',
-            });
-        } else if (modalMode === 'create') {
-            // Create logic
-            const password = formData.password || generatePassword();
-            const adminEmail = currentUser.email;
-            const adminPassword = prompt('Bitte Admin-Passwort zur Bestätigung eingeben:');
-            if (!adminPassword) return;
-
-            try {
-                const userCredential = await createUserWithEmailAndPassword(auth, formData.email, password);
-                const userData = {
-                    uid: userCredential.user.uid,
-                    email: formData.email,
-                    teamId: formData.teamId || null,
-                    role: formData.isAdmin ? 'admin' : 'team',
-                    isAdmin: formData.isAdmin,
-                    createdAt: serverTimestamp(),
-                };
-                await setDoc(doc(db, 'users', userCredential.user.uid), userData);
-                await signOut(auth);
-                await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-                alert(`Benutzer erfolgreich erstellt!\nPasswort: ${password}`);
-                fetchData();
-            } catch (error) {
-                console.error('Fehler beim Erstellen des Benutzers:', error);
-                alert('Fehler: ' + error.message);
-                try {
-                    await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-                } catch (reauthError) {
-                    console.error("Kritischer Fehler: Admin konnte nicht erneut angemeldet werden.", reauthError);
-                }
-            }
-        }
-        handleCloseModal();
-    };
-
-    const handleUpdateUser = async (userId, updates) => {
         try {
-            await updateDoc(doc(db, 'users', userId), { ...updates, updatedAt: serverTimestamp() });
+            if (modalMode === 'edit' && selectedUser) {
+                await userApiService.updateUser(selectedUser.id, {
+                    teamId: formData.teamId || null,
+                    isAdmin: formData.isAdmin,
+                });
+                setNotification({ open: true, message: 'Benutzer erfolgreich aktualisiert.', severity: 'success' });
+            } else if (modalMode === 'create') {
+                const password = formData.password || generatePassword();
+                await userApiService.createUser({
+                    email: formData.email,
+                    password: password,
+                    displayName: formData.displayName || formData.email.split('@')[0],
+                    teamId: formData.teamId || null,
+                    isAdmin: formData.isAdmin,
+                });
+                setNotification({ open: true, message: `Benutzer erfolgreich erstellt! Passwort: ${password}`, severity: 'success' });
+            }
             fetchData();
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren des Benutzers:', error);
+            handleCloseModal();
+        } catch (err) {
+            setNotification({ open: true, message: err.message || 'Ein Fehler ist aufgetreten.', severity: 'error' });
         }
     };
 
     const handleDelete = async () => {
         if (!selectedUser) return;
         try {
-            // Note: Deleting a user from Firestore doesn't delete them from Firebase Auth.
-            // This requires a backend function for security reasons.
-            await deleteDoc(doc(db, 'users', selectedUser.id));
-            alert('Benutzer aus der Datenbank gelöscht. Das Auth-Konto muss manuell entfernt werden.');
-            handleCloseModal();
+            await userApiService.deleteUser(selectedUser.id);
+            setNotification({ open: true, message: 'Benutzer wurde vollständig gelöscht.', severity: 'success' });
             fetchData();
-        } catch (error) {
-            console.error('Fehler beim Löschen des Benutzers:', error);
+            handleCloseModal();
+        } catch (err) {
+            setNotification({ open: true, message: 'Fehler beim Löschen des Benutzers.', severity: 'error' });
         }
     };
 
     const searchableFields = [
         { key: 'email' },
-        { key: 'teamId', accessor: (user) => getTeamName(user.teamId) },
+        { key: 'displayName' },
+        { key: 'teamName' }, // KORREKTUR: Direkt nach dem vom Backend gelieferten Team-Namen suchen
     ];
 
     const filteredUsers = filterData(users, searchTerm, searchableFields);
+
+    if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
 
     return (
         <Box sx={{ p: { sm: 3 } }}>
@@ -162,8 +179,14 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
                     Neuen Benutzer erstellen
                 </Button>
             </Box>
+            
+            <Snackbar open={notification.open} autoHideDuration={6000} onClose={handleNotificationClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+                <Alert onClose={handleNotificationClose} severity={notification.severity} sx={{ width: '100%', '.MuiAlert-message': { overflow: 'hidden' } }}>
+                    {notification.message}
+                </Alert>
+            </Snackbar>
 
-            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Email oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...darkInputStyle, mb: 2 }}
+            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Email, Name oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...darkInputStyle, mb: 2 }}
                 InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }}
             />
 
@@ -171,6 +194,7 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
                 <form onSubmit={handleSubmit}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <TextField size="small" label="Email" type="email" fullWidth required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={darkInputStyle} disabled={modalMode !== 'create'} />
+                        <TextField size="small" label="Anzeigename" type="text" fullWidth value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} sx={darkInputStyle} disabled={modalMode === 'view'} />
                         {modalMode === 'create' && (
                             <TextField size="small" label="Passwort (optional)" type="password" fullWidth placeholder="Leer lassen für autom. Passwort" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} sx={darkInputStyle} />
                         )}
@@ -228,6 +252,7 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
                                     if (selectedUser) {
                                         setFormData({
                                             email: selectedUser.email || '',
+                                            displayName: selectedUser.displayName || '',
                                             password: '',
                                             teamId: selectedUser.teamId || '',
                                             isAdmin: selectedUser.isAdmin || false,
@@ -237,6 +262,7 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
                                 }} sx={{ color: 'grey.400', borderColor: 'grey.700', '&:hover': { borderColor: 'grey.500' } }}>Abbrechen</Button>
                                 <Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }}>Speichern</Button>
                             </>}
+
                         </Box>
                     </Box>
                 </form>
@@ -251,27 +277,39 @@ const UserManager = ({ users, teams, fetchData, currentUser, getTeamName }) => {
                     <Table size="small">
                         <TableHead>
                             <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
-                                <StyledTableCell>Email</StyledTableCell>
-                                <StyledTableCell>Team</StyledTableCell>
-                                <StyledTableCell align="center">Admin</StyledTableCell>
+                                {isMobile ? (
+                                    <StyledTableCell>Benutzer</StyledTableCell>
+                                ) : (
+                                    <>
+                                        <StyledTableCell sx={{ width: '5%' }} />
+                                        <StyledTableCell>Email</StyledTableCell>
+                                        <StyledTableCell>Team</StyledTableCell>
+                                    </>
+                                )}
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {filteredUsers.map(user => (
                                 <TableRow key={user.id} onClick={() => handleRowClick(user)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
-                                    <StyledTableCell>{user.email}</StyledTableCell>
-                                    <StyledTableCell>{getTeamName(user.teamId) || '-'}</StyledTableCell>
-                                    <StyledTableCell align="center">
-                                        <Switch 
-                                            checked={user.isAdmin} 
-                                            readOnly 
-                                            sx={{ 
-                                                cursor: 'pointer',
-                                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#FFBF00' },
-                                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#FFBF00' },
-                                            }} 
-                                        />
-                                    </StyledTableCell>
+                                    {isMobile ? (
+                                        <StyledTableCell>
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <StatusIndicator isAdmin={user.isAdmin} />
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '0.9rem', color: 'grey.100' }}>{user.email}</Typography>
+                                                    <Typography sx={{ fontSize: '0.8rem', color: 'grey.500' }}>{user.teamName || 'Kein Team'}</Typography>
+                                                </Box>
+                                            </Box>
+                                        </StyledTableCell>
+                                    ) : (
+                                        <>
+                                            <StyledTableCell sx={{ py: 1.5 }}>
+                                                <StatusIndicator isAdmin={user.isAdmin} />
+                                            </StyledTableCell>
+                                            <StyledTableCell sx={{ py: 1.5 }}>{user.email}</StyledTableCell>
+                                            <StyledTableCell sx={{ py: 1.5 }}>{user.teamName || '-'}</StyledTableCell>
+                                        </>
+                                    )}
                                 </TableRow>
                             ))}
                         </TableBody>
