@@ -158,11 +158,11 @@ async function getResultsForTeam(teamId) {
 /**
  * Ruft die 5 zuletzt bestätigten Ergebnisse ab.
  */
-async function getRecentResults() {
+async function getRecentResults(limitNum = 5) {
   const snapshot = await resultsCollection
     .where('status', '==', 'confirmed')
     .orderBy('confirmedAt', 'desc') // Sortiert nach dem Bestätigungsdatum
-    .limit(5)
+    .limit(limitNum)
     .get();
 
   if (snapshot.empty) {
@@ -172,23 +172,33 @@ async function getRecentResults() {
 }
 
 /**
- * NEU: Ruft alle Ergebnisse für eine bestimmte Saison ab.
- * @param {string} seasonId - Die ID der Saison.
+ * Holt alle Ergebnisse für eine bestimmte Saison.
  */
 async function getResultsForSeason(seasonId) {
+  // KORREKTUR: Wir entfernen die .orderBy()-Klausel, um den Index-Zwang zu umgehen.
   const snapshot = await resultsCollection
     .where('seasonId', '==', seasonId)
-    .orderBy('confirmedAt', 'desc') // Sortiert nach dem letzten bestätigten Ergebnis
     .get();
-
+    
   if (snapshot.empty) {
     return [];
   }
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  // KORREKTUR: Die Sortierung der Ergebnisse erfolgt jetzt hier im Backend-Code.
+  // Wir sortieren absteigend nach dem Meldedatum (neueste zuerst).
+  results.sort((a, b) => {
+    const dateA = a.reportedAt?.toDate ? a.reportedAt.toDate() : new Date(0);
+    const dateB = b.reportedAt?.toDate ? b.reportedAt.toDate() : new Date(0);
+    return dateB - dateA; // Neuestes Datum zuerst
+  });
+
+  return results;
 }
 
 /**
- * Aktualisiert/Korrigiert ein bestehendes Ergebnis.
+ * Aktualisiert ein bestehendes Ergebnis.
  * Setzt den Status zurück auf 'pending'.
  */
 async function updateResult(resultId, updateData, user) {
@@ -254,6 +264,110 @@ async function getResultsByStatusForTeam(teamId, status) {
   );
 }
 
+/**
+ * NEU: Admin erstellt ein Ergebnis, das sofort bestätigt wird.
+ * Optional wird eine zugehörige Buchung als 'gespielt' markiert.
+ */
+async function adminCreateResult(resultData, adminUid) {
+  const { homeTeamId, awayTeamId, homeScore, awayScore, seasonId, bookingId } = resultData;
+
+  if (!homeTeamId || !awayTeamId || homeScore === undefined || awayScore === undefined || !seasonId) {
+    throw new Error('Unvollständige Daten. Teams, Ergebnis und Saison sind erforderlich.');
+  }
+
+  const homeTeamDoc = await teamsCollection.doc(homeTeamId).get();
+  const awayTeamDoc = await teamsCollection.doc(awayTeamId).get();
+  if (!homeTeamDoc.exists || !awayTeamDoc.exists) throw new Error('Team nicht gefunden.');
+
+  const newResultData = {
+    homeTeamId,
+    homeTeamName: homeTeamDoc.data().name,
+    awayTeamId,
+    awayTeamName: awayTeamDoc.data().name,
+    homeScore: parseInt(homeScore),
+    awayScore: parseInt(awayScore),
+    seasonId,
+    bookingId: bookingId || null,
+    status: 'confirmed', // Admin-Erstellung ist sofort bestätigt
+    reportedBy: 'admin',
+    reportedByUserId: adminUid,
+    reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+    confirmedBy: 'admin',
+    confirmedByUserId: adminUid,
+    confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  return db.runTransaction(async (transaction) => {
+    const newResultRef = resultsCollection.doc();
+    transaction.set(newResultRef, newResultData);
+
+    if (bookingId) {
+      const bookingRef = bookingsCollection.doc(bookingId);
+      const bookingDoc = await transaction.get(bookingRef);
+      if (bookingDoc.exists) {
+        transaction.update(bookingRef, { status: 'played' });
+      }
+    }
+    return { id: newResultRef.id, ...newResultData };
+  });
+}
+
+/**
+ * NEU: Admin aktualisiert ein beliebiges Ergebnis.
+ */
+async function adminUpdateResult(resultId, updateData, adminUid) {
+  const { homeTeamId, awayTeamId, homeScore, awayScore, status } = updateData;
+  const resultRef = resultsCollection.doc(resultId);
+
+  const payload = {
+    homeScore: parseInt(homeScore),
+    awayScore: parseInt(awayScore),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedBy: adminUid,
+  };
+
+  if (homeTeamId) payload.homeTeamId = homeTeamId;
+  if (awayTeamId) payload.awayTeamId = awayTeamId;
+
+  if (status) {
+    payload.status = status;
+    if (status === 'confirmed') {
+      payload.confirmedBy = 'admin';
+      payload.confirmedByUserId = adminUid;
+      payload.confirmedAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+  }
+
+  await resultRef.update(payload);
+  const updatedDoc = await resultRef.get();
+  return { id: updatedDoc.id, ...updatedDoc.data() };
+}
+
+/**
+ * NEU: Admin löscht ein Ergebnis.
+ */
+async function adminDeleteResult(resultId) {
+  const resultRef = resultsCollection.doc(resultId);
+  const resultDoc = await resultRef.get();
+  if (!resultDoc.exists) {
+    throw new Error('Ergebnis nicht gefunden.');
+  }
+  const bookingId = resultDoc.data().bookingId;
+
+  return db.runTransaction(async (transaction) => {
+    if (bookingId) {
+      const bookingRef = bookingsCollection.doc(bookingId);
+      const bookingDoc = await transaction.get(bookingRef);
+      if (bookingDoc.exists && bookingDoc.data().status === 'played') {
+        transaction.update(bookingRef, { status: 'confirmed' });
+      }
+    }
+    transaction.delete(resultRef);
+  });
+}
+
+
 module.exports = {
   createForfeitResult,
   reportResult,
@@ -261,8 +375,12 @@ module.exports = {
   getDisputedResults,
   getResultsForTeam,
   getRecentResults,
-  getResultsForSeason, // NEU
-  updateResult, // NEU
-  adminOverrideResult, // NEU
-  getResultsByStatusForTeam, // NEU
+  getResultsForSeason,
+  updateResult,
+  adminOverrideResult,
+  getResultsByStatusForTeam,
+  // NEU
+  adminCreateResult,
+  adminUpdateResult,
+  adminDeleteResult,
 };

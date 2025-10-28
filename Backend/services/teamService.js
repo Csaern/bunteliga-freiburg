@@ -223,7 +223,7 @@ async function getTeamsForActiveSeason() {
  */
 async function getPotentialOpponents(teamId) {
     const activeSeason = await seasonService.getActiveSeason();
-    if (!activeSeason.teams || activeSeason.teams.length === 0) return [];
+    if (!activeSeason || !activeSeason.teams || activeSeason.teams.length === 0) return [];
 
     const seasonTeamIds = activeSeason.teams.map(t => t.id).filter(id => id);
     const [allSeasonTeams, seasonResults, futureBookings, allPitches] = await Promise.all([
@@ -247,34 +247,29 @@ async function getPotentialOpponents(teamId) {
         const futureBookingsForOpponent = futureBookings.filter(b =>
             (b.homeTeamId === teamId && b.awayTeamId === opponent.id) ||
             (b.homeTeamId === opponent.id && b.awayTeamId === teamId)
-        ).map(b => ({
-            id: b.id,
-            date: b.date,
-            pitchName: getPitchName(b.pitchId)
-        }));
+        );
 
-        // KORREKTUR: Die Gesamtzahl der Begegnungen (gespielt + geplant) wird berechnet.
         const totalEncounters = gamesPlayed + futureBookingsForOpponent.length;
 
         let isEligible = true;
-        // KORREKTUR: Die Prüfung erfolgt jetzt gegen die Gesamtzahl.
-        if (activeSeason.mode === 'hinrunde' && totalEncounters >= 1) {
+        // KORREKTUR: Die Prüfung verwendet jetzt das korrekte Feld 'playMode' aus dem Season-Modell.
+        if (activeSeason.playMode === 'single_round_robin' && totalEncounters >= 1) {
             isEligible = false;
         }
-        if (activeSeason.mode === 'hin-und-rueckrunde' && totalEncounters >= 2) {
+        if (activeSeason.playMode === 'double_round_robin' && totalEncounters >= 2) {
             isEligible = false;
         }
 
         return {
             ...opponent,
             isEligible,
-            futureBookings: futureBookingsForOpponent
         };
     });
 
-    // KORREKTUR: Gibt jetzt ALLE Gegner zurück, damit das Frontend entscheiden kann,
-    // wie es mit "nicht verfügbaren" Gegnern umgeht (z.B. für Spielverlegungen).
-    return opponentList;
+    // Filtert die Liste serverseitig und gibt NUR die Teams zurück,
+    // gegen die noch gespielt werden darf.
+    const eligibleOpponents = opponentList.filter(opponent => opponent.isEligible);
+    return eligibleOpponents;
 }
 
 module.exports = {

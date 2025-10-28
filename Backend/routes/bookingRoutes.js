@@ -46,7 +46,19 @@ router.delete('/admin/:bookingId', checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
-// Admin erstellt eine einzelne Buchung
+// NEU: Holt Buchungen, für die ein Ergebnis eingetragen werden muss
+router.get('/needs-result/:seasonId', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { seasonId } = req.params;
+        // KORREKTUR: Der aufgerufene Service muss mit dem Import übereinstimmen (BookingService statt bookingService).
+        const bookings = await BookingService.getBookingsNeedingResult(seasonId);
+        res.status(200).json(bookings);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Admin erstellt eine einzelne, spezifische Buchung.
 router.post('/admin/create', checkAuth, checkAdmin, async (req, res) => {
     try {
         const newBooking = await BookingService.adminCreateBooking(req.body, req.user);

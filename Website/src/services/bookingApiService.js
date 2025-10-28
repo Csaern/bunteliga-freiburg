@@ -25,6 +25,11 @@ export const checkSingleSlot = async (data) => {
     return apiClient('/api/bookings/check-single', 'POST', data);
 };
 
+export const getBookingsNeedingResult = async (seasonId) => {
+    return apiClient(`/api/bookings/needs-result/${seasonId}`);
+};
+
+
 export const createBooking = async (data) => {
     return apiClient('/api/bookings/create', 'POST', data);
 };

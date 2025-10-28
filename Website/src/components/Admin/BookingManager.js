@@ -78,6 +78,17 @@ const BookingManager = ({ currentSeason }) => {
     // NEU: States für die Gegner-Logik
     const [potentialOpponents, setPotentialOpponents] = useState([]);
     const [isOpponentLoading, setIsOpponentLoading] = useState(false);
+    // ENTFERNT: States für die Spielverlegungs-Logik
+    // const [overwritableBookings, setOverwritableBookings] = useState([]);
+    // const [bookingToOverwrite, setBookingToOverwrite] = useState('');
+
+    // KORREKTUR: Die parseDate-Funktion wird hierher verschoben, damit sie in der ganzen Komponente verfügbar ist.
+    const parseDate = (dateObj) => {
+        if (!dateObj) return new Date();
+        if (dateObj.toDate) return dateObj.toDate();
+        if (dateObj._seconds) return new Date(dateObj._seconds * 1000);
+        return new Date(dateObj);
+    };
 
     const fetchData = async () => {
         // Die `currentSeason.id` wird weiterhin für die Buchungen benötigt.
@@ -92,12 +103,7 @@ const BookingManager = ({ currentSeason }) => {
 
             const [bookingsData, pitchesData, teamsData] = await Promise.all([bookingsPromise, pitchesPromise, teamsPromise]);
 
-            const parseDate = (dateObj) => {
-                if (!dateObj) return new Date();
-                if (dateObj.toDate) return dateObj.toDate();
-                if (dateObj._seconds) return new Date(dateObj._seconds * 1000);
-                return new Date(dateObj);
-            };
+            /* KORREKTUR: Die parseDate-Funktion wurde aus dieser Funktion entfernt und nach oben verschoben. */
 
             const formattedData = bookingsData.map(b => ({ ...b, date: parseDate(b.date) }));
             setLocalBookings(formattedData);
@@ -207,6 +213,9 @@ const BookingManager = ({ currentSeason }) => {
     }, [formData.homeTeamId]);
 
 
+    // ENTFERNT: Der komplexe useEffect zur Steuerung der Spielverlegungs-UI wird nicht mehr benötigt.
+
+
     // NEU: Funktion zur Überprüfung, ob ein Team in der Liste der potenziellen Gegner ist
     const isTeamInPotentialOpponents = (teamId) => {
         return potentialOpponents.some(t => t.id === teamId);
@@ -256,6 +265,7 @@ const BookingManager = ({ currentSeason }) => {
         setSelectedBooking(null);
         // NEU: Status der Kollisionsprüfung zurücksetzen
         setCollisionCheck({ status: 'idle', message: '' });
+        // ENTFERNT: States für die Verlegung müssen nicht mehr zurückgesetzt werden.
     };
 
     const handleSubmit = async (e) => {
@@ -269,16 +279,17 @@ const BookingManager = ({ currentSeason }) => {
                 awayTeamId: formData.awayTeamId || null,
                 date: combinedDate.toISOString(),
                 duration: formData.duration,
-                status: formData.isAvailable ? 'available' : (formData.homeTeamId && formData.awayTeamId ? 'confirmed' : 'available'),
             };
 
-            if (modalMode === 'edit' && selectedBooking) {
-                await bookingApiService.adminUpdateBooking(selectedBooking.id, bookingData);
-                setNotification({ open: true, message: 'Buchung aktualisiert.', severity: 'success' });
-            } else {
+            // KORREKTUR: Die Logik wurde auf die zwei einfachen Fälle reduziert.
+            if (modalMode === 'create') {
                 await bookingApiService.adminCreateBooking(bookingData);
                 setNotification({ open: true, message: 'Buchung erstellt.', severity: 'success' });
+            } else if (modalMode === 'edit' && selectedBooking) {
+                await bookingApiService.adminUpdateBooking(selectedBooking.id, bookingData);
+                setNotification({ open: true, message: 'Buchung aktualisiert.', severity: 'success' });
             }
+            
             handleCloseModal();
             fetchData();
         } catch (error) {
@@ -454,19 +465,16 @@ const BookingManager = ({ currentSeason }) => {
                                 {isOpponentLoading ? (
                                     <MenuItem disabled><em>Lade Gegner...</em></MenuItem>
                                 ) : (
-                                    potentialOpponents.map(t => (
-                                        <MenuItem key={t.id} value={t.id}>
-                                            {t.name}
-                                            {t.hasFutureBooking && (
-                                                <Typography component="span" sx={{ ml: 1, color: 'grey.500', fontSize: '0.8em' }}>
-                                                    (Spiel geplant)
-                                                </Typography>
-                                            )}
+                                    // KORREKTUR: Einfaches Mapping. Die Liste ist bereits serverseitig gefiltert.
+                                    potentialOpponents.map(opponent => (
+                                        <MenuItem key={opponent.id} value={opponent.id}>
+                                            {opponent.name}
                                         </MenuItem>
                                     ))
                                 )}
                             </Select>
                         </FormControl>
+
                         <FormControlLabel
                             control={<Checkbox
                                 checked={formData.isAvailable}
@@ -538,6 +546,7 @@ const BookingManager = ({ currentSeason }) => {
                                         label={<Typography sx={{ color: 'grey.100', fontSize: '0.8rem' }}>{day.label}</Typography>}
                                     />
                                 ))}
+
                             </Box>
                             <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }}>
                                 <Button variant="outlined" onClick={handleCloseBulkModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>

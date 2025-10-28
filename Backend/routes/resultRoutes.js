@@ -6,6 +6,39 @@ const { checkCaptainOfActingTeam } = require('../middleware/permissionMiddleware
 
 // --- ADMIN ROUTEN ---
 
+// NEU: Admin erstellt ein neues, bestätigtes Ergebnis
+router.post('/admin/create', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const newResult = await resultService.adminCreateResult(req.body, req.user.uid);
+        res.status(201).json(newResult);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// NEU: Admin aktualisiert ein Ergebnis
+router.put('/admin/:id', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updatedResult = await resultService.adminUpdateResult(id, req.body, req.user.uid);
+        res.status(200).json(updatedResult);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// NEU: Admin löscht ein Ergebnis
+router.delete('/admin/:id', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await resultService.adminDeleteResult(id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+
 // Ein Team meldet ein Ergebnis für ein Spiel
 // POST /api/results/report/:bookingId
 router.post('/report/:bookingId', checkAuth, async (req, res) => {

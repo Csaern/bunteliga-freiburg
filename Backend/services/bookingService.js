@@ -19,6 +19,62 @@ const getMillisFromDate = (date) => {
 class BookingService {
 
     /**
+     * NEU: Interne Hilfsfunktion zur Prüfung der Saisonregeln für eine Spielpaarung.
+     * Zählt existierende Ergebnisse und geplante Buchungen.
+     * @private
+     */
+    static async _checkSeasonRulesForPairing(homeTeamId, awayTeamId, seasonId, bookingIdToIgnore = null) {
+        // Wenn kein Gegnerteam vorhanden ist, gibt es nichts zu prüfen.
+        if (!homeTeamId || !awayTeamId || !seasonId) {
+            return;
+        }
+
+        const seasonDoc = await seasonsCollection.doc(seasonId).get();
+        if (!seasonDoc.exists) {
+            throw new Error('Die angegebene Saison wurde nicht gefunden.');
+        }
+        // Annahme basierend auf deinem season.js Modell: 'single_round_robin' oder 'double_round_robin'
+        const playMode = seasonDoc.data().playMode || 'double_round_robin'; 
+
+        let allowedGames;
+        if (playMode === 'single_round_robin') { // Jedes Team spielt einmal gegen jedes andere
+            allowedGames = 1;
+        } else if (playMode === 'double_round_robin') { // Jedes Team spielt zweimal gegen jedes andere (Hin- & Rückspiel)
+            allowedGames = 2;
+        } else {
+            return; // Für andere Modi wird keine Prüfung durchgeführt
+        }
+
+        // 1. Zähle bereits eingetragene Ergebnisse
+        const resultsQuery1 = resultsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', homeTeamId).where('awayTeamId', '==', awayTeamId).get();
+        const resultsQuery2 = resultsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', awayTeamId).where('awayTeamId', '==', homeTeamId).get();
+        
+        // 2. Zähle bereits geplante, bestätigte Buchungen
+        const bookingsQuery1 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', homeTeamId).where('awayTeamId', '==', awayTeamId).where('status', 'in', ['confirmed', 'pending_away_confirm']).get();
+        const bookingsQuery2 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', awayTeamId).where('awayTeamId', '==', homeTeamId).where('status', 'in', ['confirmed', 'pending_away_confirm']).get();
+
+        const [results1, results2, bookings1, bookings2] = await Promise.all([resultsQuery1, resultsQuery2, bookingsQuery1, bookingsQuery2]);
+
+        const allBookings = [...bookings1.docs, ...bookings2.docs];
+        const uniqueBookings = new Map();
+        allBookings.forEach(doc => uniqueBookings.set(doc.id, doc.data()));
+
+        let plannedGames = 0;
+        for (const id of uniqueBookings.keys()) {
+            // Zähle die Buchung nur, wenn es nicht die ist, die wir ignorieren sollen.
+            if (id !== bookingIdToIgnore) {
+                plannedGames++;
+            }
+        }
+
+        const totalEncounters = results1.size + results2.size + plannedGames;
+
+        if (totalEncounters >= allowedGames) {
+            throw new Error(`Regelverletzung: Das Spiellimit von ${allowedGames} für diese Paarung in der Saison ist bereits erreicht.`);
+        }
+    }
+
+    /**
      * KORRIGIERT: Ruft alle Buchungen für eine Saison ab und behandelt alte/neue Datumsformate.
      */
     static async getBookingsForSeason(seasonId, teamId = null) {
@@ -120,7 +176,15 @@ class BookingService {
      * Admin erstellt eine einzelne, spezifische Buchung.
      */
     static async adminCreateBooking(bookingData, user) {
-        // KORREKTUR: Status wird jetzt automatisch basierend auf den Team-IDs bestimmt.
+        // 1. Kollisionsprüfung für den Zeitslot
+        const collisionCheck = await BookingService.checkSingleSlot(bookingData);
+        if (!collisionCheck.isAvailable) {
+            throw new Error('Der Termin ist bereits belegt und kann nicht gebucht werden.');
+        }
+
+        // 2. NEU: Prüfung der Saisonregeln für die Spielpaarung
+        await BookingService._checkSeasonRulesForPairing(bookingData.homeTeamId, bookingData.awayTeamId, bookingData.seasonId);
+
         const hasBothTeams = bookingData.homeTeamId && bookingData.awayTeamId;
         const status = hasBothTeams ? 'confirmed' : 'available';
 
@@ -140,11 +204,27 @@ class BookingService {
      * Admin aktualisiert eine einzelne Buchung.
      */
     static async adminUpdateBooking(bookingId, updateData) {
+        // 1. Kollisionsprüfung für den Zeitslot
+        const collisionCheck = await BookingService.checkSingleSlot({
+            ...updateData,
+            bookingIdToIgnore: bookingId // Wichtig, damit der Termin nicht mit sich selbst kollidiert
+        });
+        if (!collisionCheck.isAvailable) {
+            throw new Error('Der neue Termin ist bereits belegt und kann nicht gebucht werden.');
+        }
+
         const bookingRef = bookingsCollection.doc(bookingId);
         const doc = await bookingRef.get();
         if (!doc.exists) {
             throw new Error('Buchung nicht gefunden.');
         }
+        const originalBooking = doc.data();
+
+        // 2. NEU: Prüfung der Saisonregeln, falls Teams geändert wurden.
+        // Wir benötigen die seasonId, die entweder im Update-Payload oder in der originalen Buchung ist.
+        const seasonId = updateData.seasonId || originalBooking.seasonId;
+        // KORREKTUR: Die ID der zu bearbeitenden Buchung wird übergeben, um sie bei der Prüfung zu ignorieren.
+        await BookingService._checkSeasonRulesForPairing(updateData.homeTeamId, updateData.awayTeamId, seasonId, bookingId);
 
         // KORREKTUR: Status wird auch beim Update automatisch angepasst.
         const hasBothTeams = updateData.homeTeamId && updateData.awayTeamId;
@@ -578,12 +658,66 @@ class BookingService {
     }
 
     /**
+     * NEU: Holt alle bestätigten Buchungen aus der Vergangenheit, für die noch kein Ergebnis eingetragen wurde.
+     */
+    static async getBookingsNeedingResult(seasonId) {
+        if (!seasonId) {
+            throw new Error('Saison-ID ist erforderlich.');
+        }
+
+        const now = new Date(); // JS Date für den Vergleich im Code
+
+        // KORREKTUR: Wir führen eine einfache Abfrage durch, die keinen speziellen Index benötigt.
+        // Wir holen alle Buchungen der angegebenen Saison.
+        const bookingsQuery = bookingsCollection
+            .where('seasonId', '==', seasonId);
+        
+        const bookingsSnapshot = await bookingsQuery.get();
+        const allSeasonBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // KORREKTUR: Die zusätzliche Filterung nach Status und Datum findet jetzt hier im Code statt.
+        const pastBookings = allSeasonBookings.filter(booking => {
+            // Wichtig: Firestore Timestamps müssen für den Vergleich in JS-Date-Objekte umgewandelt werden.
+            // KORREKTUR: Robuste Prüfung, ob .toDate() existiert. Falls nicht, wird das Datum als String behandelt.
+            if (!booking.date) return false; // Sicherheitsprüfung für den Fall, dass das Datum fehlt.
+            const bookingDate = booking.date.toDate ? booking.date.toDate() : new Date(booking.date);
+            return booking.status === 'confirmed' && bookingDate < now;
+        });
+
+        if (pastBookings.length === 0) {
+            return [];
+        }
+
+        // 2. Hole alle Ergebnisse der Saison, die eine bookingId haben
+        const resultsSnapshot = await resultsCollection.where('seasonId', '==', seasonId).get();
+        const resultBookingIds = new Set(resultsSnapshot.docs.map(doc => doc.data().bookingId).filter(Boolean));
+
+        // 3. Filtere die Buchungen, für die bereits ein Ergebnis existiert
+        const bookingsWithoutResult = pastBookings.filter(booking => !resultBookingIds.has(booking.id));
+
+        return bookingsWithoutResult;
+    }
+
+    /**
      * NEU: Erstellt eine neue Buchung und führt eine Aktion für eine alte,
      * kollidierende Buchung aus (löschen oder freigeben).
      * Läuft in einer Transaktion, um Datenkonsistenz zu sichern.
      */
     static async createBookingWithOverwrite(data, user) {
         const { newBookingData, overwriteAction, oldBookingId } = data;
+
+        // 1. Kollisionsprüfung für den neuen Termin
+        const collisionCheck = await BookingService.checkSingleSlot({
+            ...newBookingData,
+            bookingIdToIgnore: oldBookingId // Ignoriere die alte Buchung, die wir ja ersetzen
+        });
+        if (!collisionCheck.isAvailable) {
+            throw new Error('Der neue Termin kollidiert mit einer anderen, bestehenden Buchung.');
+        }
+
+        // 2. NEU: Prüfung der Saisonregeln für die neue Spielpaarung
+        // KORREKTUR: Die ID der alten Buchung wird übergeben, da sie ersetzt wird und nicht mitzählen darf.
+        await BookingService._checkSeasonRulesForPairing(newBookingData.homeTeamId, newBookingData.awayTeamId, newBookingData.seasonId, oldBookingId);
 
         if (!overwriteAction || !oldBookingId) {
             throw new Error('Aktion für die alte Buchung fehlt.');
