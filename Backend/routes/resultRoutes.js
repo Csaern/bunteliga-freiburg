@@ -4,6 +4,23 @@ const resultService = require('../services/resultService');
 const { checkAuth, checkAdmin } = require('../middleware/authMiddleware');
 const { checkCaptainOfActingTeam } = require('../middleware/permissionMiddleware');
 
+// --- ÖFFENTLICHE ROUTEN ---
+
+// Neueste bestätigte Ergebnisse einer Saison (öffentlich)
+router.get('/public/season/:seasonId', async (req, res) => {
+    try {
+        const { seasonId } = req.params;
+        if (!seasonId) {
+            return res.status(400).json({ message: 'seasonId ist erforderlich.' });
+        }
+        const results = await resultService.getResultsForSeason(seasonId);
+        const confirmedResults = results.filter(result => result.status === 'confirmed');
+        res.status(200).json(confirmedResults);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // --- ADMIN ROUTEN ---
 
 // NEU: Admin erstellt ein neues, bestätigtes Ergebnis

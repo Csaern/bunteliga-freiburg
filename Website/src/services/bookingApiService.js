@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { publicApiClient } from './apiClient';
 
 /**
  * Holt alle Buchungen für eine bestimmte Saison (Admin-Route).
@@ -6,6 +7,19 @@ import { apiClient } from './apiClient';
  */
 export const getBookingsForSeason = (seasonId) => {
     return apiClient(`/api/bookings/season/${seasonId}`, 'GET');
+};
+
+/**
+ * NEU: Holt alle verfügbaren Buchungen für eine bestimmte Saison (öffentlich, ohne Authentifizierung).
+ * @param {string} seasonId Die ID der Saison.
+ */
+export const getAvailableBookingsForSeason = (seasonId) => {
+    return publicApiClient(`/api/bookings/public/available/${seasonId}`, 'GET');
+};
+
+// NEU: Öffentliche Route – alle Buchungen (inkl. belegter) für eine Saison
+export const getPublicBookingsForSeason = (seasonId) => {
+    return publicApiClient(`/api/bookings/public/season/${seasonId}`, 'GET');
 };
 
 // NEU: Funktion zum Prüfen von Bulk-Slots
@@ -69,3 +83,37 @@ export const adminUpdateBooking = (bookingId, updateData) => {
 };
 
 // Hier kommen später die Funktionen für die Teams hin (request, confirm etc.)
+
+// Team: verfügbaren Slot anfragen
+export const requestBookingSlot = (bookingId, { homeTeamId, awayTeamId }) => {
+    return apiClient(`/api/bookings/${bookingId}/request`, 'POST', { homeTeamId, awayTeamId });
+};
+
+// Team: auf eine Spielanfrage reagieren (annehmen/ablehnen)
+export const respondToBookingRequest = (bookingId, action, reason = '') => {
+    return apiClient(`/api/bookings/${bookingId}/action`, 'POST', { action, reason });
+};
+
+// Team: Buchungen ohne Ergebnis für mein Team
+export const getBookingsNeedingResultForMyTeam = (seasonId) => {
+    const q = encodeURIComponent(seasonId);
+    return apiClient(`/api/bookings/needs-result/my-team?seasonId=${q}`, 'GET');
+};
+
+// NEU: Bevorstehende Spiele für mein Team
+export const getUpcomingBookingsForMyTeam = (seasonId) => {
+    const q = encodeURIComponent(seasonId);
+    return apiClient(`/api/bookings/upcoming/my-team?seasonId=${q}`, 'GET');
+};
+
+// NEU: Bevorstehende Spiele für ein angegebenes Team (explizite teamId)
+export const getUpcomingBookingsForTeam = (seasonId, teamId) => {
+    const s = encodeURIComponent(seasonId);
+    const t = encodeURIComponent(teamId);
+    return apiClient(`/api/bookings/upcoming/team/${t}?seasonId=${s}`, 'GET');
+};
+
+// Team: Buchung absagen
+export const cancelBooking = (bookingId, reason = '') => {
+    return apiClient(`/api/bookings/${bookingId}/cancel`, 'POST', { reason });
+};

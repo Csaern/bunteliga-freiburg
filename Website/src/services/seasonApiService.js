@@ -1,4 +1,5 @@
-import { apiClient } from './apiClient'; // Der Import war korrekt, die Verwendung war falsch.
+import { apiClient } from './apiClient';
+import { publicApiClient } from './apiClient';
 
 /**
  * Ein Service, der alle API-Aufrufe für Saisons bündelt.
@@ -29,4 +30,14 @@ export const setCurrentSeason = async (seasonId) => {
 
 export const archiveSeason = async (seasonId) => {
     return apiClient(`/api/seasons/${seasonId}/archive`, 'PUT');
+};
+
+// Aktive Saison (authentifiziert)
+export const getActiveSeason = async () => {
+    return apiClient('/api/seasons/active', 'GET');
+};
+
+// NEU: Aktive Saison (öffentlich, ohne Authentifizierung)
+export const getActiveSeasonPublic = async () => {
+    return publicApiClient('/api/seasons/public/active', 'GET');
 };

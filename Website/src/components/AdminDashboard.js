@@ -109,7 +109,7 @@ const AdminDashboard = () => {
           color: '#000000'
         }}>
           <h3 style={{ margin: '0 0 10px 0' }}>Aktuelle Saison</h3>
-          <p style={{ margin: 0 }}><strong>{stats.currentSeason.name} ({stats.currentSeason.year})</strong></p>
+          <p style={{ margin: 0 }}><strong>{stats.currentSeason.name}</strong></p>
         </div>
       )}
 

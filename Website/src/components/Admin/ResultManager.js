@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, FormControl, InputLabel, Select, MenuItem, InputAdornment, Alert, useTheme, useMediaQuery, IconButton, Menu, Snackbar, CircularProgress } from '@mui/material';
+import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, FormControl, InputLabel, Select, MenuItem, InputAdornment, Alert, useTheme, useMediaQuery, IconButton, Menu, Snackbar, CircularProgress, Avatar } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
@@ -9,6 +9,7 @@ import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import { formatGermanDate } from '../Helpers/dateUtils';
 import * as resultApiService from '../../services/resultApiService';
 import * as bookingApiService from '../../services/bookingApiService';
+import { API_BASE_URL } from '../../services/apiClient';
 
 // Status-Indikator als farbiger Kreis
 const StatusIndicator = ({ status }) => {
@@ -21,6 +22,30 @@ const StatusIndicator = ({ status }) => {
     };
     const config = statusConfig[status] || { color: theme.palette.grey[700] };
     return <Box sx={{ width: 12, height: 12, backgroundColor: config.color, borderRadius: '50%' }} title={config.label} />;
+};
+
+// Helper-Komponente für Team-Logo-Anzeige
+const TeamLogo = ({ team, size = 24 }) => {
+    const theme = useTheme();
+    const logoUrl = team?.logoUrl ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`) : null;
+    
+    return (
+        <Avatar
+            alt={`${team?.name || 'Unbekannt'} Logo`}
+            src={logoUrl}
+            sx={{
+                width: size,
+                height: size,
+                fontSize: `${size * 0.4}px`,
+                color: theme.palette.getContrastText(team?.logoColor || theme.palette.grey[700]),
+                backgroundColor: team?.logoColor || theme.palette.grey[700],
+                border: logoUrl ? `1px solid ${team?.logoColor || theme.palette.grey[700]}` : 'none',
+                mr: 1
+            }}
+        >
+            {!logoUrl && (team?.name || 'U').substring(0, 1).toUpperCase()}
+        </Avatar>
+    );
 };
 
 // KORREKTUR: Die Komponente holt ihre Daten jetzt selbst und benötigt weniger Props.
@@ -197,14 +222,28 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                 <Table size="small">
                     <TableHead><TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}><StyledTableCell>Datum</StyledTableCell><StyledTableCell>Heim</StyledTableCell><StyledTableCell>Auswärts</StyledTableCell></TableRow></TableHead>
                     <TableBody>
-                        {bookingsNeedingResult.length > 0 ? bookingsNeedingResult.map(booking => (
-                            <TableRow key={booking.id} onClick={() => handleBookingRowClick(booking)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
-                                {/* KORREKTUR: Die neue parseDate-Funktion wird auch hier für die Anzeige verwendet. */}
-                                <StyledTableCell>{formatGermanDate(parseDate(booking.date))}</StyledTableCell>
-                                <StyledTableCell>{getTeamName(booking.homeTeamId)}</StyledTableCell>
-                                <StyledTableCell>{getTeamName(booking.awayTeamId)}</StyledTableCell>
-                            </TableRow>
-                        )) : <TableRow><StyledTableCell colSpan={3} align="center" sx={{ color: 'grey.600' }}>Keine offenen Ergebnisse zum Eintragen.</StyledTableCell></TableRow>}
+                        {bookingsNeedingResult.length > 0 ? bookingsNeedingResult.map(booking => {
+                            const homeTeam = teams.find(t => t.id === booking.homeTeamId);
+                            const awayTeam = teams.find(t => t.id === booking.awayTeamId);
+                            return (
+                                <TableRow key={booking.id} onClick={() => handleBookingRowClick(booking)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                                    {/* KORREKTUR: Die neue parseDate-Funktion wird auch hier für die Anzeige verwendet. */}
+                                    <StyledTableCell>{formatGermanDate(parseDate(booking.date))}</StyledTableCell>
+                                    <StyledTableCell>
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <TeamLogo team={homeTeam} size={isMobile ? 20 : 24} />
+                                            <Typography variant="body2" sx={{ fontFamily: 'comfortaa' }}>{getTeamName(booking.homeTeamId)}</Typography>
+                                        </Box>
+                                    </StyledTableCell>
+                                    <StyledTableCell>
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <TeamLogo team={awayTeam} size={isMobile ? 20 : 24} />
+                                            <Typography variant="body2" sx={{ fontFamily: 'comfortaa' }}>{getTeamName(booking.awayTeamId)}</Typography>
+                                        </Box>
+                                    </StyledTableCell>
+                                </TableRow>
+                            );
+                        }) : <TableRow><StyledTableCell colSpan={3} align="center" sx={{ color: 'grey.600' }}>Keine offenen Ergebnisse zum Eintragen.</StyledTableCell></TableRow>}
                     </TableBody>
                 </Table>
             </TableContainer>
@@ -254,7 +293,29 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                 <Table size="small">
                     <TableHead><TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}><StyledTableCell align="center" sx={{ width: '5%' }}>Status</StyledTableCell><StyledTableCell>Datum</StyledTableCell><StyledTableCell>Heim</StyledTableCell><StyledTableCell>Auswärts</StyledTableCell><StyledTableCell align="center">Ergebnis</StyledTableCell></TableRow></TableHead>
                     <TableBody>
-                        {filteredResults.map(result => (<TableRow key={result.id} onClick={() => handleResultRowClick(result)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}><StyledTableCell align="center"><StatusIndicator status={result.status} /></StyledTableCell><StyledTableCell>{formatGermanDate(parseDate(result.reportedAt))}</StyledTableCell><StyledTableCell>{getTeamName(result.homeTeamId)}</StyledTableCell><StyledTableCell>{getTeamName(result.awayTeamId)}</StyledTableCell><StyledTableCell align="center">{result.homeScore} : {result.awayScore}</StyledTableCell></TableRow>))}
+                        {filteredResults.map(result => {
+                            const homeTeam = teams.find(t => t.id === result.homeTeamId);
+                            const awayTeam = teams.find(t => t.id === result.awayTeamId);
+                            return (
+                                <TableRow key={result.id} onClick={() => handleResultRowClick(result)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                                    <StyledTableCell align="center"><StatusIndicator status={result.status} /></StyledTableCell>
+                                    <StyledTableCell>{formatGermanDate(parseDate(result.reportedAt))}</StyledTableCell>
+                                    <StyledTableCell>
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <TeamLogo team={homeTeam} size={isMobile ? 20 : 24} />
+                                            <Typography variant="body2" sx={{ fontFamily: 'comfortaa' }}>{getTeamName(result.homeTeamId)}</Typography>
+                                        </Box>
+                                    </StyledTableCell>
+                                    <StyledTableCell>
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <TeamLogo team={awayTeam} size={isMobile ? 20 : 24} />
+                                            <Typography variant="body2" sx={{ fontFamily: 'comfortaa' }}>{getTeamName(result.awayTeamId)}</Typography>
+                                        </Box>
+                                    </StyledTableCell>
+                                    <StyledTableCell align="center">{result.homeScore} : {result.awayScore}</StyledTableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </TableContainer>

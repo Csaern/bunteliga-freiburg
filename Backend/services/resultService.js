@@ -258,10 +258,18 @@ async function getResultsByStatusForTeam(teamId, status) {
   const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
   // Filtere serverseitig, um nur die Ergebnisse zu liefern, bei denen das Team reagieren muss.
-  return results.filter(result => 
-    (result.homeTeamId === teamId && result.reportedBy !== result.homeTeamId) ||
-    (result.awayTeamId === teamId && result.reportedBy !== result.awayTeamId)
-  );
+  return results.filter(result => {
+    const reportedByTeamId = result.reportedByTeamId || result.reportedBy;
+    const isHomeTeam = result.homeTeamId === teamId;
+    const isAwayTeam = result.awayTeamId === teamId;
+    const wasReportedByThisTeam = reportedByTeamId === teamId;
+
+    if (!isHomeTeam && !isAwayTeam) {
+      return false;
+    }
+
+    return !wasReportedByThisTeam;
+  });
 }
 
 /**

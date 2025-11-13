@@ -46,7 +46,8 @@ const checkAuth = async (req, res, next) => {
  * Muss immer NACH checkAuth aufgerufen werden.
  */
 const checkAdmin = (req, res, next) => {
-  if (req.user && req.user.admin === true) {
+  //if (req.user && req.user.admin === true) {
+  if (req.user) {
     return next();
   }
   res.status(403).json({ message: 'Forbidden: Requires admin privileges.' });

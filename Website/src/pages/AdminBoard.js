@@ -161,7 +161,7 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
             </Paper>
             {currentSeason && (
                 <Alert severity="success" sx={{ mt: 2, mx: 1.75, backgroundColor: 'rgba(46, 125, 50, 0.3)', color: '#a5d6a7'}}>
-                    <strong>Aktuelle Saison:</strong> {currentSeason.name} ({currentSeason.year})
+                    <strong>Aktuelle Saison:</strong> {currentSeason.name}
                 </Alert>
             )}
             {/* NEU: Alert für offene Partien */}

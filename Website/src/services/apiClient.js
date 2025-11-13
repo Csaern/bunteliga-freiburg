@@ -43,6 +43,38 @@ export const apiClient = async (endpoint, method = 'GET', body = null) => {
 };
 
 /**
+ * NEU: Ein öffentlicher API-Client für Anfragen ohne Authentifizierung.
+ * Wird für öffentlich zugängliche Endpunkte verwendet.
+ */
+export const publicApiClient = async (endpoint, method = 'GET', body = null) => {
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const config = {
+        method,
+        headers,
+    };
+
+    if (body) {
+        config.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unbekannter Serverfehler' }));
+        throw new Error(errorData.message || `Fehler: ${response.statusText}`);
+    }
+
+    if (response.status === 204) {
+        return { success: true };
+    }
+
+    return response.json();
+};
+
+/**
  * NEU: Ein spezialisierter Client für API-Anfragen mit FormData (z.B. Datei-Uploads).
  */
 export const apiClientFormData = async (endpoint, method = 'POST', formData) => {

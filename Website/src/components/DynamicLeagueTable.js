@@ -1,6 +1,7 @@
 // src/components/DynamicLeagueTable.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -18,6 +19,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { db } from '../firebase';
+import { API_BASE_URL } from '../services/apiClient';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
@@ -90,6 +92,7 @@ const FormDisplay = ({ formArray }) => {
 const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const navigate = useNavigate();
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -281,7 +284,10 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
             {tableData.map((row) => (
               <TableRow
                 key={row.teamId}
+                onClick={() => navigate(`/team/${row.teamId}`)}
                 sx={{
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s ease',
                   '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
                   ...(userTeamId && row.teamId === userTeamId && { 
                     backgroundColor: 'rgba(0, 169, 157, 0.3)',
@@ -296,7 +302,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.3, width: '100%' }}>
                         <Avatar
                           alt={`${row.name} Logo`}
-                          src={row.logoUrl}
+                          src={row.logoUrl ? (row.logoUrl.startsWith('http') ? row.logoUrl : `${API_BASE_URL}${row.logoUrl}`) : null}
                           sx={{
                             width: 20,
                             height: 20,
@@ -319,7 +325,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Avatar
                         alt={`${row.name} Logo`}
-                        src={row.logoUrl}
+                        src={row.logoUrl ? (row.logoUrl.startsWith('http') ? row.logoUrl : `${API_BASE_URL}${row.logoUrl}`) : null}
                         sx={{
                           width: 20,
                           height: 20,

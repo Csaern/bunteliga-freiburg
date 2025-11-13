@@ -47,7 +47,22 @@ router.put('/:seasonId/teams/:teamId', checkAuth, checkAdmin, async (req, res) =
 });
 
 // --- TEAM & ÖFFENTLICHE ROUTEN ---
-// Die aktuell aktive Saison abrufen
+// Die aktuell aktive Saison abrufen (ÖFFENTLICH, ohne Authentifizierung)
+// WICHTIG: Diese Route muss VOR der allgemeinen '/:id' Route stehen.
+router.get('/public/active', async (req, res) => {
+    try {
+        const activeSeason = await seasonService.getActiveSeason();
+        if (!activeSeason) {
+            // Wir senden 200 mit einem leeren Objekt, damit das Frontend das einfach handhaben kann.
+            return res.status(200).json(null);
+        }
+        res.status(200).json(activeSeason);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Die aktuell aktive Saison abrufen (authentifiziert)
 // WICHTIG: Diese Route muss VOR der allgemeinen '/:id' Route stehen.
 router.get('/active', checkAuth, async (req, res) => {
     try {

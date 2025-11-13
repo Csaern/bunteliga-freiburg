@@ -7,13 +7,40 @@ const seasonsCollection = db.collection('seasons');
 const pitchesCollection = db.collection('pitches');
 const teamsCollection = db.collection('teams');
 const resultService = require('./resultService');
+const notificationService = require('./notificationService');
 
 // Hilfsfunktion, um alte und neue Datumsformate zu behandeln
 const getMillisFromDate = (date) => {
     if (!date) return 0;
-    if (date.toMillis) return date.toMillis(); // Korrekter Firestore Timestamp
-    if (date._seconds) return date._seconds * 1000; // Altes, fehlerhaftes Objekt
-    return new Date(date).getTime(); // Fallback für ISO-Strings etc.
+    try {
+        // Firestore Timestamp mit toMillis() Methode
+        if (typeof date.toMillis === 'function') {
+            return date.toMillis();
+        }
+        // Firestore Timestamp mit toDate() Methode
+        if (typeof date.toDate === 'function') {
+            const dateObj = date.toDate();
+            if (dateObj instanceof Date && !isNaN(dateObj.valueOf())) {
+                return dateObj.getTime();
+            }
+        }
+        // Serialisiertes Firestore Timestamp Format
+        if (typeof date._seconds === 'number') {
+            return date._seconds * 1000;
+        }
+        // JavaScript Date Objekt
+        if (date instanceof Date && !isNaN(date.valueOf())) {
+            return date.getTime();
+        }
+        // Fallback für ISO-Strings etc.
+        const d = new Date(date);
+        if (!isNaN(d.valueOf())) {
+            return d.getTime();
+        }
+    } catch (e) {
+        console.error('Fehler bei getMillisFromDate:', e, date);
+    }
+    return 0;
 };
 
 class BookingService {
@@ -466,56 +493,44 @@ class BookingService {
   
     /**
      * Leitet den Stornierungsprozess für ein bestätigtes Spiel ein.
+     * Entfernt die beiden Mannschaften und macht den Zeitslot wieder verfügbar.
      */
     static async initiateCancellation(bookingId, cancellingTeamId, reason = '') {
         const bookingRef = bookingsCollection.doc(bookingId);
         const bookingDoc = await bookingRef.get();
-        if (!bookingDoc.exists || bookingDoc.data().status !== 'confirmed') {
-            throw new Error('Nur bestätigte Spiele können storniert werden.');
+        if (!bookingDoc.exists) {
+            throw new Error('Buchung nicht gefunden.');
         }
         const bookingData = bookingDoc.data();
-  
-        const seasonDoc = await seasonsCollection.doc(bookingData.seasonId).get();
-        if (!seasonDoc.exists) throw new Error('Saison nicht gefunden.');
-        const deadlineDays = seasonDoc.data().cancellationDeadlineDays || 0;
-  
-        const gameDate = bookingData.date.toDate();
-        const now = new Date();
-        const deadlineDate = new Date(gameDate.getTime() - deadlineDays * 24 * 60 * 60 * 1000);
-  
-        if (deadlineDays === 0 || now < deadlineDate) {
-            return db.runTransaction(async (transaction) => {
-                transaction.update(bookingRef, {
-                    status: 'cancelled',
-                    cancelledByTeamId: cancellingTeamId,
-                    cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-                
-                const pitchRef = pitchesCollection.doc(bookingData.pitchId);
-                const pitchDoc = await transaction.get(pitchRef);
-                if (pitchDoc.exists && pitchDoc.data().isVerified) {
-                    const newBooking = new Booking({
-                        ...bookingData,
-                        createdBy: 'system_cancelled_recreate',
-                        homeTeamId: null,
-                        awayTeamId: null,
-                    });
-                    const firestoreObject = newBooking.toFirestoreObject();
-                    firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
-                    const newBookingRef = bookingsCollection.doc();
-                    transaction.set(newBookingRef, firestoreObject);
-                }
-                return { message: 'Spiel fristgerecht storniert. Der Termin wurde ggf. wieder freigegeben.' };
-            });
-        } else {
-            await bookingRef.update({
-                status: 'cancellation_pending',
-                cancellationRequestedByTeamId: cancellingTeamId,
-                cancellationRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
-                cancellationRequestReason: reason,
-            });
-            return { message: 'Stornierung beantragt. Der Gegner muss dem Antrag zustimmen.' };
+        
+        // Erlaube Stornierung für confirmed oder pending_away_confirm Buchungen
+        if (bookingData.status !== 'confirmed' && bookingData.status !== 'pending_away_confirm') {
+            throw new Error('Nur bestätigte Spiele oder ausstehende Anfragen können storniert werden.');
         }
+        
+        // Prüfe, ob das Team an der Buchung beteiligt ist
+        if (bookingData.homeTeamId !== cancellingTeamId && bookingData.awayTeamId !== cancellingTeamId) {
+            throw new Error('Du kannst nur Buchungen absagen, an denen dein Team beteiligt ist.');
+        }
+  
+        return await db.runTransaction(async (transaction) => {
+            // Entferne beide Mannschaften und setze Status auf available
+            transaction.update(bookingRef, {
+                status: 'available',
+                homeTeamId: null,
+                awayTeamId: null,
+                isAvailable: true,
+                cancelledByTeamId: cancellingTeamId,
+                cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                cancellationReason: reason || null,
+            });
+            
+            const message = bookingData.status === 'pending_away_confirm' 
+                ? 'Spielanfrage storniert. Der Zeitslot wurde wieder freigegeben.'
+                : 'Spiel abgesagt. Der Zeitslot wurde wieder freigegeben.';
+            
+            return { message };
+        });
     }
   
     /**
@@ -524,26 +539,86 @@ class BookingService {
     static async respondToCancellationRequest(bookingId, respondingTeamId, response, reason = '') {
         const bookingRef = bookingsCollection.doc(bookingId);
         
-        return db.runTransaction(async (transaction) => {
-            const bookingDoc = await transaction.get(bookingRef);
-            if (!bookingDoc.exists || bookingDoc.data().status !== 'cancellation_pending') {
-                throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
-            }
-            const bookingData = bookingDoc.data();
+        // Hole Daten vor der Transaction
+        const bookingDoc = await bookingRef.get();
+        if (!bookingDoc.exists || bookingDoc.data().status !== 'cancellation_pending') {
+            throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
+        }
+        const bookingData = bookingDoc.data();
   
-            if (bookingData.cancellationRequestedByTeamId === respondingTeamId) {
-                throw new Error('Du kannst nicht auf deinen eigenen Antrag antworten.');
-            }
+        if (bookingData.cancellationRequestedByTeamId === respondingTeamId) {
+            throw new Error('Du kannst nicht auf deinen eigenen Antrag antworten.');
+        }
   
-            if (response === 'accept') {
+        // Hole Team-Namen für Benachrichtigungen
+        const requestingTeamDoc = await teamsCollection.doc(bookingData.cancellationRequestedByTeamId).get();
+        const requestingTeamName = requestingTeamDoc.exists ? requestingTeamDoc.data().name : 'Unbekanntes Team';
+        
+        const respondingTeamDoc = await teamsCollection.doc(respondingTeamId).get();
+        const respondingTeamName = respondingTeamDoc.exists ? respondingTeamDoc.data().name : 'Unbekanntes Team';
+        
+        // Normalisiere das Datum nur für die Formatierung in der Benachrichtigung
+        if (!bookingData.date) {
+            throw new Error('Kein Datum in der Buchung gefunden.');
+        }
+        
+        // Konvertiere Firestore Timestamp zu Date für Formatierung
+        let gameDate;
+        try {
+            if (typeof bookingData.date.toDate === 'function') {
+                const dateObj = bookingData.date.toDate();
+                if (dateObj instanceof Date && !isNaN(dateObj.valueOf())) {
+                    gameDate = dateObj;
+                } else {
+                    throw new Error('toDate() hat kein gültiges Date-Objekt zurückgegeben');
+                }
+            } else if (bookingData.date instanceof Date && !isNaN(bookingData.date.valueOf())) {
+                gameDate = bookingData.date;
+            } else if (typeof bookingData.date._seconds === 'number') {
+                gameDate = new Date(bookingData.date._seconds * 1000);
+                if (isNaN(gameDate.valueOf())) {
+                    throw new Error('Ungültiges Datum aus _seconds');
+                }
+            } else {
+                gameDate = new Date(bookingData.date);
+                if (isNaN(gameDate.valueOf())) {
+                    throw new Error('Ungültiges Datum');
+                }
+            }
+        } catch (e) {
+            console.error('Fehler bei Datumskonvertierung:', e, bookingData.date);
+            gameDate = null; // Setze auf null, damit die Formatierung sicher ist
+        }
+        
+        let gameDateStr = 'Unbekannt';
+        let gameTimeStr = 'Unbekannt';
+        if (gameDate instanceof Date && !isNaN(gameDate.valueOf())) {
+            try {
+                gameDateStr = gameDate.toLocaleDateString('de-DE');
+                gameTimeStr = gameDate.toTimeString().slice(0, 5);
+            } catch (e) {
+                console.error('Fehler bei Datumsformatierung:', e);
+            }
+        }
+  
+        if (response === 'accept') {
+            await db.runTransaction(async (transaction) => {
+                // Alle Reads ZUERST ausführen
+                const bookingDocInTransaction = await transaction.get(bookingRef);
+                if (!bookingDocInTransaction.exists || bookingDocInTransaction.data().status !== 'cancellation_pending') {
+                    throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
+                }
+                
+                const pitchRef = pitchesCollection.doc(bookingData.pitchId);
+                const pitchDoc = await transaction.get(pitchRef);
+                
+                // Dann alle Writes ausführen
                 transaction.update(bookingRef, {
                     status: 'cancelled',
                     cancelledByTeamId: bookingData.cancellationRequestedByTeamId,
                     cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
   
-                const pitchRef = pitchesCollection.doc(bookingData.pitchId);
-                const pitchDoc = await transaction.get(pitchRef);
                 if (pitchDoc.exists && pitchDoc.data().isVerified) {
                     const newBooking = new Booking({ ...bookingData, createdBy: 'system_recreate', homeTeamId: null, awayTeamId: null });
                     const firestoreObject = newBooking.toFirestoreObject();
@@ -551,9 +626,32 @@ class BookingService {
                     const newBookingRef = bookingsCollection.doc();
                     transaction.set(newBookingRef, firestoreObject);
                 }
-                return { message: 'Stornierung angenommen. Das Spiel wurde abgesagt.' };
+            });
+            
+            // Benachrichtigung an das anfragende Team senden (außerhalb der Transaction)
+            await notificationService.notifyTeam(
+                bookingData.cancellationRequestedByTeamId,
+                'cancellation_accepted',
+                'Stornierung angenommen',
+                `${respondingTeamName} hat deine Stornierungsanfrage für das Spiel am ${gameDateStr} um ${gameTimeStr} Uhr angenommen. Das Spiel wurde abgesagt.`,
+                {
+                    bookingId: bookingId,
+                    acceptedByTeamId: respondingTeamId,
+                    acceptedByTeamName: respondingTeamName,
+                    gameDate: gameDateStr,
+                    gameTime: gameTimeStr,
+                }
+            );
+            
+            return { message: 'Stornierung angenommen. Das Spiel wurde abgesagt.' };
   
-            } else if (response === 'reject') {
+        } else if (response === 'reject') {
+            await db.runTransaction(async (transaction) => {
+                const bookingDocInTransaction = await transaction.get(bookingRef);
+                if (!bookingDocInTransaction.exists || bookingDocInTransaction.data().status !== 'cancellation_pending') {
+                    throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
+                }
+                
                 transaction.update(bookingRef, {
                     status: 'confirmed',
                     cancellationRequestedByTeamId: null,
@@ -561,11 +659,28 @@ class BookingService {
                     cancellationRequestReason: null,
                     cancellationRejectionReason: reason,
                 });
-                return { message: 'Stornierungs-Antrag abgelehnt. Das Spiel findet wie geplant statt.' };
-            } else {
-                throw new Error('Ungültige Antwort.');
-            }
-        });
+            });
+            
+            // Benachrichtigung an das anfragende Team senden (außerhalb der Transaction)
+            await notificationService.notifyTeam(
+                bookingData.cancellationRequestedByTeamId,
+                'cancellation_rejected',
+                'Stornierung abgelehnt',
+                `${respondingTeamName} hat deine Stornierungsanfrage für das Spiel am ${gameDateStr} um ${gameTimeStr} Uhr abgelehnt.${reason ? ` Grund: ${reason}` : ''} Das Spiel bleibt bestehen.`,
+                {
+                    bookingId: bookingId,
+                    rejectedByTeamId: respondingTeamId,
+                    rejectedByTeamName: respondingTeamName,
+                    gameDate: gameDateStr,
+                    gameTime: gameTimeStr,
+                    reason: reason,
+                }
+            );
+            
+            return { message: 'Stornierungs-Antrag abgelehnt. Das Spiel findet wie geplant statt.' };
+        } else {
+            throw new Error('Ungültige Antwort.');
+        }
     }
   
     /**
@@ -696,6 +811,114 @@ class BookingService {
         const bookingsWithoutResult = pastBookings.filter(booking => !resultBookingIds.has(booking.id));
 
         return bookingsWithoutResult;
+    }
+
+    /**
+     * NEU: Holt vergangene bestätigte Buchungen ohne Ergebnis für ein bestimmtes Team in einer Saison.
+     */
+    static async getBookingsNeedingResultForTeam(seasonId, teamId) {
+        if (!seasonId || !teamId) {
+            throw new Error('Saison-ID und Team-ID sind erforderlich.');
+        }
+        const all = await BookingService.getBookingsNeedingResult(seasonId);
+        return all.filter(b => b.homeTeamId === teamId || b.awayTeamId === teamId);
+    }
+
+    /**
+     * NEU: Holt zukünftige Spiele (Buchungen) für ein bestimmtes Team direkt aus der Datenbank.
+     * Prüft sowohl Heim- als auch Auswärtsspiele.
+     * Das Datum wird als Firestore Timestamp gespeichert und korrekt verarbeitet.
+     * @param {string} seasonId Die ID der Saison
+     * @param {string} teamId Die ID des Teams
+     * @returns {Array} Array von zukünftigen Buchungen für das Team
+     */
+    static async getUpcomingBookingsForTeam(seasonId, teamId) {
+        if (!seasonId || !teamId) {
+            throw new Error('Saison-ID und Team-ID sind erforderlich.');
+        }
+
+        // Erstelle Datum für "jetzt" - setze Zeit auf Anfang des aktuellen Tages, 
+        // um auch Spiele des heutigen Tages einzubeziehen
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Setze auf Mitternacht, um alle Spiele ab heute einzubeziehen
+        
+        // Query für Heimspiele: Das Team ist Heimmannschaft
+        // Verwende nur seasonId und homeTeamId für die Query, um Index-Probleme zu vermeiden
+        const homeGamesQuery = bookingsCollection
+            .where('seasonId', '==', seasonId)
+            .where('homeTeamId', '==', teamId);
+        
+        // Query für Auswärtsspiele: Das Team ist Auswärtsmannschaft
+        const awayGamesQuery = bookingsCollection
+            .where('seasonId', '==', seasonId)
+            .where('awayTeamId', '==', teamId);
+
+        // Beide Queries parallel ausführen
+        const [homeSnapshot, awaySnapshot] = await Promise.all([
+            homeGamesQuery.get(),
+            awayGamesQuery.get()
+        ]);
+
+        // Kombiniere alle Ergebnisse und filtere clientseitig nach Datum und Status
+        const bookingsMap = new Map();
+        const nowMillis = now.getTime();
+        
+        // Hilfsfunktion zur Konvertierung von Firestore Timestamp zu Millisekunden
+        const getTimestampMillis = (timestamp) => {
+            if (!timestamp) return 0;
+            if (timestamp.toMillis) return timestamp.toMillis(); // Firestore Timestamp
+            if (timestamp._seconds) return timestamp._seconds * 1000; // Serialisiertes Format
+            if (timestamp instanceof Date) return timestamp.getTime();
+            return new Date(timestamp).getTime();
+        };
+        
+        // Verarbeite Heimspiele
+        homeSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const bookingDate = data.date;
+            const bookingDateMillis = getTimestampMillis(bookingDate);
+            
+            // Prüfe, ob das Spiel in der Zukunft liegt (ab heute)
+            const isFuture = bookingDateMillis >= nowMillis;
+            
+            // Filter: Nur Spiele mit Status 'confirmed' oder 'pending_away_confirm', 
+            // oder Spiele mit beiden Teams (homeTeamId und awayTeamId vorhanden)
+            const statusOk = ['confirmed', 'pending_away_confirm'].includes(data.status) || 
+                           (!!data.homeTeamId && !!data.awayTeamId);
+            
+            if (isFuture && statusOk) {
+                bookingsMap.set(doc.id, { id: doc.id, ...data });
+            }
+        });
+
+        // Verarbeite Auswärtsspiele
+        awaySnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const bookingDate = data.date;
+            const bookingDateMillis = getTimestampMillis(bookingDate);
+            
+            // Prüfe, ob das Spiel in der Zukunft liegt (ab heute)
+            const isFuture = bookingDateMillis >= nowMillis;
+            
+            // Filter: Nur Spiele mit Status 'confirmed' oder 'pending_away_confirm',
+            // oder Spiele mit beiden Teams (homeTeamId und awayTeamId vorhanden)
+            const statusOk = ['confirmed', 'pending_away_confirm'].includes(data.status) || 
+                           (!!data.homeTeamId && !!data.awayTeamId);
+            
+            if (isFuture && statusOk) {
+                bookingsMap.set(doc.id, { id: doc.id, ...data });
+            }
+        });
+
+        // Konvertiere Map zu Array und sortiere nach Datum
+        const bookings = Array.from(bookingsMap.values());
+        bookings.sort((a, b) => {
+            const dateA = getTimestampMillis(a.date);
+            const dateB = getTimestampMillis(b.date);
+            return dateA - dateB; // Aufsteigend: früheste Spiele zuerst
+        });
+
+        return bookings;
     }
 
     /**

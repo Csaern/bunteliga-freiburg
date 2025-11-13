@@ -21,9 +21,29 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // --- ÖFFENTLICHE ROUTEN ---
-// HINWEIS: Diese Routen sind noch nicht implementiert im Service, aber als Platzhalter hier.
-// router.get('/verified', async (req, res) => { ... });
-// router.get('/team/:teamId', checkAuth, async (req, res) => { ... });
+// Alle Plätze abrufen (ÖFFENTLICH, ohne Authentifizierung)
+router.get('/public', async (req, res) => {
+    try {
+        const pitches = await pitchService.getAllPitches();
+        // Gib nur verifizierte und nicht archivierte Plätze zurück
+        const verified = pitches.filter(p => p.isVerified && !p.isArchived);
+        res.status(200).json(verified);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// --- AUTHENTIFIZIERTE ROUTEN ---
+// Verifizierte Plätze für eingeloggte Nutzer
+router.get('/verified', checkAuth, async (req, res) => {
+    try {
+        const pitches = await pitchService.getAllPitches();
+        const verified = pitches.filter(p => p.isVerified && !p.isArchived);
+        res.status(200).json(verified);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
 // --- ADMIN ROUTEN ---
 router.get('/all-admin', checkAuth, checkAdmin, async (req, res) => {

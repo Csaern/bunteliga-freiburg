@@ -1,365 +1,387 @@
 // src/components/BookingOverview.js
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, doc } from "firebase/firestore";
-import { db, auth } from "../firebase";
+// Frontend nutzt Backend-APIs; direkter Firestore-Zugriff entfällt für Aktionen
+import * as seasonApi from '../services/seasonApiService';
+import * as pitchApi from '../services/pitchApiService';
+import * as bookingApi from '../services/bookingApiService';
+import * as teamApi from '../services/teamApiService';
 import { useAuth } from '../context/AuthProvider';
+import { ReusableModal } from './Helpers/modalUtils';
+import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider } from '@mui/material';
 
 const BookingOverview = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [homeTeam, setHomeTeam] = useState('');
   const [awayTeam, setAwayTeam] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [currentSeason, setCurrentSeason] = useState(null);
   const { currentUser, teamId, role } = useAuth();
+  const [potentialOpponents, setPotentialOpponents] = useState([]);
+  const [isOpponentLoading, setIsOpponentLoading] = useState(false);
+  const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-      // Abrufen aller Daten
-        const [pitchesSnap, teamsSnap, bookingsSnap, seasonsSnap] = await Promise.all([
-        getDocs(collection(db, "pitches")),
-        getDocs(collection(db, "teams")),
-        getDocs(collection(db, "bookings")),
-        getDocs(collection(db, "seasons")),
+  const darkInputStyle = {
+    '& label.Mui-focused': { color: '#00A99D' },
+    '& .MuiOutlinedInput-root': {
+      '& fieldset': { borderColor: 'grey.700' },
+      '&:hover fieldset': { borderColor: 'grey.500' },
+      '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+    },
+    '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark', accentColor: '#00A99D' },
+    '& label': { color: 'grey.400' },
+    '& .MuiSelect-icon': { color: 'grey.400' },
+    '& .Mui-disabled': { WebkitTextFillColor: `rgba(200,200,200,0.85) !important`, color: `rgba(200,200,200,0.85) !important` },
+    '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.800' },
+  };
+
+  // parseDate-Funktion wie im Admin
+  const parseDate = (dateObj) => {
+    if (!dateObj) return new Date();
+    if (dateObj.toDate) return dateObj.toDate();
+    if (dateObj._seconds) return new Date(dateObj._seconds * 1000);
+    return new Date(dateObj);
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Verwende öffentliche APIs für alle User (auch ohne Admin-Rechte)
+      const activeSeason = await seasonApi.getActiveSeasonPublic().catch(() => null);
+      if (!activeSeason) {
+        console.error('Keine aktive Saison gefunden.');
+        setLoading(false);
+        return;
+      }
+      setCurrentSeason(activeSeason);
+
+      const [bookingsData, pitchesData, teamsData] = await Promise.all([
+        bookingApi.getPublicBookingsForSeason(activeSeason.id),
+        pitchApi.getPublicPitches(),
+        teamApi.getTeamsForActiveSeasonPublic()
       ]);
 
-        const pitches = pitchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const teams = teamsSnap.docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc.data().name }), {});
-      const bookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Formatiere die Daten wie im Admin
+      const formattedBookings = bookingsData.map(b => ({ ...b, date: parseDate(b.date) }));
       
-      // Aktuelle Saison finden
-      const seasons = seasonsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const current = seasons.find(s => s.isCurrent === true);
-      setCurrentSeason(current);
+      // Konvertiere Teams-Array zu Objekt für einfacheren Zugriff
+      const teams = teamsData.reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {});
 
-        // Gruppieren der Buchungen nach Datum und dann nach Platz
-      const groupedBookings = {};
-      bookings.forEach(booking => {
-          if (!groupedBookings[booking.date]) {
-            groupedBookings[booking.date] = {};
-        }
-          if (!groupedBookings[booking.date][booking.pitchId]) {
-            groupedBookings[booking.date][booking.pitchId] = [];
-        }
-          groupedBookings[booking.date][booking.pitchId].push(booking);
+      setData({ 
+        pitches: pitchesData, 
+        teams, 
+        bookings: formattedBookings 
       });
-      
-        setData({ pitches, teams, groupedBookings });
-        setLoading(false);
-      } catch (error) {
-        console.error('Fehler beim Laden der Daten:', error);
       setLoading(false);
-      }
-    };
+    } catch (error) {
+      console.error('Fehler beim Laden der Daten:', error);
+      setNotification({ open: true, message: 'Fehler beim Laden der Daten.', severity: 'error' });
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
   }, []);
 
-  const handleBookNow = (date, pitchId, time) => {
-    setSelectedSlot({ date, pitchId, time });
+  const handleBookNow = (booking) => {
+    const bookingDate = new Date(booking.date);
+    setSelectedSlot({ 
+      id: booking.id, 
+      date: bookingDate, 
+      pitchId: booking.pitchId, 
+      time: bookingDate.toTimeString().slice(0, 5) 
+    });
   };
+
+  // Lade potenzielle Gegner, sobald das Modal geöffnet wird
+  useEffect(() => {
+    const loadOpponents = async () => {
+      if (!selectedSlot || !teamId) { setPotentialOpponents([]); return; }
+      setIsOpponentLoading(true);
+      try {
+        const opponents = await teamApi.getPotentialOpponents(teamId);
+        setPotentialOpponents(opponents || []);
+      } catch (e) {
+        setPotentialOpponents([]);
+      } finally {
+        setIsOpponentLoading(false);
+      }
+    };
+    loadOpponents();
+  }, [selectedSlot, teamId]);
   
   const submitBooking = async (e) => {
     e.preventDefault();
     // Nur eingeloggte Team-User dürfen buchen
     if (!currentUser || !teamId) {
-      alert("Bitte melden Sie sich mit einem Team-Account an, um zu buchen.");
+      setNotification({ open: true, message: "Bitte melden Sie sich mit einem Team-Account an, um zu buchen.", severity: 'error' });
       return;
     }
     
     // Prüfe, ob aktuelle Saison vorhanden ist
     if (!currentSeason) {
-      alert("Keine aktuelle Saison gefunden! Bitte kontaktieren Sie einen Administrator.");
+      setNotification({ open: true, message: "Keine aktuelle Saison gefunden! Bitte kontaktieren Sie einen Administrator.", severity: 'error' });
       return;
     }
     
+    if (!awayTeam) {
+      setNotification({ open: true, message: "Bitte wählen Sie ein Auswärtsteam aus.", severity: 'error' });
+      return;
+    }
+    
+    setSubmitting(true);
     try {
-      // Prüfe, ob bereits eine Buchung für diesen Slot existiert
-      const existingBookings = data.groupedBookings[selectedSlot.date]?.[selectedSlot.pitchId] || [];
-      const existingBooking = existingBookings.find(booking => booking.time === selectedSlot.time);
-      
-      if (existingBooking) {
-        // Update existing booking
-        await updateDoc(doc(db, "bookings", existingBooking.id), {
-          homeTeamId: teamId,
-          awayTeamId: awayTeam,
-          isAvailable: false,
-          status: 'pending_away_confirm',
-          userId: currentUser?.uid || 'anonymous',
-          seasonId: currentSeason.id,
-          updatedAt: new Date(),
-        });
-      } else {
-        // Create new booking
-      await addDoc(collection(db, "bookings"), {
-          date: selectedSlot.date,
-          time: selectedSlot.time,
-          pitchId: selectedSlot.pitchId,
+      // Anfrage an Backend: vorhandenen Slot anfragen
+      await bookingApi.requestBookingSlot(selectedSlot.id, { 
           homeTeamId: teamId,
         awayTeamId: awayTeam,
-          isAvailable: false,
-          status: 'pending_away_confirm',
-          userId: currentUser?.uid || 'anonymous',
           seasonId: currentSeason.id,
-          contactName: contactName || (currentUser?.displayName || ''),
-          contactEmail: contactEmail || (currentUser?.email || ''),
-          contactPhone: contactPhone || '',
-        createdAt: new Date(),
+        userId: currentUser?.uid || 'anonymous'
       });
-      }
       
-      alert("Buchung erfolgreich!");
+      setNotification({ open: true, message: "Buchung erfolgreich! Warte auf Bestätigung des Gegners.", severity: 'success' });
       setSelectedSlot(null);
-      setHomeTeam('');
       setAwayTeam('');
       setContactName('');
       setContactEmail('');
       setContactPhone('');
       // Refresh data
-      window.location.reload(); 
+      fetchData(); 
     } catch (error) {
       console.error("Fehler bei der Buchung:", error);
-      alert("Buchung fehlgeschlagen.");
+      setNotification({ open: true, message: error.message || "Buchung fehlgeschlagen.", severity: 'error' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Generate date options for the next 365 days
-  const generateDateOptions = () => {
-    const dates = [];
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
-    }
-    return dates;
+
+
+  const getPitchName = (pitchId) => {
+    const pitch = data.pitches.find(p => p.id === pitchId);
+    return pitch ? pitch.name : 'Unbekannter Platz';
   };
 
-  const getAvailableBookingsForDate = (date) => {
-    return data.groupedBookings[date] || {};
+  const getTeamName = (teamId) => {
+    if (!teamId) return null;
+    const team = data.teams[teamId];
+    return team || 'Unbekannt';
   };
+
+  const displayTeamName = (teamId) => getTeamName(teamId) || '-';
+
+  // Gruppiere Buchungen nach Platz
+  const bookingsByPitch = (data.bookings || []).reduce((acc, booking) => {
+    const pitchId = booking.pitchId;
+    if (!acc[pitchId]) {
+      acc[pitchId] = [];
+    }
+    acc[pitchId].push(booking);
+    return acc;
+  }, {});
+
+  // Sortiere Buchungen innerhalb jedes Platzes nach Datum
+  Object.keys(bookingsByPitch).forEach(pitchId => {
+    bookingsByPitch[pitchId].sort((a, b) => new Date(a.date) - new Date(b.date));
+  });
+
+  // Sortiere Plätze alphabetisch
+  const sortedPitchIds = Object.keys(bookingsByPitch).sort((a, b) => {
+    const pitchA = getPitchName(a);
+    const pitchB = getPitchName(b);
+    return pitchA.localeCompare(pitchB);
+  });
 
   if (loading) {
-    return <div>Lade Spielplan...</div>;
+    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
   }
   
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Spielplan & Reservierung</h1>
+    <Box sx={{ p: { sm: 3 } }}>
+      <Snackbar open={notification.open} autoHideDuration={6000} onClose={() => setNotification({ ...notification, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setNotification({ ...notification, open: false })} severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>
+      </Snackbar>
+      
+      <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
+        Spielplan & Reservierung
+      </Typography>
 
-      {/* Kompakte, nach Platz gruppierte Liste aller Termine */}
-      {data.pitches.map(pitch => {
-        // Sammle alle Buchungen für diesen Platz über alle Daten
-        const bookingsForPitch = [];
-        Object.keys(data.groupedBookings).forEach(dateKey => {
-          const list = data.groupedBookings[dateKey]?.[pitch.id] || [];
-          list.forEach(b => bookingsForPitch.push({ ...b, date: dateKey }));
-        });
+      {sortedPitchIds.length === 0 ? (
+        <Paper sx={{ backgroundColor: '#111', borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', border: '1px solid #222' }}>
+          <Typography sx={{ color: 'grey.500', fontFamily: 'comfortaa' }}>
+            Keine Zeitslots für die aktuelle Saison vorhanden.
+          </Typography>
+        </Paper>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {sortedPitchIds.map(pitchId => {
+            const pitchBookings = bookingsByPitch[pitchId];
+            const pitchName = getPitchName(pitchId);
+            
+            return (
+              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
+                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
+                  <Typography variant="h6" sx={{ color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
+                    {pitchName}
+                  </Typography>
+                </Box>
+                <Table size="small">
+                  <TableHead>
+                    {isMobile ? (
+                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
+                        <TableCell align="center" colSpan={7} sx={{ color: 'grey.100' }}>Verfügbare Termine</TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
+                        <TableCell align="center" sx={{ width: '40px', color: 'grey.100' }}>Status</TableCell>
+                        <TableCell sx={{ color: 'grey.100' }}>Datum</TableCell>
+                        <TableCell sx={{ color: 'grey.100' }}>Zeitraum</TableCell>
+                        <TableCell sx={{ color: 'grey.100' }}>Heim</TableCell>
+                        <TableCell sx={{ color: 'grey.100' }}>Auswärts</TableCell>
+                        <TableCell align="center" sx={{ color: 'grey.100' }}>Aktion</TableCell>
+                      </TableRow>
+                    )}
+                  </TableHead>
+                  <TableBody>
+                    {pitchBookings.map(booking => {
+                      const startTime = new Date(booking.date).toTimeString().slice(0, 5);
+                      const endTime = booking.duration ? new Date(new Date(booking.date).getTime() + booking.duration * 60000).toTimeString().slice(0, 5) : '-';
+                      const timeRange = `${startTime} - ${endTime}`;
+                      
+                      // Eine Buchung ist verfügbar, wenn: status === 'available' ODER (isAvailable === true UND keine Teams zugewiesen)
+                      const isAvailable = booking.status === 'available' || 
+                                         (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
+                      const isBooked = !isAvailable && booking.homeTeamId && booking.awayTeamId;
+                      const isMyBooking = (booking.homeTeamId === teamId || booking.awayTeamId === teamId) && booking.status === 'confirmed';
 
-        // Sortiere nach Datum und Uhrzeit
-        bookingsForPitch.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-
-                    return (
-          <div key={pitch.id} style={{
-            border: '1px solid #ccc',
-            margin: '12px 0',
-            padding: '12px',
-            borderRadius: '8px',
-            backgroundColor: '#f9f9f9'
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: 8, color: '#000' }}>{pitch.name}</h3>
-
-            {bookingsForPitch.length === 0 ? (
-              <p style={{ color: '#666', fontStyle: 'italic', margin: 0 }}>
-                Keine Zeitslots verfügbar. <span>Kontaktieren Sie einen Administrator, um Zeitslots hinzuzufügen.</span>
-              </p>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {bookingsForPitch.map(booking => {
-                  const isBooked = !booking.isAvailable && booking.homeTeamId && booking.awayTeamId;
-                  const homeTeamName = data.teams[booking.homeTeamId] || '';
-                  const awayTeamName = data.teams[booking.awayTeamId] || '';
-                  const labelDate = new Date(booking.date).toLocaleDateString('de-DE');
-                    return (
-                    <li key={booking.id} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '6px 0',
-                      borderBottom: '1px solid #e5e5e5'
-                    }}>
-                      <span style={{ marginRight: 8, whiteSpace: 'nowrap', color: '#000' }}>
-                        {labelDate} {booking.time}
-                      </span>
-                      <span style={{ flex: 1, marginLeft: 8, color: isBooked ? '#d32f2f' : '#2e7d32' }}>
-                        {isBooked ? (
-                          <strong>Belegt</strong>
-                        ) : (
-                          <strong>Verfügbar</strong>
-                        )}
-                        {isBooked && `: ${homeTeamName} vs. ${awayTeamName}`}
-                      </span>
-                      {!isBooked && (
-                        <button
-                          onClick={() => handleBookNow(booking.date, pitch.id, booking.time)}
-                          style={{
-                            padding: '5px 10px',
-                            backgroundColor: '#4caf50',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '3px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Buchen
-                        </button>
-                      )}
-                      </li>
-                    );
-                })}
-              </ul>
-            )}
-            </div>
-        );
-      })}
+                      return isMobile ? (
+                        <TableRow key={booking.id} sx={{ backgroundColor: '#0e0e0eff', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                          <TableCell colSpan={7} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
+                            <Box sx={{ display: 'flex', alignItems: 'stretch', minHeight: '70px' }}>
+                              <Box sx={{ width: '4px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main }} />
+                              <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Box sx={{ textAlign: 'center', pr: 2 }}>
+                                    <Typography sx={{ fontSize: '0.7rem', color: 'grey.300' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                  </Box>
+                                  <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.grey[800]}` }}>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</Typography>
+                                    <Typography sx={{ color: 'grey.500', fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.awayTeamId)}</Typography>
+                                  </Box>
+                                  <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.grey[800]}` }}>
+                                    {isAvailable ? (
+                                      <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
+                                        Buchen
+                                      </Button>
+                                    ) : (
+                                      <Button size="small" variant="contained" color="warning" disabled>
+                                        Belegt
+                                      </Button>
+                                    )}
+                                  </Box>
+                                </Box>
+                              </Box>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                          <TableCell align="center">
+                            <Box sx={{ width: '10px', height: '10px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main, borderRadius: '50%', boxShadow: `0 0 8px ${isAvailable ? theme.palette.success.main : theme.palette.error.main}` }} />
+                          </TableCell>
+                          <TableCell sx={{ color: 'grey.100' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</TableCell>
+                          <TableCell sx={{ color: 'grey.100' }}>{timeRange}</TableCell>
+                          <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</TableCell>
+                          <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.awayTeamId)}</TableCell>
+                          <TableCell align="center">
+                            {isAvailable ? (
+                              <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
+                                Platz buchen
+                              </Button>
+                            ) : (
+                              <Button size="small" variant="contained" color="warning" disabled>
+                                Belegt
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            );
+          })}
+        </Box>
+      )}
 
       {/* Pop-up-Formular für die Buchung */}
       {selectedSlot && (
-        <div style={{ 
-          position: 'fixed', 
-          top: '50%', 
-          left: '50%', 
-          transform: 'translate(-50%, -50%)', 
-          backgroundColor: 'white', 
-          padding: '30px', 
-          border: '2px solid #333', 
-          borderRadius: '10px',
-          zIndex: 1000,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-          minWidth: '400px'
-        }}>
-          <h3 style={{ marginTop: 0, color: '#333' }}>Platz buchen</h3>
-          <div style={{ marginBottom: '15px' }}>
-            <strong>Datum:</strong> {new Date(selectedSlot.date).toLocaleDateString('de-DE')}
-          </div>
-          <div style={{ marginBottom: '15px' }}>
-            <strong>Platz:</strong> {data.pitches.find(p => p.id === selectedSlot.pitchId)?.name}
-          </div>
-          <div style={{ marginBottom: '20px' }}>
-            <strong>Uhrzeit:</strong> {selectedSlot.time}
-          </div>
+        <ReusableModal open={!!selectedSlot} onClose={() => setSelectedSlot(null)} title="Platz buchen">
+          <Box component="form" onSubmit={submitBooking} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField size="small" label="Datum" type="date" fullWidth value={new Date(selectedSlot.date).toISOString().split('T')[0]} InputLabelProps={{ shrink: true }} sx={darkInputStyle} disabled />
+              <TextField size="small" label="Uhrzeit" type="time" fullWidth value={selectedSlot.time} InputLabelProps={{ shrink: true }} sx={darkInputStyle} disabled />
+            </Box>
+            <TextField size="small" label="Dauer (Minuten)" type="number" fullWidth value={(data.bookings || []).find(b => b.id === selectedSlot.id)?.duration || 90} sx={darkInputStyle} disabled />
+            <FormControl size="small" fullWidth sx={darkInputStyle} disabled>
+              <InputLabel>Platz</InputLabel>
+              <Select value={selectedSlot.pitchId} label="Platz" MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }} sx={{ color: 'grey.100' }}>
+                {data.pitches.map(p => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+              </Select>
+            </FormControl>
 
-          <form onSubmit={submitBooking}>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Heim-Mannschaft:
-              </label>
-              <div style={{ padding: '8px 0', fontSize: '16px', color: '#000' }}>
-                {data.teams[teamId] || 'Dein Team'}
-              </div>
-            </div>
+            <Divider sx={{ my: 1, borderColor: 'grey.800' }} />
             
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Auswärts-Mannschaft:
-              </label>
-              <select 
+            <Box>
+              <Typography sx={{ color: 'grey.100', fontWeight: 'bold', mb: 0.5 }}>Heim-Mannschaft</Typography>
+              <Typography sx={{ color: 'grey.200' }}>{data.teams[teamId] || 'Dein Team'}</Typography>
+            </Box>
+
+            <Box>
+            <Typography sx={{ color: 'grey.100', fontWeight: 'bold', mb: 0.5 }}>Auswärts-Mannschaft</Typography>
+            <FormControl fullWidth size="small" sx={{ borderColor: 'grey.700' , bgcolor: '#333' }}>
+              <Select sx={{ color: 'grey.100' }}
+                label="Auswärts-Mannschaft"
                 value={awayTeam} 
-                onChange={e => setAwayTeam(e.target.value)} 
+                onChange={(e) => setAwayTeam(e.target.value)}
                 required
-                style={{ width: '100%', padding: '8px', fontSize: '16px' }}
+                MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200'} } }}
+                disabled={isOpponentLoading}
               >
-                <option value="">Team auswählen</option>
-                {Object.keys(data.teams).map(teamId => (
-                    <option key={teamId} value={teamId}>{data.teams[teamId]}</option>
-                ))}
-            </select>
-            </div>
+                <MenuItem value=""><em>-</em></MenuItem>
+                {isOpponentLoading ? (
+                  <MenuItem disabled><em>Lade Gegner...</em></MenuItem>
+                ) : (
+                  potentialOpponents.map(opponent => (
+                    <MenuItem key={opponent.id} value={opponent.id}>
+                      {opponent.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </FormControl>
+            </Box>
 
-            {/* Kontaktdaten - nur für nicht-angemeldete Benutzer (falls nötig) */}
-            {!currentUser && (
-              <>
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                    Ihr Name: *
-                  </label>
-                  <input 
-                    type="text" 
-                    value={contactName} 
-                    onChange={e => setContactName(e.target.value)} 
-                    required
-                    style={{ width: '100%', padding: '8px', fontSize: '16px', boxSizing: 'border-box' }}
-                    placeholder="Ihr vollständiger Name"
-                  />
-                </div>
-                
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                    E-Mail-Adresse: *
-                  </label>
-                  <input 
-                    type="email" 
-                    value={contactEmail} 
-                    onChange={e => setContactEmail(e.target.value)} 
-                    required
-                    style={{ width: '100%', padding: '8px', fontSize: '16px', boxSizing: 'border-box' }}
-                    placeholder="ihre.email@beispiel.de"
-                  />
-                </div>
-                
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                    Telefonnummer:
-                  </label>
-                  <input 
-                    type="tel" 
-                    value={contactPhone} 
-                    onChange={e => setContactPhone(e.target.value)} 
-                    style={{ width: '100%', padding: '8px', fontSize: '16px', boxSizing: 'border-box' }}
-                    placeholder="+49 123 456789"
-                  />
-                </div>
-              </>
-            )}
-            
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button 
-                type="button" 
-                onClick={() => setSelectedSlot(null)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                Abbrechen
-              </button>
-              <button 
-                type="submit"
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                Jetzt buchen
-              </button>
-            </div>
-          </form>
-        </div>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
+              <Button variant="outlined" color="inherit" onClick={() => setSelectedSlot(null)}sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
+              <Button variant="contained" sx={{ bgcolor: '#00A99D' }} type="submit" disabled={!awayTeam || submitting}>
+                {submitting ? <CircularProgress size={20} /> : 'Jetzt buchen'}
+              </Button>
+            </Box>
+          </Box>
+        </ReusableModal>
       )}
-    </div>
+    </Box>
   );
 };
 

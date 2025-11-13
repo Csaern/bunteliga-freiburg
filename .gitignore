@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/Teamboard/node_modules
 /.pnp
 .pnp.js
 
@@ -9,6 +10,10 @@
 node_modules/.cache/
 Website/node_modules/.cache/
 .cache/
+
+# Next.js build output
+.next/
+Teamboard/.next/
 
 # testing
 /coverage

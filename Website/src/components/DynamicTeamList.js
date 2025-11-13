@@ -14,6 +14,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { db } from '../firebase';
+import { API_BASE_URL } from '../services/apiClient';
 
 const DynamicTeamList = ({ title }) => {
   const theme = useTheme();
@@ -109,99 +110,105 @@ const DynamicTeamList = ({ title }) => {
           </Box>
         ) : (
           <List disablePadding>
-            {teams.map((team, index) => (
-              <ListItem
-                key={team.id}
-                sx={{
-                  py: isMobile ? 1.25 : 2,
-                  px: isMobile ? 1.5 : 2.5,
-                  borderBottom: index === teams.length - 1 ? 'none' : `1px solid ${theme.palette.grey[800]}`,
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' },
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <ListItemAvatar sx={{ minWidth: isMobile ? 40 : 56 }}>
-                  {team.logoUrl ? (
-                    <Avatar
-                      alt={`${team.name} Logo`}
-                      src={team.logoUrl}
+            {teams.map((team, index) => {
+              const logoSrc = team.logoUrl
+                ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`)
+                : null;
+
+              return (
+                <ListItem
+                  key={team.id}
+                  sx={{
+                    py: isMobile ? 1.25 : 2,
+                    px: isMobile ? 1.5 : 2.5,
+                    borderBottom: index === teams.length - 1 ? 'none' : `1px solid ${theme.palette.grey[800]}`,
+                    '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' },
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <ListItemAvatar sx={{ minWidth: isMobile ? 40 : 56 }}>
+                    {logoSrc ? (
+                      <Avatar
+                        alt={`${team.name} Logo`}
+                        src={logoSrc}
+                        sx={{
+                          width: isMobile ? 28 : 40,
+                          height: isMobile ? 28 : 40,
+                          border: `2px solid ${team.logoColor || theme.palette.grey[700]}`,
+                        }}
+                      />
+                    ) : (
+                      <Avatar
+                        alt={`${team.name} Logo`}
+                        sx={{
+                          width: isMobile ? 28 : 40,
+                          height: isMobile ? 28 : 40,
+                          fontSize: isMobile ? '0.8rem' : '1rem',
+                          color: theme.palette.getContrastText(team.logoColor || theme.palette.grey[700]),
+                          backgroundColor: team.logoColor || theme.palette.grey[700],
+                          fontFamily: 'comfortaa',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        {team.name.substring(0, 1).toUpperCase()}
+                      </Avatar>
+                    )}
+                  </ListItemAvatar>
+                
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography
+                      variant="body1"
+                      component="div"
+                      onClick={() => navigate(`/team/${team.id}`)}
                       sx={{
-                        width: isMobile ? 28 : 40,
-                        height: isMobile ? 28 : 40,
-                        border: `2px solid ${team.logoColor || theme.palette.grey[700]}`,
-                      }}
-                    />
-                  ) : (
-                    <Avatar
-                      alt={`${team.name} Logo`}
-                      sx={{
-                        width: isMobile ? 28 : 40,
-                        height: isMobile ? 28 : 40,
-                        fontSize: isMobile ? '0.8rem' : '1rem',
-                        color: theme.palette.getContrastText(team.logoColor || theme.palette.grey[700]),
-                        backgroundColor: team.logoColor || theme.palette.grey[700],
                         fontFamily: 'comfortaa',
+                        color: theme.palette.grey[100],
                         fontWeight: 'bold',
+                        fontSize: isMobile ? '0.8rem' : '1.1rem',
+                        lineHeight: 1.3,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: '#00A99D',
+                          textDecoration: 'underline',
+                        },
                       }}
                     >
-                      {team.name.substring(0, 1).toUpperCase()}
-                    </Avatar>
-                  )}
-                </ListItemAvatar>
-                
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography
-                    variant="body1"
-                    component="div"
-                    onClick={() => navigate(`/team/${team.id}`)}
-                    sx={{
-                      fontFamily: 'comfortaa',
-                      color: theme.palette.grey[100],
-                      fontWeight: 'bold',
-                      fontSize: isMobile ? '0.8rem' : '1.1rem',
-                      lineHeight: 1.3,
-                      cursor: 'pointer',
-                      '&:hover': {
-                        color: '#00A99D',
-                        textDecoration: 'underline',
-                      },
-                    }}
-                  >
-                    {team.name}
-                  </Typography>
-                  
-                  {team.description && (
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontFamily: 'comfortaa',
-                        color: theme.palette.grey[400],
-                        fontSize: isMobile ? '0.7rem' : '0.9rem',
-                        mt: 0.5,
-                      }}
-                    >
-                      {team.description}
+                      {team.name}
                     </Typography>
-                  )}
-                </Box>
-                
-                {team.foundedYear && (
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontFamily: 'comfortaa',
-                        color: theme.palette.grey[500],
-                        fontSize: isMobile ? '0.6rem' : '0.8rem',
-                      }}
-                    >
-                      Gegründet {team.foundedYear}
-                    </Typography>
+                    
+                    {team.description && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'comfortaa',
+                          color: theme.palette.grey[400],
+                          fontSize: isMobile ? '0.7rem' : '0.9rem',
+                          mt: 0.5,
+                        }}
+                      >
+                        {team.description}
+                      </Typography>
+                    )}
                   </Box>
-                )}
-              </ListItem>
-            ))}
+                  
+                  {team.foundedYear && (
+                    <Box sx={{ textAlign: 'right' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontFamily: 'comfortaa',
+                          color: theme.palette.grey[500],
+                          fontSize: isMobile ? '0.6rem' : '0.8rem',
+                        }}
+                      >
+                        Gegründet {team.foundedYear}
+                      </Typography>
+                    </Box>
+                  )}
+                </ListItem>
+              );
+            })}
           </List>
         )}
       </Paper>

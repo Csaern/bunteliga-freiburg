@@ -39,7 +39,7 @@ const ResultsPage = () => {
   return (
     <div>
       <DynamicLeagueTable 
-        title={`Liga-Tabelle ${currentSeason.year}`}
+        title={`Liga-Tabelle`}
         form={true} 
         seasonId={currentSeason?.id}
       />

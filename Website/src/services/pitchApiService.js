@@ -1,10 +1,18 @@
 import { apiClient, apiClientFormData } from './apiClient';
+import { publicApiClient } from './apiClient';
 
 /**
  * Holt alle Plätze (Admin-Route).
  */
 export const getAllPitches = () => {
     return apiClient('/api/pitches/all-admin', 'GET');
+};
+
+/**
+ * NEU: Holt alle verifizierten Plätze (öffentlich, ohne Authentifizierung).
+ */
+export const getPublicPitches = () => {
+    return publicApiClient('/api/pitches/public', 'GET');
 };
 
 /**

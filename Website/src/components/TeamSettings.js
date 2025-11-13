@@ -2,9 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthProvider';
+import { 
+  TextField, 
+  Button, 
+  Box, 
+  Typography, 
+  CircularProgress,
+  useTheme
+} from '@mui/material';
+import { ReusableModal } from './Helpers/modalUtils';
+import * as teamApi from '../services/teamApiService';
 
 const TeamSettings = ({ onClose }) => {
   const { teamId } = useAuth();
+  const theme = useTheme();
   const [team, setTeam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,10 +40,18 @@ const TeamSettings = ({ onClose }) => {
 
   const loadTeamData = async () => {
     try {
-      const teamDoc = await getDoc(doc(db, 'teams', teamId));
-      if (teamDoc.exists()) {
-        const teamData = teamDoc.data();
-        setTeam({ id: teamDoc.id, ...teamData });
+      setLoading(true);
+      const teamData = await teamApi.getTeamByIdPublic(teamId).catch(async () => {
+        // Fallback zu Firestore
+        const teamDoc = await getDoc(doc(db, 'teams', teamId));
+        if (teamDoc.exists()) {
+          return { id: teamDoc.id, ...teamDoc.data() };
+        }
+        return null;
+      });
+      
+      if (teamData) {
+        setTeam(teamData);
         setFormData({
           description: teamData.description || '',
           foundedYear: teamData.foundedYear || '',
@@ -57,7 +76,7 @@ const TeamSettings = ({ onClose }) => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await updateDoc(doc(db, 'teams', teamId), formData);
+      await teamApi.updateTeam(teamId, formData);
       setTeam({ ...team, ...formData });
       alert('Team-Einstellungen erfolgreich gespeichert!');
       onClose();
@@ -69,263 +88,171 @@ const TeamSettings = ({ onClose }) => {
     }
   };
 
+  const darkInputStyle = {
+    '& label.Mui-focused': { color: '#00A99D' },
+    '& .MuiOutlinedInput-root': {
+      '& fieldset': { borderColor: 'grey.700' },
+      '&:hover fieldset': { borderColor: 'grey.500' },
+      '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+    },
+    '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark' },
+    '& label': { color: 'grey.400' },
+  };
+
   if (loading) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '40px',
-          borderRadius: '12px',
-          textAlign: 'center',
-          fontFamily: 'comfortaa'
-        }}>
-          <div>Lade Team-Daten...</div>
-        </div>
-      </div>
+      <ReusableModal open={true} onClose={onClose} title="Team-Einstellungen">
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: '#00A99D' }} />
+        </Box>
+      </ReusableModal>
     );
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: '64px',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'flex-start',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '20px',
-      paddingTop: '40px'
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '30px',
-        maxWidth: '600px',
-        width: '100%',
-        maxHeight: 'calc(100vh - 120px)',
-        overflowY: 'auto',
-        fontFamily: 'comfortaa',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '30px'
-        }}>
-           <h2 style={{
-             margin: 0,
-             color: '#000000',
-             fontFamily: 'comfortaa',
-             fontSize: '1.8rem'
-           }}>
-            ⚙️ Team-Einstellungen
-          </h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: '#666'
-            }}
-          >
-            ×
-          </button>
-        </div>
+    <ReusableModal open={true} onClose={onClose} title="Team-Einstellungen">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: '70vh', overflowY: 'auto', pr: 1 }}>
+          <TextField
+            label="Beschreibung"
+            multiline
+            rows={4}
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            fullWidth
+            sx={darkInputStyle}
+            placeholder="Beschreiben Sie Ihr Team..."
+          />
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-          <div style={{ display: 'grid', gap: '20px', flex: 1, overflowY: 'auto', paddingRight: '10px', minHeight: 0 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                Beschreibung:
-              </label>
-               <textarea
-                 value={formData.description}
-                 onChange={(e) => setFormData({...formData, description: e.target.value})}
-                 rows="4"
-                 style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                 placeholder="Beschreiben Sie Ihr Team..."
-               />
-            </div>
+          <TextField
+            label="Gründungsjahr"
+            type="number"
+            value={formData.foundedYear}
+            onChange={(e) => setFormData({...formData, foundedYear: e.target.value})}
+            fullWidth
+            sx={darkInputStyle}
+            placeholder="z.B. 2020"
+          />
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                Gründungsjahr:
-              </label>
-              <input
-                type="number"
-                value={formData.foundedYear}
-                onChange={(e) => setFormData({...formData, foundedYear: e.target.value})}
-                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa' }}
-                placeholder="z.B. 2020"
+          <Box sx={{ borderTop: '1px solid', borderColor: 'grey.800', pt: 2 }}>
+            <Typography variant="subtitle1" sx={{ color: 'grey.300', mb: 2, fontFamily: 'comfortaa', fontWeight: 600 }}>
+              Kontaktinformationen
+            </Typography>
+            
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Ansprechpartner"
+                value={formData.contactPerson}
+                onChange={(e) => setFormData({...formData, contactPerson: e.target.value})}
+                fullWidth
+                sx={darkInputStyle}
+                placeholder="Name des Ansprechpartners"
               />
-            </div>
 
-            <div style={{ borderTop: '1px solid #eee', paddingTop: '20px' }}>
-               <h3 style={{ fontFamily: 'comfortaa', marginBottom: '15px', color: '#000000' }}>📞 Kontaktinformationen</h3>
-              
-              <div style={{ display: 'grid', gap: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                    Ansprechpartner:
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.contactPerson}
-                    onChange={(e) => setFormData({...formData, contactPerson: e.target.value})}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                    placeholder="Name des Ansprechpartners"
-                  />
-                </div>
+              <TextField
+                label="E-Mail"
+                type="email"
+                value={formData.contactEmail}
+                onChange={(e) => setFormData({...formData, contactEmail: e.target.value})}
+                fullWidth
+                sx={darkInputStyle}
+                placeholder="team@example.com"
+              />
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                    E-Mail:
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.contactEmail}
-                    onChange={(e) => setFormData({...formData, contactEmail: e.target.value})}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                    placeholder="team@example.com"
-                  />
-                </div>
+              <TextField
+                label="Telefon"
+                type="tel"
+                value={formData.contactPhone}
+                onChange={(e) => setFormData({...formData, contactPhone: e.target.value})}
+                fullWidth
+                sx={darkInputStyle}
+                placeholder="+49 123 456789"
+              />
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                    Telefon:
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.contactPhone}
-                    onChange={(e) => setFormData({...formData, contactPhone: e.target.value})}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                    placeholder="+49 123 456789"
-                  />
-                </div>
+              <TextField
+                label="Website"
+                type="url"
+                value={formData.website}
+                onChange={(e) => setFormData({...formData, website: e.target.value})}
+                fullWidth
+                sx={darkInputStyle}
+                placeholder="https://www.team-website.com"
+              />
+            </Box>
+          </Box>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                    Website:
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.website}
-                    onChange={(e) => setFormData({...formData, website: e.target.value})}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                    placeholder="https://www.team-website.com"
-                  />
-                </div>
-              </div>
-            </div>
+          <Box sx={{ borderTop: '1px solid', borderColor: 'grey.800', pt: 2 }}>
+            <Typography variant="subtitle1" sx={{ color: 'grey.300', mb: 2, fontFamily: 'comfortaa', fontWeight: 600 }}>
+              Social Media
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Facebook"
+                type="url"
+                value={formData.socialMedia.facebook}
+                onChange={(e) => setFormData({
+                  ...formData, 
+                  socialMedia: {...formData.socialMedia, facebook: e.target.value}
+                })}
+                fullWidth
+                sx={darkInputStyle}
+                placeholder="https://facebook.com/team"
+              />
+              <TextField
+                label="Instagram"
+                type="url"
+                value={formData.socialMedia.instagram}
+                onChange={(e) => setFormData({
+                  ...formData, 
+                  socialMedia: {...formData.socialMedia, instagram: e.target.value}
+                })}
+                fullWidth
+                sx={darkInputStyle}
+                placeholder="https://instagram.com/team"
+              />
+              <TextField
+                label="Twitter"
+                type="url"
+                value={formData.socialMedia.twitter}
+                onChange={(e) => setFormData({
+                  ...formData, 
+                  socialMedia: {...formData.socialMedia, twitter: e.target.value}
+                })}
+                fullWidth
+                sx={darkInputStyle}
+                placeholder="https://twitter.com/team"
+              />
+            </Box>
+          </Box>
 
-            <div style={{ borderTop: '1px solid #eee', paddingTop: '20px' }}>
-               <h3 style={{ fontFamily: 'comfortaa', marginBottom: '15px', color: '#000000' }}>🌐 Social Media</h3>
-              <div style={{ display: 'grid', gap: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                    Facebook:
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.socialMedia.facebook}
-                    onChange={(e) => setFormData({
-                      ...formData, 
-                      socialMedia: {...formData.socialMedia, facebook: e.target.value}
-                    })}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                    placeholder="https://facebook.com/team"
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                    Instagram:
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.socialMedia.instagram}
-                    onChange={(e) => setFormData({
-                      ...formData, 
-                      socialMedia: {...formData.socialMedia, instagram: e.target.value}
-                    })}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                    placeholder="https://instagram.com/team"
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontFamily: 'comfortaa', color: '#000000' }}>
-                    Twitter:
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.socialMedia.twitter}
-                    onChange={(e) => setFormData({
-                      ...formData, 
-                      socialMedia: {...formData.socialMedia, twitter: e.target.value}
-                    })}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'comfortaa', color: '#000000' }}
-                    placeholder="https://twitter.com/team"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee', flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontFamily: 'comfortaa',
-                  fontWeight: 'bold'
-                }}
-              >
-                Abbrechen
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: saving ? '#6c757d' : '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: saving ? 'not-allowed' : 'pointer',
-                  fontFamily: 'comfortaa',
-                  fontWeight: 'bold'
-                }}
-              >
-                {saving ? 'Speichern...' : 'Speichern'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 2, borderTop: '1px solid', borderColor: 'grey.800' }}>
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outlined"
+              sx={{ 
+                color: 'grey.400', 
+                borderColor: 'grey.700',
+                '&:hover': { borderColor: 'grey.500', backgroundColor: 'rgba(255,255,255,0.05)' }
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="submit"
+              disabled={saving}
+              variant="contained"
+              sx={{ 
+                backgroundColor: saving ? '#6c757d' : '#00A99D',
+                '&:hover': { backgroundColor: saving ? '#6c757d' : '#00897B' }
+              }}
+            >
+              {saving ? 'Speichern...' : 'Speichern'}
+            </Button>
+          </Box>
+        </Box>
+      </form>
+    </ReusableModal>
   );
 };
 

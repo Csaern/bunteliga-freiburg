@@ -1,4 +1,4 @@
-import { apiClient, apiClientFormData } from './apiClient';
+import { apiClient, apiClientFormData, publicApiClient } from './apiClient';
 
 export const adminCreateResult = async (resultData) => {
     return apiClient('/api/results/admin/create', 'POST', resultData);
@@ -14,4 +14,23 @@ export const adminDeleteResult = async (resultId) => {
 
 export const getResultsForSeason = async (seasonId) => {
     return apiClient(`/api/results/season/${seasonId}`);
+};
+
+export const getResultsForSeasonPublic = async (seasonId) => {
+    return publicApiClient(`/api/results/public/season/${seasonId}`);
+};
+
+// Team meldet ein Ergebnis zu einer Buchung
+export const reportResult = async (bookingId, resultData) => {
+    return apiClient(`/api/results/report/${bookingId}`, 'POST', resultData);
+};
+
+// Ausstehende Ergebnisbestätigungen für mein Team
+export const getPendingResultsForMyTeam = async () => {
+    return apiClient('/api/results/team/pending', 'GET');
+};
+
+// Team bestätigt oder lehnt ein gemeldetes Ergebnis ab
+export const respondToResultAction = async (resultId, actingTeamId, action, reason = '') => {
+    return apiClient(`/api/results/${resultId}/action`, 'POST', { actingTeamId, action, reason });
 };
