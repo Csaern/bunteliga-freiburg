@@ -43,12 +43,42 @@ async function deleteNews(newsId) {
 }
 
 async function getPublishedNews() {
-  const snapshot = await newsCollection
-    .where('status', '==', 'published')
-    .orderBy('publishedAt', 'desc')
-    .get();
-  if (snapshot.empty) return [];
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  try {
+    // Zuerst alle veröffentlichten News abrufen
+    const snapshot = await newsCollection
+      .where('status', '==', 'published')
+      .get();
+    
+    if (snapshot.empty) return [];
+    
+    // Daten konvertieren und nach publishedAt sortieren (falls vorhanden)
+    const news = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return { id: doc.id, ...data };
+    });
+    
+    // Sortiere nach publishedAt (neueste zuerst), falls vorhanden
+    news.sort((a, b) => {
+      const dateA = a.publishedAt ? (a.publishedAt.toDate ? a.publishedAt.toDate().getTime() : new Date(a.publishedAt).getTime()) : 0;
+      const dateB = b.publishedAt ? (b.publishedAt.toDate ? b.publishedAt.toDate().getTime() : new Date(b.publishedAt).getTime()) : 0;
+      return dateB - dateA; // Neueste zuerst
+    });
+    
+    return news;
+  } catch (error) {
+    console.error('Fehler beim Abrufen der veröffentlichten News:', error);
+    // Fallback: Versuche ohne orderBy
+    try {
+      const snapshot = await newsCollection
+        .where('status', '==', 'published')
+        .get();
+      if (snapshot.empty) return [];
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (fallbackError) {
+      console.error('Fallback-Query fehlgeschlagen:', fallbackError);
+      return [];
+    }
+  }
 }
 
 async function getAllNewsForAdmin() {

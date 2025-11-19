@@ -11,6 +11,7 @@ import {
   Button,
   useTheme,
   useMediaQuery,
+  Grid,
 } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 
@@ -112,7 +113,62 @@ const VenuesPage = () => {
         variant={isMobile ? 'h4' : 'h3'}
         component="h1"
         sx={{
+          mb: 3,
+          mt: 2,
+          color: '#00A99D',
+          fontWeight: 700,
+          fontFamily: 'comfortaa',
+          textAlign: 'center',
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+        }}
+      >
+        Über uns
+      </Typography>
+      
+      {/* Beschreibung über die Bunte Liga */}
+      <Paper
+        sx={{
+          backgroundColor: '#1C1C1C',
+          borderRadius: theme.shape.borderRadius,
+          border: `1px solid ${theme.palette.grey[800]}`,
+          p: { xs: 2, sm: 3 },
           mb: 4,
+        }}
+      >
+        <Typography
+          variant="h5"
+          sx={{
+            color: '#00A99D',
+            fontFamily: 'comfortaa',
+            fontWeight: 700,
+            mb: 2,
+            textAlign: 'center',
+          }}
+        >
+          Die Bunte Liga Freiburg
+        </Typography>
+        <Typography
+          variant="body1"
+          sx={{
+            color: theme.palette.grey[300],
+            fontFamily: 'comfortaa',
+            lineHeight: 1.8,
+            textAlign: 'justify',
+          }}
+        >
+          Die Bunte Liga Freiburg ist eine inklusive Fußballliga, die Menschen aller Hintergründe zusammenbringt. 
+          Wir fördern Fairplay, Gemeinschaft und den Spaß am Fußball. Unsere Liga steht für Vielfalt, Respekt und 
+          sportliche Begeisterung. Egal ob Anfänger oder erfahrener Spieler – bei uns ist jeder willkommen, der 
+          die Leidenschaft für den Fußball teilt.
+        </Typography>
+      </Paper>
+
+      {/* Plätze in Grid (max 2 nebeneinander) */}
+      <Typography
+        variant="h5"
+        sx={{
+          mb: 3,
           mt: 2,
           color: '#00A99D',
           fontWeight: 700,
@@ -125,13 +181,13 @@ const VenuesPage = () => {
         Unsere Plätze
       </Typography>
       
-      <Box>
+      <Grid container spacing={3}>
         {venuesData.map((venue) => (
-          <Box key={venue.id} sx={{ mb: isMobile ? 3 : 4 }}>
+          <Grid item xs={12} sm={6} key={venue.id}>
             <VenueCard venue={venue} />
-          </Box>
+          </Grid>
         ))}
-      </Box>
+      </Grid>
     </Container>
   );
 };

@@ -1,6 +1,6 @@
 // src/components/DynamicLeagueTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import {
   Table,
@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { db } from '../firebase';
 import { API_BASE_URL } from '../services/apiClient';
+import * as seasonApiService from '../services/seasonApiService';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
@@ -98,9 +99,40 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
 
   const loadTableData = useCallback(async () => {
     try {
+      // Wenn seasonId vorhanden ist, lade die Saison-Daten, um die registrierten Teams zu erhalten
+      let seasonTeams = [];
+      if (seasonId) {
+        try {
+          // Versuche zuerst die aktive Saison zu laden (falls es die aktive ist)
+          const activeSeason = await seasonApiService.getActiveSeasonPublic();
+          if (activeSeason && activeSeason.id === seasonId && activeSeason.teams) {
+            seasonTeams = activeSeason.teams.map(t => t.id || t.teamId).filter(Boolean);
+          } else {
+            // Falls nicht die aktive Saison, lade die Saison direkt aus Firestore
+            const seasonDoc = await getDoc(doc(db, 'seasons', seasonId));
+            if (seasonDoc.exists()) {
+              const seasonData = seasonDoc.data();
+              if (seasonData.teams && Array.isArray(seasonData.teams)) {
+                seasonTeams = seasonData.teams.map(t => {
+                  // Unterstütze sowohl {id, name} als auch {teamId, name} Format
+                  return t.id || t.teamId;
+                }).filter(Boolean);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Fehler beim Laden der Saison-Daten:', error);
+        }
+      }
+
       // Teams laden
       const teamsSnap = await getDocs(collection(db, 'teams'));
-      const teams = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let teams = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Nur Teams anzeigen, die für die Saison registriert sind
+      if (seasonId && seasonTeams.length > 0) {
+        teams = teams.filter(team => seasonTeams.includes(team.id));
+      }
 
       // Ergebnisse für die aktuelle Saison laden
       let resultsQuery = collection(db, 'results');
@@ -114,7 +146,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
       // Tabellendaten berechnen
       const teamStats = {};
       
-      // Initialisiere alle Teams
+      // Initialisiere nur die Teams, die für die Saison registriert sind
       teams.forEach(team => {
         teamStats[team.id] = {
           teamId: team.id,

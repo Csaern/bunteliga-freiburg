@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
 import NewsCarousel from '../components/News/News';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
-import { db } from '../firebase';
+import * as seasonApi from '../services/seasonApiService';
 
 const HomePage = () => {
   const [currentSeason, setCurrentSeason] = useState(null);
@@ -15,10 +14,9 @@ const HomePage = () => {
 
   const loadCurrentSeason = async () => {
     try {
-      const seasonsSnap = await getDocs(collection(db, 'seasons'));
-      const seasons = seasonsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const current = seasons.find(s => s.isCurrent === true);
-      setCurrentSeason(current);
+      // Lade die aktive Saison über die API (nur active Saisons werden zurückgegeben)
+      const activeSeason = await seasonApi.getActiveSeasonPublic();
+      setCurrentSeason(activeSeason);
     } catch (error) {
       console.error('Fehler beim Laden der aktuellen Saison:', error);
     } finally {

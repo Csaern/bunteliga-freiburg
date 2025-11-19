@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { db } from '../firebase';
 import { API_BASE_URL } from '../services/apiClient';
+import * as seasonApiService from '../services/seasonApiService';
 
 const DynamicTeamList = ({ title }) => {
   const theme = useTheme();
@@ -29,11 +30,29 @@ const DynamicTeamList = ({ title }) => {
 
   const loadTeams = async () => {
     try {
+      // Lade die aktive Saison, um nur Teams anzuzeigen, die für die Saison registriert sind
+      let seasonTeams = [];
+      try {
+        const activeSeason = await seasonApiService.getActiveSeasonPublic();
+        if (activeSeason && activeSeason.teams) {
+          seasonTeams = activeSeason.teams.map(t => t.id || t.teamId).filter(Boolean);
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der aktiven Saison:', error);
+      }
+
       const teamsSnap = await getDocs(collection(db, 'teams'));
-      const teamsData = teamsSnap.docs.map(doc => ({ 
+      let teamsData = teamsSnap.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data() 
-      })).sort((a, b) => a.name.localeCompare(b.name)); // Alphabetisch sortieren
+      }));
+
+      // Nur Teams anzeigen, die für die aktive Saison registriert sind
+      if (seasonTeams.length > 0) {
+        teamsData = teamsData.filter(team => seasonTeams.includes(team.id));
+      }
+
+      teamsData.sort((a, b) => a.name.localeCompare(b.name)); // Alphabetisch sortieren
       
       setTeams(teamsData);
     } catch (error) {

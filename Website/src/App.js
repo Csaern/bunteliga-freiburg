@@ -24,9 +24,9 @@ import LoginPage from './pages/LoginPage';
 // AdminPage und AdminDashboardPage werden nicht mehr direkt benötigt,
 // stattdessen verwenden wir AdminBoard
 import AdminBoard from './pages/AdminBoard';
+import AdminDashboard from './components/Admin/AdminDashboard';
 import UserBoard from './pages/UserBoard';
 import DashboardPage from './pages/DashboardPage';
-import ResultEntryPage from './pages/ResultEntryPage';
 import TeamDetailPage from './pages/TeamDetailPage';
 import ResultConfirmationPage from './pages/ResultConfirmationPage';
 import GameManagementPage from './pages/GameManagementPage';
@@ -52,11 +52,11 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             
             {/* --- NEUE ADMIN ROUTEN --- */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/:tab" element={<AdminBoardWrapper />} />
-            <Route path="/admin" element={<AdminBoardWrapper />} />
+            <Route path="/admin" element={<AdminDashboard />} />
 
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/ergebnis-melden" element={<ResultEntryPage />} />
             <Route path="/board" element={<UserBoard />} />
             <Route path="/historie" element={<HistoryPage />} />
             <Route path="/kontakt" element={<ContactPage />} />

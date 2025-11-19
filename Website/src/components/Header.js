@@ -41,6 +41,7 @@ import InsightsIcon from '@mui/icons-material/Insights';
 import StyleIcon from '@mui/icons-material/Style';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import StadiumIcon from '@mui/icons-material/Stadium';
+import ArticleIcon from '@mui/icons-material/Article';
 
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -57,11 +58,12 @@ const pages = [
   { text: 'Teams', iconName: 'Diversity3Icon', path: '/teams' },
   { text: 'Historiker-Ecke', iconName: 'ScheduleIcon', path: '/historie' },
   { text: 'Regeln', iconName: 'GavelIcon', path: '/regeln' },
-  { text: 'Plätze', iconName: 'ScheduleIcon', path: '/plaetze' },
+  { text: 'Über uns', iconName: 'ScheduleIcon', path: '/plaetze' },
   { text: 'Kontakt', iconName: 'PermContactCalendarIcon', path: '/kontakt' },
 ];
 
 const adminPages = [
+  { text: 'Übersicht', path: '/admin/dashboard', iconName: 'DashboardIcon' },
   { text: 'Buchungen', path: '/admin/bookings', iconName: 'EventIcon' },
   { text: 'Benutzer', path: '/admin/users', iconName: 'GroupIcon' },
   { text: 'Saisons', path: '/admin/season', iconName: 'EmojiEventsIcon' },
@@ -73,11 +75,11 @@ const adminPages = [
 const teamboardPages = [
   { text: 'Übersicht', path: '/dashboard', iconName: 'DashboardIcon' },
   { text: 'Platz buchen', path: '/platzreservierung', iconName: 'EventIcon' },
-  { text: 'Ergebnis melden', path: '/ergebnis-melden', iconName: 'InsightsIcon' },
 ];
 
 const iconMap = {
   HomeIcon: HomeIcon,
+  ArticleIcon: ArticleIcon,
   TableViewIcon: TableViewIcon,
   Diversity3Icon: Diversity3Icon,
   ScheduleIcon: ScheduleIcon,
@@ -142,7 +144,7 @@ function Header() {
   const [teamboardMenuAnchorEl, setTeamboardMenuAnchorEl] = React.useState(null);
   const [mobileTeamboardMenuOpen, setMobileTeamboardMenuOpen] = React.useState(false);
 
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, teamId } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -197,7 +199,7 @@ function Header() {
       <Divider sx={{ borderColor: theme.palette.grey[850] }} />
 
       <List>
-        {currentUser && (
+        {currentUser && teamId && (
           <>
             <ListItem disablePadding>
               <ListItemButton onClick={handleMobileTeamboardMenuToggle} sx={{ margin: theme.spacing(0.5, 1) }}>
@@ -365,7 +367,7 @@ function Header() {
               );
             })}
 
-            {currentUser && (
+            {currentUser && teamId && (
               <>
                 <Button id="teamboard-menu-button" onClick={handleTeamboardMenuOpen}
                   sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: isTeamboardActive ? '#FFBF00' : 'rgba(255, 255, 255, 0.75)', display: 'block', fontFamily: 'comfortaa', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: isTeamboardActive ? 'bold' : 400, borderBottom: isTeamboardActive ? `3px solid #FFBF00` : '3px solid transparent', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: theme.palette.common.white, borderBottom: `3px solid rgba(255, 255, 255, 0.15)` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}

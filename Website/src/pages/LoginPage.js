@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthProvider';
-import { Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Container, Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { currentUser } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -27,9 +28,19 @@ const LoginPage = () => {
         return;
       }
       
+      const userData = udoc.data();
+      const isUserAdmin = userData.isAdmin || false;
+      
       await setDoc(doc(db, 'users', cred.user.uid), {
         lastLogin: serverTimestamp(),
       }, { merge: true });
+      
+      // Direkte Weiterleitung basierend auf Admin-Status
+      if (isUserAdmin) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
       
     } catch (error) {
       console.error('Login-Fehler:', error);
@@ -46,9 +57,21 @@ const LoginPage = () => {
     }
   };
 
-  if (currentUser) {
-    return <Navigate to="/dashboard" />;
-  }
+  // Fallback-Weiterleitung wenn bereits eingeloggt
+  useEffect(() => {
+    if (currentUser) {
+      // Warte kurz, damit isAdmin geladen werden kann
+      const timer = setTimeout(() => {
+        if (isAdmin === true) {
+          navigate('/admin/dashboard');
+        } else if (isAdmin === false) {
+          navigate('/dashboard');
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser, isAdmin, navigate]);
 
   return (
     <Container

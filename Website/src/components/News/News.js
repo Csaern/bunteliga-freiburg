@@ -1,48 +1,117 @@
 import * as React from 'react';
-import { Box, Container, IconButton, Typography, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Container, IconButton, Typography, useTheme, useMediaQuery, CircularProgress } from '@mui/material';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import NewsCard from './NewsCard.js'; 
-import { useSwipeable } from 'react-swipeable'; 
-
-// Beispieldaten für die News
-const newsData = [
-  {
-    date: '31. Mai 2025',
-    title: 'Meister!',
-    subtitle: 'Wir gratulieren dem 1. FC Ferdi Weiß zum Meistertitel der Saison 2024/2025',
-    content: 'Eine überragende Saisonleistung krönt den 1. FC Ferdi Weiß! Mit beeindruckender Konstanz und tollem Teamgeist sicherte sich die Mannschaft verdient den Meistertitel. Herzlichen Glückwunsch an alle Spieler, Trainer und Fans!',
-  },
-  {
-    date: '28. Mai 2025',
-    title: 'Testtitel 1',
-    subtitle: 'Untertitel 1',
-    content: 'Das Liga-Komitee hat in Zusammenarbeit mit den Team-Vertretern ein überarbeitetes Fair-Play-Regelwerk verabschiedet. Die wichtigste Änderung betrifft die Handhabung von Zeitstrafen, die nun konsequenter geahndet werden. Zudem wird die Fair-Play-Wertung am Ende der Saison ein höheres Gewicht haben. Alle Details zu den neuen Regeln findet ihr im Download-Bereich auf der Webseite. Fairness und Respekt auf und neben dem Platz sind die Grundpfeiler unserer Liga.',
-  },
-  {
-    date: '25. Mai 2025',
-    title: 'Csaern!',
-    subtitle: 'Bester Spieler',
-    content: '',
-  },
-];
+import { useSwipeable } from 'react-swipeable';
+import * as newsApi from '../../services/newsApiService';
 
 const NewsCarousel = () => {
   const theme = useTheme(); 
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const [newsData, setNewsData] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // Helper function to normalize Firestore timestamps
+  const normalizeToDate = (maybeDate) => {
+    if (!maybeDate) return null;
+    
+    // Firestore Timestamp object (has toDate() method)
+    if (typeof maybeDate.toDate === 'function') {
+      return maybeDate.toDate();
+    }
+    
+    // Serialized Firestore Timestamp format {_seconds, _nanoseconds}
+    if (typeof maybeDate === 'object' && typeof maybeDate._seconds === 'number') {
+      const milliseconds = maybeDate._seconds * 1000;
+      if (typeof maybeDate._nanoseconds === 'number') {
+        return new Date(milliseconds + (maybeDate._nanoseconds / 1000000));
+      }
+      return new Date(milliseconds);
+    }
+    
+    // JavaScript Date object or ISO string
+    const d = new Date(maybeDate);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  React.useEffect(() => {
+    const loadNews = async () => {
+      try {
+        console.log('Lade News...');
+        const news = await newsApi.getPublishedNews();
+        console.log('News geladen:', news);
+        
+        if (!news || !Array.isArray(news)) {
+          console.warn('News ist kein Array:', news);
+          setNewsData([]);
+          setLoading(false);
+          return;
+        }
+
+        // Format news data for NewsCard component
+        const formattedNews = news.map(item => {
+          // Format date from Firestore timestamp
+          let dateStr = '';
+          if (item.publishedAt) {
+            const date = normalizeToDate(item.publishedAt);
+            if (date) {
+              dateStr = date.toLocaleDateString('de-DE', { 
+                day: '2-digit', 
+                month: 'long', 
+                year: 'numeric' 
+              });
+            }
+          } else if (item.createdAt) {
+            // Fallback: Verwende createdAt wenn publishedAt nicht vorhanden ist
+            const date = normalizeToDate(item.createdAt);
+            if (date) {
+              dateStr = date.toLocaleDateString('de-DE', { 
+                day: '2-digit', 
+                month: 'long', 
+                year: 'numeric' 
+              });
+            }
+          }
+          
+          return {
+            id: item.id,
+            title: item.title || '',
+            subtitle: item.subtitle || '',
+            content: item.content || '',
+            date: dateStr,
+          };
+        });
+        
+        console.log('Formatierte News:', formattedNews);
+        setNewsData(formattedNews);
+        setActiveIndex(0);
+      } catch (error) {
+        console.error('Fehler beim Laden der News:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+        });
+        setNewsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadNews();
+  }, []);
 
   const handlePreviousCallback = React.useCallback(() => {
     if (newsData && newsData.length > 0) {
         setActiveIndex((prevIndex) => Math.max(0, prevIndex - 1));
     }
-  }, []); 
+  }, [newsData]); 
 
   const handleNextCallback = React.useCallback(() => {
     if (newsData && newsData.length > 0) {
         setActiveIndex((prevIndex) => Math.min(newsData.length - 1, prevIndex + 1));
     }
-  }, []); 
+  }, [newsData]); 
 
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => handleNextCallback(),
@@ -51,10 +120,26 @@ const NewsCarousel = () => {
     trackMouse: true 
   });
 
+  if (loading) {
+    return (
+      <Container maxWidth="xl" sx={{ my: 4, textAlign: 'center' }}>
+        <CircularProgress sx={{ color: '#00A99D' }} />
+        <Typography variant="body2" sx={{ mt: 2, fontFamily: 'comfortaa', color: 'grey.400' }}>
+          Lade News...
+        </Typography>
+      </Container>
+    );
+  }
+
   if (!newsData || newsData.length === 0) {
     return (
       <Container maxWidth="xl" sx={{ my: 4, textAlign: 'center' }}>
-        <Typography variant="h6" sx={{fontFamily:'comfortaa'}}>Keine Nachrichten verfügbar.</Typography>
+        <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: 'grey.400', mb: 1 }}>
+          Keine Nachrichten verfügbar.
+        </Typography>
+        <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: 'grey.500' }}>
+          Es wurden noch keine News veröffentlicht.
+        </Typography>
       </Container>
     );
   }

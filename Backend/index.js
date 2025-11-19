@@ -23,6 +23,7 @@ const pitchRoutes = require('./routes/pitchRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const resultRoutes = require('./routes/resultRoutes');
 const userRoutes = require('./routes/userRoutes');
+const newsRoutes = require('./routes/newsRoutes');
 
 
 const db = getFirestore();
@@ -56,6 +57,7 @@ app.use('/api/pitches', pitchRoutes); // KORREKTUR: Sicherstellen, dass diese Ze
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/users', userRoutes); // NEU: Benutzer-Routen registrieren
+app.use('/api/news', newsRoutes); // NEU: News-Routen registrieren
 
 
 // 5. Den Server starten

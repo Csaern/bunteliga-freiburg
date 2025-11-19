@@ -67,6 +67,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   const [loading, setLoading] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
   const [pitchName, setPitchName] = useState('');
+  const [pitchesMap, setPitchesMap] = useState({});
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportForm, setReportForm] = useState({ homeScore: '', awayScore: '' });
@@ -383,6 +384,23 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       }
       
       if (showType === 'upcoming' || showType === 'all') {
+        // Lade Pitch-Namen für bevorstehende Spiele
+        const pitchIds = [...new Set(bookings.map(b => b.pitchId).filter(Boolean))];
+        const pitchesData = {};
+        if (pitchIds.length > 0) {
+          try {
+            const pitches = await pitchApi.getPublicPitches();
+            pitches.forEach(pitch => {
+              if (pitchIds.includes(pitch.id)) {
+                pitchesData[pitch.id] = pitch.name;
+              }
+            });
+            setPitchesMap(pitchesData);
+          } catch (error) {
+            console.error('Fehler beim Laden der Plätze:', error);
+          }
+        }
+        
         allFixtures.push(...bookings.map(booking => ({
           id: `booking-${booking.id}`,
           bookingId: booking.id,
@@ -394,6 +412,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           awayScore: null,
           isPast: false,
           pitchId: booking.pitchId,
+          location: pitchesData[booking.pitchId] || 'Unbekannt',
         })));
       }
 
@@ -588,7 +607,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
               <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Auswärts</StyledTableCell>
               
               {details && (
-                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '15%' }} hideOnMobile={true}>
+                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '15%' }} hideOnMobile={showType !== 'upcoming'}>
                   Ort
                 </StyledTableCell>
               )}
@@ -699,7 +718,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                 </StyledTableCell>
                 
                 {details && (
-                  <StyledTableCell hideOnMobile={true}>{fixture.location}</StyledTableCell>
+                  <StyledTableCell hideOnMobile={showType !== 'upcoming'}>
+                    {fixture.location || (fixture.pitchId && pitchesMap[fixture.pitchId]) || 'Unbekannt'}
+                  </StyledTableCell>
                 )}
               </TableRow>
             );

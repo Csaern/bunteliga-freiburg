@@ -3,6 +3,7 @@ class News {
    * Erstellt einen neuen News-Artikel.
    * @param {object} data - Die Daten für den neuen Artikel.
    * @param {string} data.title - Die Überschrift des Artikels.
+   * @param {string} [data.subtitle] - Der Untertitel des Artikels.
    * @param {string} data.content - Der Inhalt des Artikels.
    * @param {string} data.authorId - Die UID des Admins.
    * @param {string} data.authorName - Der Name des Admins (denormalisiert).
@@ -10,6 +11,7 @@ class News {
    */
   constructor({
     title,
+    subtitle = '',
     content,
     authorId,
     authorName,
@@ -25,6 +27,7 @@ class News {
 
     // 2. Zuweisung der Eigenschaften
     this.title = title;
+    this.subtitle = subtitle || '';
     this.content = content;
     this.authorId = authorId;
     this.authorName = authorName;
@@ -35,6 +38,7 @@ class News {
   toFirestoreObject() {
     return {
       title: this.title,
+      subtitle: this.subtitle,
       content: this.content,
       authorId: this.authorId,
       authorName: this.authorName,
