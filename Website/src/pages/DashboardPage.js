@@ -489,9 +489,6 @@ const DashboardPage = () => {
                     <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleRejectPendingResult(result)}>
                       Ablehnen
                     </Button>
-                    <Button size="small" variant="outlined" color="info" startIcon={<EditIcon />} onClick={() => handleOpenEditModal(result)}>
-                      Korrigieren
-                    </Button>
                   </Box>
                 </Paper>
               ))}

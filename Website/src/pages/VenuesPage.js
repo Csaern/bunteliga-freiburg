@@ -50,6 +50,9 @@ const VenueCard = ({ venue }) => {
         borderRadius: theme.shape.borderRadius,
         border: `1px solid ${theme.palette.grey[800]}`,
         overflow: 'hidden',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <Box
@@ -157,10 +160,12 @@ const VenuesPage = () => {
             textAlign: 'justify',
           }}
         >
-          Die Bunte Liga Freiburg ist eine inklusive Fußballliga, die Menschen aller Hintergründe zusammenbringt. 
+          Die Bunte Liga Freiburg ist eine inklusive Hans Fußballliga, die Menschen aller Hintergründe zusammenbringt. 
           Wir fördern Fairplay, Gemeinschaft und den Spaß am Fußball. Unsere Liga steht für Vielfalt, Respekt und 
           sportliche Begeisterung. Egal ob Anfänger oder erfahrener Spieler – bei uns ist jeder willkommen, der 
           die Leidenschaft für den Fußball teilt.
+
+          Dumm wer nicht mitmacht!
         </Typography>
       </Paper>
 
@@ -183,7 +188,7 @@ const VenuesPage = () => {
       
       <Grid container spacing={3}>
         {venuesData.map((venue) => (
-          <Grid item xs={12} sm={6} key={venue.id}>
+          <Grid item xs={12} sm={6} md={4} key={venue.id} sx={{ display: 'flex' }}>
             <VenueCard venue={venue} />
           </Grid>
         ))}
