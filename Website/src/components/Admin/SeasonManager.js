@@ -343,7 +343,7 @@ const SeasonManager = () => {
                                 {!isMobile && <StyledTableCell align="center">{season.teams?.length || 0}</StyledTableCell>}
                                 <StyledTableCell align="right">
                                     <Box onClick={e => e.stopPropagation()} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                        <Tooltip title="Saison beenden">
+                                        <Tooltip title="Saison abrechnen">
                                             <span>
                                                 <IconButton onClick={() => handleActionRequest('finish', season.id)} disabled={season.status !== 'active'}>
                                                     <StopCircleOutlinedIcon sx={{ color: season.status === 'active' ? 'warning.light' : 'grey.800' }} />

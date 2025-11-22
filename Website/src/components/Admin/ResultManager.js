@@ -79,7 +79,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
 
     // --- DATA FETCHING ---
     const fetchData = async () => {
-        if (!currentSeason?.id) return;
+        if (!currentSeason?.id) return; 
         setLoading(true);
         try {
             const [pendingBookingsData, resultsData] = await Promise.all([
@@ -97,7 +97,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
 
     useEffect(() => {
         fetchData();
-    }, [currentSeason]);
+    }, [currentSeason?.id]);
 
     // NEU: Hilfsfunktion zur sicheren Umwandlung von Firestore-Timestamps in JS-Date-Objekte.
     const parseDate = (dateObj) => {
@@ -166,7 +166,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         if (formData.homeTeamId === formData.awayTeamId) { setNotification({ open: true, message: 'Heim- und Auswärtsmannschaft müssen unterschiedlich sein!', severity: 'error' }); return; }
 
         try {
-            const resultData = { ...formData, homeScore: parseInt(formData.homeScore), awayScore: parseInt(formData.awayScore), seasonId: currentSeason.id };
+            const resultData = { ...formData, homeScore: parseInt(formData.homeScore), awayScore: parseInt(formData.awayScore), seasonId: currentSeason?.id };
             
             if (modalMode === 'edit' && selectedResult) {
                 await resultApiService.adminUpdateResult(selectedResult.id, { ...resultData, status: 'confirmed' });

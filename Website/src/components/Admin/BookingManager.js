@@ -91,7 +91,6 @@ const BookingManager = ({ currentSeason }) => {
     };
 
     const fetchData = async () => {
-        // Die `currentSeason.id` wird weiterhin für die Buchungen benötigt.
         if (!currentSeason?.id) return;
         setLoading(true);
         try {
@@ -270,6 +269,10 @@ const BookingManager = ({ currentSeason }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!currentSeason?.id) {
+            setNotification({ open: true, message: 'Keine aktive Saison gefunden. Bitte erstellen Sie zuerst eine aktive Saison.', severity: 'error' });
+            return;
+        }
         try {
             const combinedDate = new Date(`${formData.date}T${formData.time}`);
             const bookingData = {
@@ -331,6 +334,10 @@ const BookingManager = ({ currentSeason }) => {
 
     const handleBulkCheck = async (e) => {
         e.preventDefault();
+        if (!currentSeason?.id) {
+            setNotification({ open: true, message: 'Keine aktive Saison gefunden. Bitte erstellen Sie zuerst eine aktive Saison.', severity: 'error' });
+            return;
+        }
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const selectedStartDate = new Date(bulkFormData.startDate);
@@ -367,6 +374,10 @@ const BookingManager = ({ currentSeason }) => {
 
     const handleBulkCreate = async () => {
         if (!bulkCheckResult || bulkCheckResult.validSlots.length === 0) return;
+        if (!currentSeason?.id) {
+            setNotification({ open: true, message: 'Keine aktive Saison gefunden. Bitte erstellen Sie zuerst eine aktive Saison.', severity: 'error' });
+            return;
+        }
         try {
             const dataToSend = {
                 seasonId: currentSeason.id,

@@ -209,7 +209,7 @@ const AdminDashboard = () => {
                   Teams
                 </Typography>
                 <Typography variant="h4" sx={{ fontFamily: 'comfortaa', color: '#00A99D', fontWeight: 700 }}>
-                  {stats.totalTeams}
+                  {currentSeason?.teams?.length || 0}
                 </Typography>
               </Paper>
             </Grid>
@@ -219,7 +219,7 @@ const AdminDashboard = () => {
                   Offene Partien
                 </Typography>
                 <Typography variant="h4" sx={{ fontFamily: 'comfortaa', color: stats.openMatches > 0 ? '#FFBF00' : '#00A99D', fontWeight: 700 }}>
-                  {stats.openMatches}
+                  {currentSeason?.openMatches?.length || 0}
                 </Typography>
               </Paper>
             </Grid>
@@ -229,7 +229,7 @@ const AdminDashboard = () => {
                   Ausstehende Ergebnisse
                 </Typography>
                 <Typography variant="h4" sx={{ fontFamily: 'comfortaa', color: stats.pendingResults > 0 ? '#FFBF00' : '#00A99D', fontWeight: 700 }}>
-                  {stats.pendingResults}
+                  {currentSeason?.pendingResults?.length || 0}
                 </Typography>
               </Paper>
             </Grid>

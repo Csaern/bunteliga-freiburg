@@ -3,7 +3,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from '../context/AuthProvider';
 import { Container, Box, Typography, Button, Paper, CircularProgress, Alert, useMediaQuery, useTheme } from '@mui/material';
-
+import * as seasonApi from '../services/seasonApiService';
 
 import BookingManager from '../components/Admin/BookingManager';
 import UserManager from '../components/Admin/UserManager';
@@ -73,13 +73,15 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
                 teamsSnapshot,
                 bookingsSnapshot,
                 seasonsSnapshot,
-                resultsSnapshot
+                resultsSnapshot,
+                activeSeasonData
             ] = await Promise.all([
                 getDocs(usersCollection),
                 getDocs(teamsCollection),
                 getDocs(bookingsCollection),
                 getDocs(seasonsCollection),
-                getDocs(resultsCollection)
+                getDocs(resultsCollection),
+                seasonApi.getActiveSeason().catch(() => null) // Lade aktive Saison über API
             ]);
 
             const usersData = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -95,8 +97,9 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
             setSeasons(seasonsData);
             setResults(resultsData);
 
-            const current = seasonsData.find(s => s.isCurrent);
-            setCurrentSeason(current);
+            // KORREKTUR: Verwende die aktive Saison von der API (status === 'active')
+            // statt nach isCurrent zu suchen
+            setCurrentSeason(activeSeasonData);
 
         } catch (err) {
             console.error("Fehler beim Laden der Admin-Daten:", err);
@@ -159,17 +162,6 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
             }}>
                 {renderActiveTab()}
             </Paper>
-            {currentSeason && (
-                <Alert severity="success" sx={{ mt: 2, mx: 1.75, backgroundColor: 'rgba(46, 125, 50, 0.3)', color: '#a5d6a7'}}>
-                    <strong>Aktuelle Saison:</strong> {currentSeason.name}
-                </Alert>
-            )}
-            {/* NEU: Alert für offene Partien */}
-            {openMatchesCount > 0 && (
-                 <Alert severity="info" sx={{ mt: 2, mx: 1.75, backgroundColor: 'rgba(2, 136, 209, 0.2)', color: '#90caf9' }}>
-                    <strong>Offene Partien:</strong> Es gibt {openMatchesCount} angesetzte Spiele, für die noch kein Ergebnis eingetragen wurde.
-                </Alert>
-            )}
         </Container>
     );
 };

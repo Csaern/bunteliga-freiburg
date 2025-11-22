@@ -404,7 +404,6 @@ const DashboardPage = () => {
             }}
           >
             <Grid container spacing={1} justifyContent="space-around" alignItems="center">
-              {isAdmin && renderIconButton('Verwaltung', <AdminPanelSettingsIcon />, '/admin')}
               {renderIconButton('Platz buchen', <AddCircleOutlineIcon />, '/platzreservierung')}
               {renderIconButton('Ergebnis melden', <PostAddIcon />, null, handleOpenReportModal)}
               {teamId && renderIconButton('Team-Einstellungen', <SettingsIcon />, null, () => setShowTeamSettings(true))}
