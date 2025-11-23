@@ -413,7 +413,7 @@ const TeamDetailPage = () => {
           <Grid item>
             <DynamicFixtureList 
               title="ERGEBNISSE" 
-              details={true} 
+              details={false} 
               seasonId={selectedSeasonId} 
               showType="results" 
               userTeamId={teamId}

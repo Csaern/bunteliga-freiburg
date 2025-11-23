@@ -61,7 +61,8 @@ const VenueCard = ({ venue }) => {
         alt={`Bild von ${venue.name}`}
         sx={{
           width: '100%',
-          aspectRatio: '4 / 3', // Stellt ein 4:3 Seitenverhältnis sicher
+          height: { xs: 'auto', sm: '200px' }, // Mobile: auto, Desktop: feste Höhe
+          aspectRatio: { xs: '4 / 3', sm: 'auto' }, // Mobile: 4:3, Desktop: auto
           objectFit: 'cover',   // Füllt den Bereich, schneidet bei Bedarf ab
           display: 'block',     // Verhindert unerwünschten Leerraum unter dem Bild
         }}
@@ -111,7 +112,7 @@ const VenuesPage = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
-    <Container maxWidth="md" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
       <Typography
         variant={isMobile ? 'h4' : 'h3'}
         component="h1"
@@ -174,7 +175,7 @@ const VenuesPage = () => {
         variant="h5"
         sx={{
           mb: 3,
-          mt: 2,
+          mt: 4,
           color: '#00A99D',
           fontWeight: 700,
           fontFamily: 'comfortaa',
@@ -186,13 +187,34 @@ const VenuesPage = () => {
         Unsere Plätze
       </Typography>
       
-      <Grid container spacing={3}>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 3,
+          justifyContent: 'center',
+        }}
+      >
         {venuesData.map((venue) => (
-          <Grid item xs={12} sm={6} md={4} key={venue.id} sx={{ display: 'flex' }}>
+          <Box
+            key={venue.id}
+            sx={{
+              width: { 
+                xs: '100%', // Mobile: volle Breite
+                sm: venuesData.length === 1 ? '100%' : 
+                    venuesData.length === 2 ? 'calc(50% - 12px)' : 
+                    venuesData.length === 3 ? 'calc(33.333% - 16px)' : 
+                    'calc(25% - 18px)' // Maximal 4 pro Zeile
+              },
+              minWidth: { sm: venuesData.length > 4 ? 'calc(25% - 18px)' : 'auto' },
+              maxWidth: { sm: venuesData.length > 4 ? 'calc(25% - 18px)' : 'none' },
+              display: 'flex',
+            }}
+          >
             <VenueCard venue={venue} />
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
     </Container>
   );
 };

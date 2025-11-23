@@ -124,9 +124,9 @@ const ResultsPage = () => {
       
       <DynamicFixtureList 
         title="Alle Spiele" 
-        details={true} 
+        details={false} 
         seasonId={selectedSeasonId}
-        showType="results"
+        showType="all"
       />
     </Container>
   );
