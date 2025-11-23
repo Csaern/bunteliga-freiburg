@@ -32,6 +32,14 @@ export const archiveSeason = async (seasonId) => {
     return apiClient(`/api/seasons/${seasonId}/archive`, 'PUT');
 };
 
+export const evaluateSeason = async (seasonId) => {
+    return apiClient(`/api/seasons/${seasonId}/evaluate`, 'PUT');
+};
+
+export const deleteSeason = async (seasonId) => {
+    return apiClient(`/api/seasons/${seasonId}`, 'DELETE');
+};
+
 // Aktive Saison (authentifiziert)
 export const getActiveSeason = async () => {
     return apiClient('/api/seasons/active', 'GET');

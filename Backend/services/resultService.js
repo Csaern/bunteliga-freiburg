@@ -325,18 +325,20 @@ async function adminCreateResult(resultData, adminUid) {
  * NEU: Admin aktualisiert ein beliebiges Ergebnis.
  */
 async function adminUpdateResult(resultId, updateData, adminUid) {
-  const { homeTeamId, awayTeamId, homeScore, awayScore, status } = updateData;
+  const { homeTeamId, awayTeamId, homeScore, awayScore, status, isValid } = updateData;
   const resultRef = resultsCollection.doc(resultId);
 
   const payload = {
-    homeScore: parseInt(homeScore),
-    awayScore: parseInt(awayScore),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedBy: adminUid,
   };
 
+  // Nur Felder hinzufügen, die tatsächlich übergeben wurden
+  if (homeScore !== undefined) payload.homeScore = parseInt(homeScore);
+  if (awayScore !== undefined) payload.awayScore = parseInt(awayScore);
   if (homeTeamId) payload.homeTeamId = homeTeamId;
   if (awayTeamId) payload.awayTeamId = awayTeamId;
+  if (isValid !== undefined) payload.isValid = isValid;
 
   if (status) {
     payload.status = status;

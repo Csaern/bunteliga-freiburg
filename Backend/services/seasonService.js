@@ -5,6 +5,8 @@ const Season = require('../models/season');
 const db = admin.firestore();
 const seasonsCollection = db.collection('seasons');
 const teamsCollection = db.collection('teams');
+const resultsCollection = db.collection('results');
+const bookingsCollection = db.collection('bookings');
 const tableService = require('./tableService');
 
 /**
@@ -129,11 +131,165 @@ async function deleteSeason(seasonId) {
     return { message: 'Saison erfolgreich gelöscht.' };
 }
 
+/**
+ * NEU: Beendet eine Saison (setzt Status auf 'finished').
+ */
+async function finishSeason(seasonId, adminUid) {
+    const seasonRef = seasonsCollection.doc(seasonId);
+    const doc = await seasonRef.get();
+    if (!doc.exists) {
+        throw new Error('Saison nicht gefunden.');
+    }
+    const seasonData = doc.data();
+    if (seasonData.status !== 'active') {
+        throw new Error('Nur aktive Saisons können beendet werden.');
+    }
+    
+    await seasonRef.update({
+        status: 'finished',
+        isFinished: true,
+        finishedAt: admin.firestore.FieldValue.serverTimestamp(),
+        finishedBy: adminUid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { message: 'Saison erfolgreich beendet.' };
+}
+
+/**
+ * NEU: Setzt eine Saison als die aktuell aktive fest.
+ * Setzt alle anderen Saisons auf 'planning' zurück.
+ */
+async function setCurrentSeason(seasonId) {
+    const seasonRef = seasonsCollection.doc(seasonId);
+    const doc = await seasonRef.get();
+    if (!doc.exists) {
+        throw new Error('Saison nicht gefunden.');
+    }
+    const seasonData = doc.data();
+    if (seasonData.status !== 'planning') {
+        throw new Error('Nur Saisons in Planung können aktiviert werden.');
+    }
+    
+    // Setze alle anderen aktiven Saisons auf 'finished'
+    const activeSeasons = await seasonsCollection.where('status', '==', 'active').get();
+    const batch = db.batch();
+    
+    activeSeasons.docs.forEach(activeDoc => {
+        batch.update(activeDoc.ref, {
+            status: 'finished',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    });
+    
+    // Setze die neue Saison auf 'active'
+    batch.update(seasonRef, {
+        status: 'active',
+        isCurrent: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    await batch.commit();
+    return { message: 'Saison erfolgreich aktiviert.' };
+}
+
+/**
+ * NEU: Archiviert eine Saison (setzt Status auf 'archived').
+ */
+async function archiveSeason(seasonId) {
+    const seasonRef = seasonsCollection.doc(seasonId);
+    const doc = await seasonRef.get();
+    if (!doc.exists) {
+        throw new Error('Saison nicht gefunden.');
+    }
+    const seasonData = doc.data();
+    if (seasonData.status !== 'finished' && seasonData.status !== 'planning') {
+        throw new Error('Nur beendete oder geplante Saisons können archiviert werden.');
+    }
+    
+    await seasonRef.update({
+        status: 'archived',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { message: 'Saison erfolgreich archiviert.' };
+}
+
+/**
+ * NEU: Rechnet eine Saison ab (setzt evaluated = true, Status bleibt 'active').
+ */
+async function evaluateSeason(seasonId, adminUid) {
+    const seasonRef = seasonsCollection.doc(seasonId);
+    const doc = await seasonRef.get();
+    if (!doc.exists) {
+        throw new Error('Saison nicht gefunden.');
+    }
+    const seasonData = doc.data();
+    if (seasonData.status !== 'active') {
+        throw new Error('Nur aktive Saisons können abgerechnet werden.');
+    }
+    if (seasonData.evaluated === true) {
+        throw new Error('Saison wurde bereits abgerechnet.');
+    }
+    
+    await seasonRef.update({
+        evaluated: true,
+        evaluatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        evaluatedBy: adminUid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { message: 'Saison erfolgreich abgerechnet.' };
+}
+
+/**
+ * NEU: Löscht eine Saison und alle zugehörigen Daten (Ergebnisse, Buchungen).
+ */
+async function deleteSeasonWithAllData(seasonId, adminUid) {
+    const seasonRef = seasonsCollection.doc(seasonId);
+    const doc = await seasonRef.get();
+    if (!doc.exists) {
+        throw new Error('Saison nicht gefunden.');
+    }
+    
+    // Verwende eine Batch-Operation für atomare Löschung
+    const batch = db.batch();
+    
+    // 1. Lösche alle Ergebnisse dieser Saison
+    const resultsSnapshot = await resultsCollection.where('seasonId', '==', seasonId).get();
+    resultsSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    
+    // 2. Lösche alle Buchungen dieser Saison
+    const bookingsSnapshot = await bookingsCollection.where('seasonId', '==', seasonId).get();
+    bookingsSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    
+    // 3. Lösche die Saison selbst
+    batch.delete(seasonRef);
+    
+    // Führe alle Löschungen in einer Transaktion aus
+    await batch.commit();
+    
+    return { 
+        message: 'Saison und alle zugehörigen Daten erfolgreich gelöscht.',
+        deletedResults: resultsSnapshot.size,
+        deletedBookings: bookingsSnapshot.size
+    };
+}
+
 module.exports = {
     createSeason,
     getAllSeasons,
     getSeasonById,
     updateSeason,
     getActiveSeason,
-    deleteSeason, // Dieser Export wird jetzt eine definierte Funktion finden
+    deleteSeason,
+    finishSeason,
+    setCurrentSeason,
+    archiveSeason,
+    evaluateSeason,
+    deleteSeasonWithAllData
 };

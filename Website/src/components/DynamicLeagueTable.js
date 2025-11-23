@@ -101,22 +101,33 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
     try {
       // Wenn seasonId vorhanden ist, lade die Saison-Daten, um die registrierten Teams zu erhalten
       let seasonTeams = [];
+      let activeTeamIds = [];
       if (seasonId) {
         try {
           // Versuche zuerst die aktive Saison zu laden (falls es die aktive ist)
           const activeSeason = await seasonApiService.getActiveSeasonPublic();
           if (activeSeason && activeSeason.id === seasonId && activeSeason.teams) {
-            seasonTeams = activeSeason.teams.map(t => t.id || t.teamId).filter(Boolean);
+            seasonTeams = activeSeason.teams;
+            // Nur aktive Teams berücksichtigen
+            activeTeamIds = seasonTeams
+              .filter(t => t.status === 'active')
+              .map(t => t.id || t.teamId)
+              .filter(Boolean);
           } else {
             // Falls nicht die aktive Saison, lade die Saison direkt aus Firestore
             const seasonDoc = await getDoc(doc(db, 'seasons', seasonId));
             if (seasonDoc.exists()) {
               const seasonData = seasonDoc.data();
               if (seasonData.teams && Array.isArray(seasonData.teams)) {
-                seasonTeams = seasonData.teams.map(t => {
-                  // Unterstütze sowohl {id, name} als auch {teamId, name} Format
-                  return t.id || t.teamId;
-                }).filter(Boolean);
+                seasonTeams = seasonData.teams;
+                // Nur aktive Teams berücksichtigen
+                activeTeamIds = seasonTeams
+                  .filter(t => t.status === 'active')
+                  .map(t => {
+                    // Unterstütze sowohl {id, name} als auch {teamId, name} Format
+                    return t.id || t.teamId;
+                  })
+                  .filter(Boolean);
               }
             }
           }
@@ -129,9 +140,13 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
       const teamsSnap = await getDocs(collection(db, 'teams'));
       let teams = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Nur Teams anzeigen, die für die Saison registriert sind
-      if (seasonId && seasonTeams.length > 0) {
-        teams = teams.filter(team => seasonTeams.includes(team.id));
+      // Nur aktive Teams anzeigen, die für die Saison registriert sind
+      if (seasonId && activeTeamIds.length > 0) {
+        teams = teams.filter(team => activeTeamIds.includes(team.id));
+      } else if (seasonId && seasonTeams.length > 0) {
+        // Fallback: Falls keine Status-Informationen vorhanden, alle Teams der Saison anzeigen
+        const allTeamIds = seasonTeams.map(t => t.id || t.teamId).filter(Boolean);
+        teams = teams.filter(team => allTeamIds.includes(team.id));
       }
 
       // Ergebnisse für die aktuelle Saison laden
@@ -141,7 +156,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
       }
       const resultsSnap = await getDocs(resultsQuery);
       const results = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(result => result.status === 'confirmed'); // Nur bestätigte Ergebnisse
+        .filter(result => result.status === 'confirmed' && result.isValid !== false); // Nur bestätigte und gültige Ergebnisse
 
       // Tabellendaten berechnen
       const teamStats = {};

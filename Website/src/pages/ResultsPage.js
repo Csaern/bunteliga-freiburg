@@ -126,7 +126,7 @@ const ResultsPage = () => {
         title="Alle Spiele" 
         details={true} 
         seasonId={selectedSeasonId}
-        showType="all"
+        showType="results"
       />
     </Container>
   );

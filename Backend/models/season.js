@@ -72,7 +72,10 @@ class Season {
     this.isFinished = false;
     this.finishedAt = null;
     this.finishedBy = null;
-    this.isCurrent = false; 
+    this.isCurrent = false;
+    this.evaluated = false; // NEU: Wurde die Saison bereits abgerechnet?
+    this.evaluatedAt = null;
+    this.evaluatedBy = null;
     this.createdAt = null; // Wird im Service gesetzt
   }
 
