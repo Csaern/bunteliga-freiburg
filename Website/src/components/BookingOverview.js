@@ -7,12 +7,12 @@ import * as bookingApi from '../services/bookingApiService';
 import * as teamApi from '../services/teamApiService';
 import { useAuth } from '../context/AuthProvider';
 import { ReusableModal } from './Helpers/modalUtils';
-import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel } from '@mui/material';
 
 const BookingOverview = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
+
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -26,6 +26,7 @@ const BookingOverview = () => {
   const [isOpponentLoading, setIsOpponentLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [submitting, setSubmitting] = useState(false);
+  const [isFriendlyGame, setIsFriendlyGame] = useState(false);
 
   const darkInputStyle = {
     '& label.Mui-focused': { color: '#00A99D' },
@@ -69,14 +70,14 @@ const BookingOverview = () => {
 
       // Formatiere die Daten wie im Admin
       const formattedBookings = bookingsData.map(b => ({ ...b, date: parseDate(b.date) }));
-      
+
       // Konvertiere Teams-Array zu Objekt für einfacheren Zugriff
       const teams = teamsData.reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {});
 
-      setData({ 
-        pitches: pitchesData, 
-        teams, 
-        bookings: formattedBookings 
+      setData({
+        pitches: pitchesData,
+        teams,
+        bookings: formattedBookings
       });
       setLoading(false);
     } catch (error) {
@@ -92,12 +93,14 @@ const BookingOverview = () => {
 
   const handleBookNow = (booking) => {
     const bookingDate = new Date(booking.date);
-    setSelectedSlot({ 
-      id: booking.id, 
-      date: bookingDate, 
-      pitchId: booking.pitchId, 
-      time: bookingDate.toTimeString().slice(0, 5) 
+    setSelectedSlot({
+      id: booking.id,
+      date: bookingDate,
+      pitchId: booking.pitchId,
+      time: bookingDate.toTimeString().slice(0, 5),
+      friendly: booking.friendly || false
     });
+    setIsFriendlyGame(booking.friendly || false);
   };
 
   // Lade potenzielle Gegner, sobald das Modal geöffnet wird
@@ -106,7 +109,7 @@ const BookingOverview = () => {
       if (!selectedSlot || !teamId) { setPotentialOpponents([]); return; }
       setIsOpponentLoading(true);
       try {
-        const opponents = await teamApi.getPotentialOpponents(teamId);
+        const opponents = await teamApi.getPotentialOpponents(teamId, isFriendlyGame);
         setPotentialOpponents(opponents || []);
       } catch (e) {
         setPotentialOpponents([]);
@@ -115,8 +118,8 @@ const BookingOverview = () => {
       }
     };
     loadOpponents();
-  }, [selectedSlot, teamId]);
-  
+  }, [selectedSlot, teamId, isFriendlyGame]);
+
   const submitBooking = async (e) => {
     e.preventDefault();
     // Nur eingeloggte Team-User dürfen buchen
@@ -124,28 +127,29 @@ const BookingOverview = () => {
       setNotification({ open: true, message: "Bitte melden Sie sich mit einem Team-Account an, um zu buchen.", severity: 'error' });
       return;
     }
-    
+
     // Prüfe, ob aktuelle Saison vorhanden ist
     if (!currentSeason) {
       setNotification({ open: true, message: "Keine aktuelle Saison gefunden! Bitte kontaktieren Sie einen Administrator.", severity: 'error' });
       return;
     }
-    
+
     if (!awayTeam) {
       setNotification({ open: true, message: "Bitte wählen Sie ein Auswärtsteam aus.", severity: 'error' });
       return;
     }
-    
+
     setSubmitting(true);
     try {
       // Anfrage an Backend: vorhandenen Slot anfragen
-      await bookingApi.requestBookingSlot(selectedSlot.id, { 
-          homeTeamId: teamId,
+      await bookingApi.requestBookingSlot(selectedSlot.id, {
+        homeTeamId: teamId,
         awayTeamId: awayTeam,
-          seasonId: currentSeason.id,
-        userId: currentUser?.uid || 'anonymous'
+        seasonId: currentSeason.id,
+        userId: currentUser?.uid || 'anonymous',
+        friendly: isFriendlyGame
       });
-      
+
       setNotification({ open: true, message: "Buchung erfolgreich! Warte auf Bestätigung des Gegners.", severity: 'success' });
       setSelectedSlot(null);
       setAwayTeam('');
@@ -153,7 +157,7 @@ const BookingOverview = () => {
       setContactEmail('');
       setContactPhone('');
       // Refresh data
-      fetchData(); 
+      fetchData();
     } catch (error) {
       console.error("Fehler bei der Buchung:", error);
       setNotification({ open: true, message: error.message || "Buchung fehlgeschlagen.", severity: 'error' });
@@ -202,13 +206,13 @@ const BookingOverview = () => {
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
   }
-  
+
   return (
     <Box sx={{ p: { sm: 3 } }}>
       <Snackbar open={notification.open} autoHideDuration={6000} onClose={() => setNotification({ ...notification, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={() => setNotification({ ...notification, open: false })} severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>
       </Snackbar>
-      
+
       <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
         Spielplan & Reservierung
       </Typography>
@@ -224,7 +228,7 @@ const BookingOverview = () => {
           {sortedPitchIds.map(pitchId => {
             const pitchBookings = bookingsByPitch[pitchId];
             const pitchName = getPitchName(pitchId);
-            
+
             return (
               <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
                 <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
@@ -254,10 +258,10 @@ const BookingOverview = () => {
                       const startTime = new Date(booking.date).toTimeString().slice(0, 5);
                       const endTime = booking.duration ? new Date(new Date(booking.date).getTime() + booking.duration * 60000).toTimeString().slice(0, 5) : '-';
                       const timeRange = `${startTime} - ${endTime}`;
-                      
+
                       // Eine Buchung ist verfügbar, wenn: status === 'available' ODER (isAvailable === true UND keine Teams zugewiesen)
-                      const isAvailable = booking.status === 'available' || 
-                                         (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
+                      const isAvailable = booking.status === 'available' ||
+                        (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
                       const isBooked = !isAvailable && booking.homeTeamId && booking.awayTeamId;
                       const isMyBooking = (booking.homeTeamId === teamId || booking.awayTeamId === teamId) && booking.status === 'confirmed';
 
@@ -270,7 +274,10 @@ const BookingOverview = () => {
                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                   <Box sx={{ textAlign: 'center', pr: 2 }}>
                                     <Typography sx={{ fontSize: '0.7rem', color: 'grey.300' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
-                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                      {booking.friendly && <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.8rem' }}>F</Typography>}
+                                    </Box>
                                   </Box>
                                   <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.grey[800]}` }}>
                                     <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</Typography>
@@ -299,7 +306,10 @@ const BookingOverview = () => {
                             <Box sx={{ width: '10px', height: '10px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main, borderRadius: '50%', boxShadow: `0 0 8px ${isAvailable ? theme.palette.success.main : theme.palette.error.main}` }} />
                           </TableCell>
                           <TableCell sx={{ color: 'grey.100' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{timeRange}</TableCell>
+                          <TableCell sx={{ color: 'grey.100' }}>
+                            {timeRange}
+                            {booking.friendly && <Typography component="span" sx={{ ml: 1, color: '#FFD700', fontWeight: 'bold' }}>F</Typography>}
+                          </TableCell>
                           <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</TableCell>
                           <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.awayTeamId)}</TableCell>
                           <TableCell align="center">
@@ -341,39 +351,54 @@ const BookingOverview = () => {
             </FormControl>
 
             <Divider sx={{ my: 1, borderColor: 'grey.800' }} />
-            
+
             <Box>
               <Typography sx={{ color: 'grey.100', fontWeight: 'bold', mb: 0.5 }}>Heim-Mannschaft</Typography>
               <Typography sx={{ color: 'grey.200' }}>{data.teams[teamId] || 'Dein Team'}</Typography>
             </Box>
 
             <Box>
-            <Typography sx={{ color: 'grey.100', fontWeight: 'bold', mb: 0.5 }}>Auswärts-Mannschaft</Typography>
-            <FormControl fullWidth size="small" sx={{ borderColor: 'grey.700' , bgcolor: '#333' }}>
-              <Select sx={{ color: 'grey.100' }}
-                label="Auswärts-Mannschaft"
-                value={awayTeam} 
-                onChange={(e) => setAwayTeam(e.target.value)}
-                required
-                MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200'} } }}
-                disabled={isOpponentLoading}
-              >
-                <MenuItem value=""><em>-</em></MenuItem>
-                {isOpponentLoading ? (
-                  <MenuItem disabled><em>Lade Gegner...</em></MenuItem>
-                ) : (
-                  potentialOpponents.map(opponent => (
-                    <MenuItem key={opponent.id} value={opponent.id}>
-                      {opponent.name}
-                    </MenuItem>
-                  ))
-                )}
-              </Select>
-            </FormControl>
+              <Typography sx={{ color: 'grey.100', fontWeight: 'bold', mb: 0.5 }}>Auswärts-Mannschaft</Typography>
+              <FormControl fullWidth size="small" sx={{ borderColor: 'grey.700', bgcolor: '#333' }}>
+                <Select sx={{ color: 'grey.100' }}
+                  label="Auswärts-Mannschaft"
+                  value={awayTeam}
+                  onChange={(e) => setAwayTeam(e.target.value)}
+                  required
+                  MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}
+                  disabled={isOpponentLoading}
+                >
+                  <MenuItem value=""><em>-</em></MenuItem>
+                  {isOpponentLoading ? (
+                    <MenuItem disabled><em>Lade Gegner...</em></MenuItem>
+                  ) : (
+                    potentialOpponents.map(opponent => (
+                      <MenuItem key={opponent.id} value={opponent.id}>
+                        {opponent.name}
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+              </FormControl>
             </Box>
 
+            <FormControlLabel
+              control={<Checkbox
+                checked={isFriendlyGame}
+                onChange={(e) => setIsFriendlyGame(e.target.checked)}
+                sx={{ color: 'grey.100', '&.Mui-checked': { color: '#FFD700' }, '&.Mui-disabled': { color: 'grey.700' } }}
+                disabled={!selectedSlot.friendly}
+              />}
+              label={
+                <Box>
+                  <Typography sx={{ color: !selectedSlot.friendly ? 'grey.600' : 'grey.100' }}>Freundschaftsspiel</Typography>
+                  {!selectedSlot.friendly && <Typography variant="caption" sx={{ color: 'grey.600' }}>Nicht freigegeben</Typography>}
+                </Box>
+              }
+            />
+
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
-              <Button variant="outlined" color="inherit" onClick={() => setSelectedSlot(null)}sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
+              <Button variant="outlined" color="inherit" onClick={() => setSelectedSlot(null)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
               <Button variant="contained" sx={{ bgcolor: '#00A99D' }} type="submit" disabled={!awayTeam || submitting}>
                 {submitting ? <CircularProgress size={20} /> : 'Jetzt buchen'}
               </Button>

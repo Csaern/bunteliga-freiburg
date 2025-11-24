@@ -11,7 +11,7 @@ import * as teamApiService from '../../services/teamApiService'; // NEU: Team-Se
 const StatusIndicator = ({ status }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-    
+
     const statusConfig = {
         available: { color: theme.palette.success.main, label: 'Verfügbar' },
         confirmed: { color: theme.palette.info.main, label: 'Bestätigt' },
@@ -51,7 +51,7 @@ const BookingManager = ({ currentSeason }) => {
     const [localBookings, setLocalBookings] = useState([]);
     const [loading, setLoading] = useState(false);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
-    
+
     const [allPitches, setAllPitches] = useState([]);
     const [allTeams, setAllTeams] = useState([]); // NEU: Eigener State für Teams
 
@@ -59,15 +59,15 @@ const BookingManager = ({ currentSeason }) => {
     const [modalMode, setModalMode] = useState('view');
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [formData, setFormData] = useState({ date: '', time: '', pitchId: '', homeTeamId: '', awayTeamId: '', isAvailable: true, duration: 90 });
+    const [formData, setFormData] = useState({ date: '', time: '', pitchId: '', homeTeamId: '', awayTeamId: '', isAvailable: true, duration: 90, friendly: false });
     const [searchTerm, setSearchTerm] = useState('');
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [bulkFormData, setBulkFormData] = useState({
-        startDate: new Date().toISOString().split('T')[0], 
-        endDate: '', 
-        startTime: '10:00', 
-        endTime: '18:00', 
-        timeInterval: 120, 
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        startTime: '10:00',
+        endTime: '18:00',
+        timeInterval: 120,
         pitchIds: [],
         daysOfWeek: [6, 0]
     });
@@ -107,7 +107,7 @@ const BookingManager = ({ currentSeason }) => {
             const formattedData = bookingsData.map(b => ({ ...b, date: parseDate(b.date) }));
             setLocalBookings(formattedData);
             setAllPitches(pitchesData);
-            
+
             // KORREKTUR: Der überflüssige Filter wurde entfernt.
             // Alle Teams, die vom Backend kommen, werden direkt verwendet.
             setAllTeams(teamsData);
@@ -183,6 +183,7 @@ const BookingManager = ({ currentSeason }) => {
                 homeTeamId: selectedBooking.homeTeamId || '', awayTeamId: selectedBooking.awayTeamId || '',
                 duration: selectedBooking.duration || 90,
                 isAvailable: selectedBooking.status === 'available',
+                friendly: selectedBooking.friendly || false,
             });
         }
     }, [selectedBooking]);
@@ -246,7 +247,8 @@ const BookingManager = ({ currentSeason }) => {
             homeTeamId: '',
             awayTeamId: '',
             isAvailable: true,
-            duration: 120
+            duration: 120,
+            friendly: false
         });
         setModalMode('create');
         setIsModalOpen(true);
@@ -282,6 +284,7 @@ const BookingManager = ({ currentSeason }) => {
                 awayTeamId: formData.awayTeamId || null,
                 date: combinedDate.toISOString(),
                 duration: formData.duration,
+                friendly: formData.friendly,
             };
 
             // KORREKTUR: Die Logik wurde auf die zwei einfachen Fälle reduziert.
@@ -292,7 +295,7 @@ const BookingManager = ({ currentSeason }) => {
                 await bookingApiService.adminUpdateBooking(selectedBooking.id, bookingData);
                 setNotification({ open: true, message: 'Buchung aktualisiert.', severity: 'success' });
             }
-            
+
             handleCloseModal();
             fetchData();
         } catch (error) {
@@ -394,7 +397,7 @@ const BookingManager = ({ currentSeason }) => {
     };
 
     const isReadOnly = modalMode === 'view';
-    const displayTeamName = (teamId) => getTeamName(teamId) || '-' ;
+    const displayTeamName = (teamId) => getTeamName(teamId) || '-';
 
     const searchableFields = [
         { key: 'date', accessor: (date) => formatDateForSearch(date) },
@@ -443,14 +446,14 @@ const BookingManager = ({ currentSeason }) => {
                                 {allPitches.map(p => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                             </Select>
                         </FormControl>
-                        
+
                         {/* NEU: Anzeige für die Kollisionsprüfung */}
                         {collisionCheck.status !== 'idle' && (
                             <Alert
                                 severity={collisionCheck.status === 'success' ? 'success' : collisionCheck.status === 'error' ? 'error' : 'info'}
                                 icon={collisionCheck.status === 'checking' ? <CircularProgress size={20} /> : null}
-                                sx={{ 
-                                    mt: 1, 
+                                sx={{
+                                    mt: 1,
                                     bgcolor: collisionCheck.status === 'error' ? 'rgba(211, 47, 47, 0.1)' : 'rgba(46, 125, 50, 0.1)',
                                     color: collisionCheck.status === 'error' ? '#ffcdd2' : '#a5d6a7'
                                 }}
@@ -495,6 +498,15 @@ const BookingManager = ({ currentSeason }) => {
                             />}
                             label={<Typography sx={{ color: 'grey.100' }}>Verfügbar</Typography>}
                         />
+                        <FormControlLabel
+                            control={<Checkbox
+                                checked={formData.friendly}
+                                onChange={(e) => setFormData({ ...formData, friendly: e.target.checked })}
+                                sx={{ color: 'grey.100', '&.Mui-checked': { color: '#FFD700' }, '&.Mui-disabled': { color: 'grey.700' } }}
+                                disabled={isReadOnly}
+                            />}
+                            label={<Typography sx={{ color: 'grey.100' }}>Freundschaftsspiel</Typography>}
+                        />
                         {showDeleteConfirm && modalMode === 'view' && (<Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>Möchtest du diese Buchung wirklich endgültig löschen?</Alert>)}
                         {/* KORREKTUR: justifyContent wurde auf 'center' für alle Modi vereinheitlicht. */}
                         <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -533,7 +545,7 @@ const BookingManager = ({ currentSeason }) => {
                                     <InputLabel>Plätze (nur offizielle)</InputLabel>
                                     <Select multiple value={bulkFormData.pitchIds} label="Plätze (nur offizielle)" onChange={(e) => setBulkFormData({ ...bulkFormData, pitchIds: e.target.value })} renderValue={(selected) => selected.map(id => getPitchName(id)).join(', ')} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
                                         {officialPitches.length > 0 ? (
-                                            officialPitches.map(p => <MenuItem key={p.id} value={p.id}><Checkbox checked={bulkFormData.pitchIds.indexOf(p.id) > -1} sx={{color: 'grey.100', '&.Mui-checked': {color: '#00A99D'}}} /> <ListItemText primary={p.name} /></MenuItem>)
+                                            officialPitches.map(p => <MenuItem key={p.id} value={p.id}><Checkbox checked={bulkFormData.pitchIds.indexOf(p.id) > -1} sx={{ color: 'grey.100', '&.Mui-checked': { color: '#00A99D' } }} /> <ListItemText primary={p.name} /></MenuItem>)
                                         ) : (
                                             <MenuItem disabled sx={{ fontStyle: 'italic', color: 'grey.600' }}>
                                                 Keine offiziellen Plätze gefunden.
@@ -571,7 +583,7 @@ const BookingManager = ({ currentSeason }) => {
                     <Box>
                         {bulkCheckResult && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Typography sx={{color: 'grey.200'}}>
+                                <Typography sx={{ color: 'grey.200' }}>
                                     Es wurden <strong>{bulkCheckResult.totalSlots}</strong> mögliche Termine gefunden.
                                 </Typography>
                                 <Alert severity="success" sx={{ bgcolor: 'rgba(46, 125, 50, 0.2)', color: '#a5d6a7' }}>
@@ -638,7 +650,10 @@ const BookingManager = ({ currentSeason }) => {
                                                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                                         <Box sx={{ textAlign: 'center', pr: 2 }}>
                                                             <Typography sx={{ fontSize: '0.7rem', color: 'grey.300' }}>{formatGermanDate(booking.date)}</Typography>
-                                                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                                                {booking.friendly && <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.8rem' }}>F</Typography>}
+                                                            </Box>
                                                         </Box>
                                                         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.grey[800]}` }}>
                                                             <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</Typography>
@@ -654,7 +669,10 @@ const BookingManager = ({ currentSeason }) => {
                                     <TableRow key={booking.id} onClick={() => handleRowClick(booking)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
                                         <StyledTableCell align="center"><StatusIndicator status={booking.status} /></StyledTableCell>
                                         <StyledTableCell>{formatGermanDate(booking.date)}</StyledTableCell>
-                                        <StyledTableCell>{timeRange}</StyledTableCell>
+                                        <StyledTableCell>
+                                            {timeRange}
+                                            {booking.friendly && <Typography component="span" sx={{ ml: 1, color: '#FFD700', fontWeight: 'bold' }}>F</Typography>}
+                                        </StyledTableCell>
                                         <StyledTableCell>{getPitchName(booking.pitchId)}</StyledTableCell>
                                         <StyledTableCell>{displayTeamName(booking.homeTeamId)}</StyledTableCell>
                                         <StyledTableCell>{displayTeamName(booking.awayTeamId)}</StyledTableCell>

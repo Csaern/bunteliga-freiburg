@@ -83,11 +83,12 @@ async function reportResult(bookingId, resultData) {
       awayTeamName: awayTeamDoc.data().name,
       seasonId: bookingData.seasonId,
       bookingId: bookingId,
+      friendly: bookingData.friendly || false, // NEU: Übernehme Friendly-Status
     });
 
     const firestoreObject = newResult.toFirestoreObject();
     firestoreObject.reportedAt = admin.firestore.FieldValue.serverTimestamp();
-    
+
     transaction.set(newResultRef, firestoreObject);
     transaction.update(bookingRef, { status: 'played' });
 
@@ -135,24 +136,24 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
  * Holt alle Ergebnisse, die von Admins geprüft werden müssen.
  */
 async function getDisputedResults() {
-    const snapshot = await resultsCollection.where('status', '==', 'disputed').get();
-    if (snapshot.empty) return [];
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const snapshot = await resultsCollection.where('status', '==', 'disputed').get();
+  if (snapshot.empty) return [];
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 /**
  * Holt alle relevanten Ergebnisse für ein bestimmtes Team.
  */
 async function getResultsForTeam(teamId) {
-    const homeGamesQuery = resultsCollection.where('homeTeamId', '==', teamId).get();
-    const awayGamesQuery = resultsCollection.where('awayTeamId', '==', teamId).get();
-    const [homeSnapshot, awaySnapshot] = await Promise.all([homeGamesQuery, awayGamesQuery]);
-    
-    const results = [];
-    homeSnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-    awaySnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-    
-    return results;
+  const homeGamesQuery = resultsCollection.where('homeTeamId', '==', teamId).get();
+  const awayGamesQuery = resultsCollection.where('awayTeamId', '==', teamId).get();
+  const [homeSnapshot, awaySnapshot] = await Promise.all([homeGamesQuery, awayGamesQuery]);
+
+  const results = [];
+  homeSnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+  awaySnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+
+  return results;
 }
 
 /**
@@ -179,7 +180,7 @@ async function getResultsForSeason(seasonId) {
   const snapshot = await resultsCollection
     .where('seasonId', '==', seasonId)
     .get();
-    
+
   if (snapshot.empty) {
     return [];
   }
@@ -254,7 +255,7 @@ async function getResultsByStatusForTeam(teamId, status) {
     .get();
 
   if (snapshot.empty) return [];
-  
+
   const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
   // Filtere serverseitig, um nur die Ergebnisse zu liefern, bei denen das Team reagieren muss.
@@ -307,17 +308,21 @@ async function adminCreateResult(resultData, adminUid) {
   };
 
   return db.runTransaction(async (transaction) => {
-    const newResultRef = resultsCollection.doc();
-    transaction.set(newResultRef, newResultData);
-
+    let friendly = false;
     if (bookingId) {
       const bookingRef = bookingsCollection.doc(bookingId);
       const bookingDoc = await transaction.get(bookingRef);
       if (bookingDoc.exists) {
+        friendly = bookingDoc.data().friendly || false;
         transaction.update(bookingRef, { status: 'played' });
       }
     }
-    return { id: newResultRef.id, ...newResultData };
+
+    const finalResultData = { ...newResultData, friendly };
+    const newResultRef = resultsCollection.doc();
+    transaction.set(newResultRef, finalResultData);
+
+    return { id: newResultRef.id, ...finalResultData };
   });
 }
 
