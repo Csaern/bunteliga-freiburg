@@ -14,7 +14,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import RecordsList from '../components/RecordsList';
-import LeagueTable from '../components/LeagueTable';
+import LeagueTable from '../components/HistoryLeagueTable';
 import FixtureList from '../components/FixtureList';
 
 const teamData = {

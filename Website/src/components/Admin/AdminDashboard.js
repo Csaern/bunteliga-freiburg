@@ -264,7 +264,7 @@ const AdminDashboard = () => {
           <Grid>
             <DynamicFixtureList 
               title="NEUESTE ERGEBNISSE" 
-              details={true} 
+              details={false} 
               seasonId={currentSeason.id} 
               showType="results" 
             />

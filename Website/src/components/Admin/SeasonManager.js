@@ -175,7 +175,7 @@ const SeasonManager = () => {
                     const validResults = results.filter(r => r.status === 'confirmed' && r.isValid !== false);
                     
                     // Nur aktive Teams berücksichtigen
-                    const activeTeams = season.teams.filter(team => team.status === 'active');
+                    const activeTeams = season.teams.filter(team => team.status !== 'inactive');
                     
                     // Zähle Spiele pro Team (nur für aktive Teams)
                     const gamesPerTeam = {};
