@@ -7,11 +7,11 @@ import SeasonChampionsList from '../components/SeasonChampionsList';
 const HistoryPage = () => {
   return (
     <div>
-      <RecordsList/>
-      <SeasonChampionsList title="Platzierungen" />
-  <HallOfFame title="Rekordsieger" />
-  <LeagueTable title="Ewige Tabelle" />
-  </div>
+      {/* <RecordsList/> */}
+      {/* <SeasonChampionsList title="Platzierungen" /> */}
+      {/* <HallOfFame title="Rekordsieger" /> */}
+      <LeagueTable title="Ewige Tabelle" />
+    </div>
   );
 };
 

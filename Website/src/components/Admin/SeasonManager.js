@@ -217,13 +217,6 @@ const SeasonManager = () => {
         }
     };
 
-    // Funktion 1: Zur Ewigen Tabelle hinzufügen (Placeholder, noch nicht aktiv)
-    const addToEternalTable = async (seasonId) => {
-        // TODO: Diese Funktion wird später implementiert
-        // Die komplette Tabelle soll zur Ewigen Tabelle hinzugefügt werden
-        console.log('addToEternalTable called for season:', seasonId);
-    };
-
     // Funktion 2: Ergebnisse von Teams unter Minimum als ungültig markieren
     const markResultsAsInvalid = async (seasonId, teamIds) => {
         if (!teamIds || teamIds.length === 0) return;
@@ -299,7 +292,6 @@ const SeasonManager = () => {
 
     const availableTeams = allTeams.filter(team => !formData.teams.some(selected => selected.id === team.id));
     const isReadOnly = modalMode === 'view';
-    const hasActiveSeason = seasons.some(s => s.status === 'active');
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
 

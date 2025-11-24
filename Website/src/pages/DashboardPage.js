@@ -16,8 +16,6 @@ import * as resultApi from '../services/resultApiService';
 // Icons for Alerts and the new Icon Bar
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
-import EditIcon from '@mui/icons-material/Edit';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -38,9 +36,7 @@ const DashboardPage = () => {
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
   // State for Edit Modal
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
-  const [editFormData, setEditFormData] = useState({ homeScore: '', awayScore: '' });
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportForm, setReportForm] = useState({ bookingId: '', homeScore: '', awayScore: '' });
   const [reportOptions, setReportOptions] = useState([]);
@@ -312,20 +308,6 @@ const DashboardPage = () => {
     }
     const d = new Date(maybeDate);
     return isNaN(d.getTime()) ? null : d;
-  };
-
-  const handleOpenEditModal = (result) => {
-    setSelectedResult(result);
-    setEditFormData({ homeScore: result.homeScore, awayScore: result.awayScore });
-    setIsEditModalOpen(true);
-  };
-
-  const handleUpdateResult = async (e) => {
-    e.preventDefault();
-    if (!selectedResult) return;
-    // Platzhalter: Ergebnis-Korrektur über Backend-API folgt separat
-    alert('Ergebniskorrektur folgt über Backend-API in einem nächsten Schritt.');
-    setIsEditModalOpen(false);
   };
 
   if (loading) {
@@ -645,23 +627,6 @@ const DashboardPage = () => {
       </Grid>
 
       {showTeamSettings && <TeamSettings onClose={() => setShowTeamSettings(false)} />}
-      
-      <ReusableModal open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Ergebnis korrigieren">
-        <form onSubmit={handleUpdateResult}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography>Passe das Ergebnis an. Dein Gegner muss die Änderung erneut bestätigen.</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <TextField size="small" label="Tore Heim" type="number" fullWidth required value={editFormData.homeScore} onChange={(e) => setEditFormData({ ...editFormData, homeScore: e.target.value })} sx={darkInputStyle} />
-              <Typography sx={{ color: 'grey.400' }}>:</Typography>
-              <TextField size="small" label="Tore Auswärts" type="number" fullWidth required value={editFormData.awayScore} onChange={(e) => setEditFormData({ ...editFormData, awayScore: e.target.value })} sx={darkInputStyle} />
-            </Box>
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-              <Button variant="outlined" onClick={() => setIsEditModalOpen(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
-              <Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }}>Korrektur senden</Button>
-            </Box>
-          </Box>
-        </form>
-      </ReusableModal>
 
       <ReusableModal open={isReportModalOpen} onClose={handleCloseReportModal} title="Ergebnis melden">
         <Box component="form" onSubmit={handleReportSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
