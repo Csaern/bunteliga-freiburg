@@ -79,7 +79,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
 
     // --- DATA FETCHING ---
     const fetchData = async () => {
-        if (!currentSeason?.id) return;
+        if (!currentSeason?.id) return; 
         setLoading(true);
         try {
             const [pendingBookingsData, resultsData] = await Promise.all([
@@ -97,7 +97,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
 
     useEffect(() => {
         fetchData();
-    }, [currentSeason]);
+    }, [currentSeason?.id]);
 
     // NEU: Hilfsfunktion zur sicheren Umwandlung von Firestore-Timestamps in JS-Date-Objekte.
     const parseDate = (dateObj) => {
@@ -166,7 +166,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         if (formData.homeTeamId === formData.awayTeamId) { setNotification({ open: true, message: 'Heim- und Auswärtsmannschaft müssen unterschiedlich sein!', severity: 'error' }); return; }
 
         try {
-            const resultData = { ...formData, homeScore: parseInt(formData.homeScore), awayScore: parseInt(formData.awayScore), seasonId: currentSeason.id };
+            const resultData = { ...formData, homeScore: parseInt(formData.homeScore), awayScore: parseInt(formData.awayScore), seasonId: currentSeason?.id };
             
             if (modalMode === 'edit' && selectedResult) {
                 await resultApiService.adminUpdateResult(selectedResult.id, { ...resultData, status: 'confirmed' });
@@ -264,13 +264,13 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                         <FormControl size="small" fullWidth required sx={darkInputStyle} disabled={isReadOnly || isFromBooking}>
                             <InputLabel>Heim</InputLabel>
                             <Select value={formData.homeTeamId} label="Heim" onChange={(e) => setFormData({ ...formData, homeTeamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
-                                {teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                                {currentSeason.teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
                             </Select>
                         </FormControl>
                         <FormControl size="small" fullWidth required sx={darkInputStyle} disabled={isReadOnly || isFromBooking}>
                             <InputLabel>Auswärts</InputLabel>
                             <Select value={formData.awayTeamId} label="Auswärts" onChange={(e) => setFormData({ ...formData, awayTeamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
-                                {teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                                {currentSeason.teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
                             </Select>
                         </FormControl>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

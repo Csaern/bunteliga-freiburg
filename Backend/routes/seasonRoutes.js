@@ -158,4 +158,28 @@ router.put('/:id/archive', checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
+// NEU: Eine Saison abrechnen (setzt evaluated = true, Status bleibt active)
+router.put('/:id/evaluate', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const adminUid = req.user.uid;
+        const result = await seasonService.evaluateSeason(id, adminUid);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// NEU: Eine Saison und alle zugehörigen Daten löschen
+router.delete('/:id', checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const adminUid = req.user.uid;
+        const result = await seasonService.deleteSeasonWithAllData(id, adminUid);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
 module.exports = router;

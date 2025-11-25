@@ -46,8 +46,8 @@ export const getTeamsForActiveSeasonPublic = async () => {
   return publicApiClient('/api/teams/active-season', 'GET');
 };
 
-export const getPotentialOpponents = async (teamId) => {
-  return apiClient(`/api/teams/${teamId}/potential-opponents`, 'GET');
+export const getPotentialOpponents = async (teamId, isFriendly = false) => {
+  return apiClient(`/api/teams/${teamId}/potential-opponents?isFriendly=${isFriendly}`, 'GET');
 };
 
 export const getTeamByIdPublic = async (teamId) => {

@@ -12,8 +12,8 @@ router.get('/public/available/:seasonId', async (req, res) => {
         const bookings = await BookingService.getBookingsForSeason(req.params.seasonId);
         // Filtere nur verfügbare Buchungen: status === 'available' ODER (isAvailable === true UND keine Teams)
         const availableBookings = bookings.filter(booking => {
-            return booking.status === 'available' || 
-                   (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
+            return booking.status === 'available' ||
+                (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
         });
         res.status(200).json(availableBookings);
     } catch (error) {
@@ -133,8 +133,8 @@ router.put('/:id', checkAuth, checkAdmin, async (req, res) => {
 router.post('/:bookingId/request', checkAuth, async (req, res) => {
     try {
         const { bookingId } = req.params;
-        const { homeTeamId, awayTeamId } = req.body;
-        const result = await BookingService.requestBookingSlot(bookingId, homeTeamId, awayTeamId, req.user.uid);
+        const { homeTeamId, awayTeamId, friendly } = req.body; // NEU: friendly
+        const result = await BookingService.requestBookingSlot(bookingId, homeTeamId, awayTeamId, req.user.uid, friendly);
         res.status(200).json(result);
     } catch (error) {
         res.status(400).json({ message: error.message });

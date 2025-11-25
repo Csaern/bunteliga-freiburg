@@ -61,7 +61,7 @@ class BookingService {
             throw new Error('Die angegebene Saison wurde nicht gefunden.');
         }
         // Annahme basierend auf deinem season.js Modell: 'single_round_robin' oder 'double_round_robin'
-        const playMode = seasonDoc.data().playMode || 'double_round_robin'; 
+        const playMode = seasonDoc.data().playMode || 'double_round_robin';
 
         let allowedGames;
         if (playMode === 'single_round_robin') { // Jedes Team spielt einmal gegen jedes andere
@@ -75,7 +75,7 @@ class BookingService {
         // 1. Zähle bereits eingetragene Ergebnisse
         const resultsQuery1 = resultsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', homeTeamId).where('awayTeamId', '==', awayTeamId).get();
         const resultsQuery2 = resultsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', awayTeamId).where('awayTeamId', '==', homeTeamId).get();
-        
+
         // 2. Zähle bereits geplante, bestätigte Buchungen
         const bookingsQuery1 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', homeTeamId).where('awayTeamId', '==', awayTeamId).where('status', 'in', ['confirmed', 'pending_away_confirm']).get();
         const bookingsQuery2 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', awayTeamId).where('awayTeamId', '==', homeTeamId).where('status', 'in', ['confirmed', 'pending_away_confirm']).get();
@@ -113,7 +113,7 @@ class BookingService {
             const homeGamesPromise = query.where('homeTeamId', '==', teamId).get();
             const awayGamesPromise = query.where('awayTeamId', '==', teamId).get();
             const [homeSnapshot, awaySnapshot] = await Promise.all([homeGamesPromise, awayGamesPromise]);
-            
+
             const bookings = [];
             homeSnapshot.forEach(doc => bookings.push({ id: doc.id, ...doc.data() }));
             awaySnapshot.forEach(doc => {
@@ -121,21 +121,21 @@ class BookingService {
                     bookings.push({ id: doc.id, ...doc.data() });
                 }
             });
-            
+
             bookings.sort((a, b) => getMillisFromDate(a.date) - getMillisFromDate(b.date));
             return bookings;
 
         } else {
             const snapshot = await query.get();
             if (snapshot.empty) return [];
-            
+
             const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             // KORREKTUR: Verwendet die robuste Hilfsfunktion, um den Absturz zu verhindern.
             bookings.sort((a, b) => getMillisFromDate(a.date) - getMillisFromDate(b.date));
             return bookings;
         }
     }
-    
+
     /**
      * Admin-Funktion zum harten Löschen einer Buchung.
      */
@@ -152,7 +152,6 @@ class BookingService {
      * NEU: Prüft, ob ein einzelner Zeitslot auf einem Platz verfügbar ist.
      * Berücksichtigt die Dauer und kann eine existierende Buchung ignorieren (für Updates).
      */
-    // KORREKTUR: Das fehlende 'static'-Schlüsselwort wurde hinzugefügt.
     static async checkSingleSlot(slotData) {
         const { pitchId, date, duration, bookingIdToIgnore = null } = slotData;
 
@@ -210,7 +209,10 @@ class BookingService {
         }
 
         // 2. NEU: Prüfung der Saisonregeln für die Spielpaarung
-        await BookingService._checkSeasonRulesForPairing(bookingData.homeTeamId, bookingData.awayTeamId, bookingData.seasonId);
+        // NEU: Prüfung nur durchführen, wenn es KEIN Freundschaftsspiel ist.
+        if (!bookingData.friendly) {
+            await BookingService._checkSeasonRulesForPairing(bookingData.homeTeamId, bookingData.awayTeamId, bookingData.seasonId);
+        }
 
         const hasBothTeams = bookingData.homeTeamId && bookingData.awayTeamId;
         const status = hasBothTeams ? 'confirmed' : 'available';
@@ -222,6 +224,7 @@ class BookingService {
             status: status, // Automatischer Status
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             createdBy: user.uid,
+            friendly: bookingData.friendly || false, // NEU
         };
         const docRef = await bookingsCollection.add(newBooking);
         return { id: docRef.id, ...newBooking };
@@ -250,8 +253,13 @@ class BookingService {
         // 2. NEU: Prüfung der Saisonregeln, falls Teams geändert wurden.
         // Wir benötigen die seasonId, die entweder im Update-Payload oder in der originalen Buchung ist.
         const seasonId = updateData.seasonId || originalBooking.seasonId;
+
         // KORREKTUR: Die ID der zu bearbeitenden Buchung wird übergeben, um sie bei der Prüfung zu ignorieren.
-        await BookingService._checkSeasonRulesForPairing(updateData.homeTeamId, updateData.awayTeamId, seasonId, bookingId);
+        // NEU: Prüfung nur durchführen, wenn es KEIN Freundschaftsspiel ist.
+        const isFriendly = updateData.friendly !== undefined ? updateData.friendly : originalBooking.friendly;
+        if (!isFriendly) {
+            await BookingService._checkSeasonRulesForPairing(updateData.homeTeamId, updateData.awayTeamId, seasonId, bookingId);
+        }
 
         // KORREKTUR: Status wird auch beim Update automatisch angepasst.
         const hasBothTeams = updateData.homeTeamId && updateData.awayTeamId;
@@ -262,6 +270,7 @@ class BookingService {
             date: admin.firestore.Timestamp.fromDate(new Date(updateData.date)),
             status: status, // Automatischer Status
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            friendly: isFriendly, // NEU
         };
 
         await bookingRef.update(dataToUpdate);
@@ -275,16 +284,16 @@ class BookingService {
     static async getUpcomingBookings() {
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Setzt die Zeit auf den Anfang des Tages
-    
+
         const snapshot = await bookingsCollection
             .where('status', '==', 'confirmed')
             .where('date', '>=', admin.firestore.Timestamp.fromDate(today))
             .get();
-    
+
         if (snapshot.empty) {
             return [];
         }
-        
+
         const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         // Sortierung im Code
@@ -293,13 +302,13 @@ class BookingService {
         // Begrenzung auf 5 Ergebnisse
         return bookings.slice(0, 5);
     }
-  
+
     /**
      * KORRIGIERT: Führt eine "Trockenübung" für die Bulk-Erstellung durch, ohne einen Index zu benötigen.
      */
     static async bulkCheckSlots(data) {
         const { seasonId, pitchIds, startDate, endDate, days, times, timeInterval } = data;
-        
+
         const potentialSlots = [];
         const start = new Date(startDate);
         const end = new Date(endDate);
@@ -369,7 +378,7 @@ class BookingService {
     static async bulkCreateAvailableSlots(data, user) {
         const { seasonId, slotsToCreate } = data;
         const batch = db.batch();
-        
+
         for (const slot of slotsToCreate) {
             const newBooking = {
                 seasonId,
@@ -393,104 +402,58 @@ class BookingService {
     /**
      * Ein Team fordert einen verfügbaren Spieltermin an.
      */
-    static async requestBookingSlot(bookingId, homeTeamId, awayTeamId, requestingUserId) {
-      const bookingRef = bookingsCollection.doc(bookingId);
-      const bookingDoc = await bookingRef.get();
-  
-      if (!bookingDoc.exists || bookingDoc.data().status !== 'available') {
-        throw new Error('Dieser Spieltermin ist nicht verfügbar.');
-      }
-  
-      const activeSeasonQuery = await seasonsCollection.where('status', '==', 'active').limit(1).get();
-      if (activeSeasonQuery.empty) {
-        throw new Error('Derzeit gibt es keine aktive Saison.');
-      }
-      const activeSeason = activeSeasonQuery.docs[0].data();
-      const activeSeasonId = activeSeasonQuery.docs[0].id;
-  
-      if (!activeSeason.teams.some(team => team.id === homeTeamId)) {
-        throw new Error('Dein Team ist nicht Teil der aktiven Saison.');
-      }
-  
-      const existingGameQuery = await bookingsCollection
-        .where('seasonId', '==', activeSeasonId)
-        .where('homeTeamId', 'in', [homeTeamId, awayTeamId])
-        .where('awayTeamId', 'in', [homeTeamId, awayTeamId])
-        .where('status', 'in', ['pending_away_confirm', 'confirmed'])
-        .get();
-  
-      if (!existingGameQuery.empty) {
-        throw new Error('Du hast bereits ein Spiel gegen dieses Team angefragt oder bestätigt.');
-      }
-  
-      await bookingRef.update({
-        homeTeamId: homeTeamId,
-        awayTeamId: awayTeamId,
-        status: 'pending_away_confirm',
-        isAvailable: false,
-        createdBy: requestingUserId,
-        requestedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-  
-      return { message: 'Spieltermin erfolgreich angefragt. Warte auf Bestätigung des Gegners.' };
-    }
-  
-    /**
-     * Verarbeitet die Aktion eines Teams auf eine Anfrage (Annehmen / Ablehnen).
-     */
-    static async handleBookingAction(bookingId, actingTeamId, action, reason = '') {
-      const bookingRef = bookingsCollection.doc(bookingId);
-      const bookingDoc = await bookingRef.get();
-      const bookingData = bookingDoc.data();
-  
-      if (!bookingDoc.exists || bookingData.status !== 'pending_away_confirm' || bookingData.awayTeamId !== actingTeamId) {
-        throw new Error('Diese Aktion kann nicht ausgeführt werden.');
-      }
-  
-      if (action === 'confirm') {
-        await bookingRef.update({
-          status: 'confirmed',
-          confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        return { message: 'Spiel bestätigt!' };
-      }
-  
-      if (action === 'deny') {
-        await bookingRef.update({
-          status: 'denied',
-          deniedByTeamId: actingTeamId,
-          deniedAt: admin.firestore.FieldValue.serverTimestamp(),
-          denialReason: reason,
-        });
-  
-        const seasonDoc = await seasonsCollection.doc(bookingData.seasonId).get();
-        if (!seasonDoc.exists) throw new Error(`Saison nicht gefunden.`);
-        
-        const denialLimit = seasonDoc.data().maxDenials || 0;
-  
-        if (denialLimit > 0) {
-          const denialsQuery = await bookingsCollection
-            .where('seasonId', '==', bookingData.seasonId)
-            .where('deniedByTeamId', '==', actingTeamId)
-            .get();
-          
-          if (denialsQuery.size >= denialLimit) {
-            await resultService.createForfeitResult({
-              seasonId: bookingData.seasonId,
-              winningTeamId: bookingData.homeTeamId,
-              losingTeamId: actingTeamId,
-              bookingId: bookingId,
-            });
-            return { message: `Anfrage abgelehnt. ACHTUNG: Dies war die ${denialLimit}. Ablehnung, ein Straf-Ergebnis wurde erstellt.` };
-          }
+    static async requestBookingSlot(bookingId, homeTeamId, awayTeamId, requestingUserId, friendly = false) {
+        const bookingRef = bookingsCollection.doc(bookingId);
+        const bookingDoc = await bookingRef.get();
+
+        if (!bookingDoc.exists || bookingData.status !== 'pending_away_confirm' || bookingData.awayTeamId !== actingTeamId) {
+            throw new Error('Diese Aktion kann nicht ausgeführt werden.');
         }
-        
-        return { message: 'Anfrage abgelehnt.' };
-      }
-  
-      throw new Error('Ungültige Aktion.');
+
+        if (action === 'confirm') {
+            await bookingRef.update({
+                status: 'confirmed',
+                confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return { message: 'Spiel bestätigt!' };
+        }
+
+        if (action === 'deny') {
+            await bookingRef.update({
+                status: 'denied',
+                deniedByTeamId: actingTeamId,
+                deniedAt: admin.firestore.FieldValue.serverTimestamp(),
+                denialReason: reason,
+            });
+
+            const seasonDoc = await seasonsCollection.doc(bookingData.seasonId).get();
+            if (!seasonDoc.exists) throw new Error(`Saison nicht gefunden.`);
+
+            const denialLimit = seasonDoc.data().maxDenials || 0;
+
+            if (denialLimit > 0) {
+                const denialsQuery = await bookingsCollection
+                    .where('seasonId', '==', bookingData.seasonId)
+                    .where('deniedByTeamId', '==', actingTeamId)
+                    .get();
+
+                if (denialsQuery.size >= denialLimit) {
+                    await resultService.createForfeitResult({
+                        seasonId: bookingData.seasonId,
+                        winningTeamId: bookingData.homeTeamId,
+                        losingTeamId: actingTeamId,
+                        bookingId: bookingId,
+                    });
+                    return { message: `Anfrage abgelehnt. ACHTUNG: Dies war die ${denialLimit}. Ablehnung, ein Straf-Ergebnis wurde erstellt.` };
+                }
+            }
+
+            return { message: 'Anfrage abgelehnt.' };
+        }
+
+        throw new Error('Ungültige Aktion.');
     }
-  
+
     /**
      * Leitet den Stornierungsprozess für ein bestätigtes Spiel ein.
      * Entfernt die beiden Mannschaften und macht den Zeitslot wieder verfügbar.
@@ -502,17 +465,17 @@ class BookingService {
             throw new Error('Buchung nicht gefunden.');
         }
         const bookingData = bookingDoc.data();
-        
+
         // Erlaube Stornierung für confirmed oder pending_away_confirm Buchungen
         if (bookingData.status !== 'confirmed' && bookingData.status !== 'pending_away_confirm') {
             throw new Error('Nur bestätigte Spiele oder ausstehende Anfragen können storniert werden.');
         }
-        
+
         // Prüfe, ob das Team an der Buchung beteiligt ist
         if (bookingData.homeTeamId !== cancellingTeamId && bookingData.awayTeamId !== cancellingTeamId) {
             throw new Error('Du kannst nur Buchungen absagen, an denen dein Team beteiligt ist.');
         }
-  
+
         return await db.runTransaction(async (transaction) => {
             // Entferne beide Mannschaften und setze Status auf available
             transaction.update(bookingRef, {
@@ -524,44 +487,44 @@ class BookingService {
                 cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
                 cancellationReason: reason || null,
             });
-            
-            const message = bookingData.status === 'pending_away_confirm' 
+
+            const message = bookingData.status === 'pending_away_confirm'
                 ? 'Spielanfrage storniert. Der Zeitslot wurde wieder freigegeben.'
                 : 'Spiel abgesagt. Der Zeitslot wurde wieder freigegeben.';
-            
+
             return { message };
         });
     }
-  
+
     /**
      * Verarbeitet die Antwort des Gegners auf einen Stornierungs-Antrag.
      */
     static async respondToCancellationRequest(bookingId, respondingTeamId, response, reason = '') {
         const bookingRef = bookingsCollection.doc(bookingId);
-        
+
         // Hole Daten vor der Transaction
         const bookingDoc = await bookingRef.get();
         if (!bookingDoc.exists || bookingDoc.data().status !== 'cancellation_pending') {
             throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
         }
         const bookingData = bookingDoc.data();
-  
+
         if (bookingData.cancellationRequestedByTeamId === respondingTeamId) {
             throw new Error('Du kannst nicht auf deinen eigenen Antrag antworten.');
         }
-  
+
         // Hole Team-Namen für Benachrichtigungen
         const requestingTeamDoc = await teamsCollection.doc(bookingData.cancellationRequestedByTeamId).get();
         const requestingTeamName = requestingTeamDoc.exists ? requestingTeamDoc.data().name : 'Unbekanntes Team';
-        
+
         const respondingTeamDoc = await teamsCollection.doc(respondingTeamId).get();
         const respondingTeamName = respondingTeamDoc.exists ? respondingTeamDoc.data().name : 'Unbekanntes Team';
-        
+
         // Normalisiere das Datum nur für die Formatierung in der Benachrichtigung
         if (!bookingData.date) {
             throw new Error('Kein Datum in der Buchung gefunden.');
         }
-        
+
         // Konvertiere Firestore Timestamp zu Date für Formatierung
         let gameDate;
         try {
@@ -589,7 +552,7 @@ class BookingService {
             console.error('Fehler bei Datumskonvertierung:', e, bookingData.date);
             gameDate = null; // Setze auf null, damit die Formatierung sicher ist
         }
-        
+
         let gameDateStr = 'Unbekannt';
         let gameTimeStr = 'Unbekannt';
         if (gameDate instanceof Date && !isNaN(gameDate.valueOf())) {
@@ -600,7 +563,7 @@ class BookingService {
                 console.error('Fehler bei Datumsformatierung:', e);
             }
         }
-  
+
         if (response === 'accept') {
             await db.runTransaction(async (transaction) => {
                 // Alle Reads ZUERST ausführen
@@ -608,17 +571,17 @@ class BookingService {
                 if (!bookingDocInTransaction.exists || bookingDocInTransaction.data().status !== 'cancellation_pending') {
                     throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
                 }
-                
+
                 const pitchRef = pitchesCollection.doc(bookingData.pitchId);
                 const pitchDoc = await transaction.get(pitchRef);
-                
+
                 // Dann alle Writes ausführen
                 transaction.update(bookingRef, {
                     status: 'cancelled',
                     cancelledByTeamId: bookingData.cancellationRequestedByTeamId,
                     cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
-  
+
                 if (pitchDoc.exists && pitchDoc.data().isVerified) {
                     const newBooking = new Booking({ ...bookingData, createdBy: 'system_recreate', homeTeamId: null, awayTeamId: null });
                     const firestoreObject = newBooking.toFirestoreObject();
@@ -627,7 +590,7 @@ class BookingService {
                     transaction.set(newBookingRef, firestoreObject);
                 }
             });
-            
+
             // Benachrichtigung an das anfragende Team senden (außerhalb der Transaction)
             await notificationService.notifyTeam(
                 bookingData.cancellationRequestedByTeamId,
@@ -642,16 +605,16 @@ class BookingService {
                     gameTime: gameTimeStr,
                 }
             );
-            
+
             return { message: 'Stornierung angenommen. Das Spiel wurde abgesagt.' };
-  
+
         } else if (response === 'reject') {
             await db.runTransaction(async (transaction) => {
                 const bookingDocInTransaction = await transaction.get(bookingRef);
                 if (!bookingDocInTransaction.exists || bookingDocInTransaction.data().status !== 'cancellation_pending') {
                     throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
                 }
-                
+
                 transaction.update(bookingRef, {
                     status: 'confirmed',
                     cancellationRequestedByTeamId: null,
@@ -660,7 +623,7 @@ class BookingService {
                     cancellationRejectionReason: reason,
                 });
             });
-            
+
             // Benachrichtigung an das anfragende Team senden (außerhalb der Transaction)
             await notificationService.notifyTeam(
                 bookingData.cancellationRequestedByTeamId,
@@ -676,86 +639,86 @@ class BookingService {
                     reason: reason,
                 }
             );
-            
+
             return { message: 'Stornierungs-Antrag abgelehnt. Das Spiel findet wie geplant statt.' };
         } else {
             throw new Error('Ungültige Antwort.');
         }
     }
-  
+
     /**
      * Erstellt eine komplett neue, individuelle Buchung.
      */
     static async createCustomBooking(bookingData, user) {
-      const { pitchId, homeTeamId, awayTeamId, seasonId, date, time } = bookingData;
-      if (!pitchId || !homeTeamId || !seasonId || !date || !time) {
-        throw new Error('Platz, Heimteam, Saison, Datum und Zeit sind erforderlich.');
-      }
-  
-      const pitchDoc = await pitchesCollection.doc(pitchId).get();
-      if (!pitchDoc.exists) throw new Error('Der angegebene Platz wurde nicht gefunden.');
-      const pitch = pitchDoc.data();
-  
-      if (!user.admin) {
-        const teamDoc = await teamsCollection.doc(homeTeamId).get();
-        if (!teamDoc.exists || !teamDoc.data().captainIds.includes(user.uid)) {
-            throw new Error('Du bist kein Kapitän des angegebenen Heimteams.');
+        const { pitchId, homeTeamId, awayTeamId, seasonId, date, time } = bookingData;
+        if (!pitchId || !homeTeamId || !seasonId || !date || !time) {
+            throw new Error('Platz, Heimteam, Saison, Datum und Zeit sind erforderlich.');
         }
-        if (pitch.isVerified || pitch.teamId !== homeTeamId) {
-          throw new Error('Du kannst individuelle Buchungen nur auf dem eigenen, inoffiziellen Team-Platz erstellen.');
+
+        const pitchDoc = await pitchesCollection.doc(pitchId).get();
+        if (!pitchDoc.exists) throw new Error('Der angegebene Platz wurde nicht gefunden.');
+        const pitch = pitchDoc.data();
+
+        if (!user.admin) {
+            const teamDoc = await teamsCollection.doc(homeTeamId).get();
+            if (!teamDoc.exists || !teamDoc.data().captainIds.includes(user.uid)) {
+                throw new Error('Du bist kein Kapitän des angegebenen Heimteams.');
+            }
+            if (pitch.isVerified || pitch.teamId !== homeTeamId) {
+                throw new Error('Du kannst individuelle Buchungen nur auf dem eigenen, inoffiziellen Team-Platz erstellen.');
+            }
         }
-      }
-  
-      const seasonDoc = await seasonsCollection.doc(seasonId).get();
-      if (!seasonDoc.exists || seasonDoc.data().status !== 'active') {
-          throw new Error('Buchungen sind in dieser Saison nicht (mehr) möglich.');
-      }
-  
-      const newBookingData = {
-        ...bookingData,
-        createdBy: user.uid,
-        status: awayTeamId ? 'pending_away_confirm' : 'confirmed',
-      };
-  
-      const newBooking = new Booking(newBookingData);
-      const firestoreObject = newBooking.toFirestoreObject();
-      firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
-  
-      const docRef = await bookingsCollection.add(firestoreObject);
-      return { id: docRef.id, ...firestoreObject };
+
+        const seasonDoc = await seasonsCollection.doc(seasonId).get();
+        if (!seasonDoc.exists || seasonDoc.data().status !== 'active') {
+            throw new Error('Buchungen sind in dieser Saison nicht (mehr) möglich.');
+        }
+
+        const newBookingData = {
+            ...bookingData,
+            createdBy: user.uid,
+            status: awayTeamId ? 'pending_away_confirm' : 'confirmed',
+        };
+
+        const newBooking = new Booking(newBookingData);
+        const firestoreObject = newBooking.toFirestoreObject();
+        firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
+
+        const docRef = await bookingsCollection.add(firestoreObject);
+        return { id: docRef.id, ...firestoreObject };
     }
-  
+
     /**
      * Storniert ein Spiel final durch einen Admin.
      */
     static async adminCancelBooking(bookingId, reason, adminUid) {
-      const bookingRef = bookingsCollection.doc(bookingId);
-      await bookingRef.update({
-        status: 'cancelled_admin',
-        cancellationReason: reason,
-        cancelledBy: adminUid,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return { message: 'Spiel wurde durch Admin erfolgreich storniert.' };
+        const bookingRef = bookingsCollection.doc(bookingId);
+        await bookingRef.update({
+            status: 'cancelled_admin',
+            cancellationReason: reason,
+            cancelledBy: adminUid,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { message: 'Spiel wurde durch Admin erfolgreich storniert.' };
     }
-  
+
     /**
      * KORRIGIERT: Ruft Buchungen für ein bestimmtes Team mit einem bestimmten Status ab, ohne einen Index zu benötigen.
      */
     static async getBookingsByStatusForTeam(teamId, status) {
-      const snapshot = await bookingsCollection
-        .where('awayTeamId', '==', teamId)
-        .where('status', '==', status)
-        .get();
-      
-      if (snapshot.empty) return [];
-      
-      const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const snapshot = await bookingsCollection
+            .where('awayTeamId', '==', teamId)
+            .where('status', '==', status)
+            .get();
 
-      // Sortierung im Code
-      bookings.sort((a, b) => a.date.toMillis() - b.date.toMillis());
+        if (snapshot.empty) return [];
 
-      return bookings;
+        const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Sortierung im Code
+        bookings.sort((a, b) => a.date.toMillis() - b.date.toMillis());
+
+        return bookings;
     }
 
     /**
@@ -767,7 +730,7 @@ class BookingService {
             .where('seasonId', '==', seasonId)
             .where('date', '>', now)
             .get();
-        
+
         if (snapshot.empty) return [];
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
@@ -786,7 +749,7 @@ class BookingService {
         // Wir holen alle Buchungen der angegebenen Saison.
         const bookingsQuery = bookingsCollection
             .where('seasonId', '==', seasonId);
-        
+
         const bookingsSnapshot = await bookingsQuery.get();
         const allSeasonBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -841,13 +804,13 @@ class BookingService {
         // um auch Spiele des heutigen Tages einzubeziehen
         const now = new Date();
         now.setHours(0, 0, 0, 0); // Setze auf Mitternacht, um alle Spiele ab heute einzubeziehen
-        
+
         // Query für Heimspiele: Das Team ist Heimmannschaft
         // Verwende nur seasonId und homeTeamId für die Query, um Index-Probleme zu vermeiden
         const homeGamesQuery = bookingsCollection
             .where('seasonId', '==', seasonId)
             .where('homeTeamId', '==', teamId);
-        
+
         // Query für Auswärtsspiele: Das Team ist Auswärtsmannschaft
         const awayGamesQuery = bookingsCollection
             .where('seasonId', '==', seasonId)
@@ -862,7 +825,7 @@ class BookingService {
         // Kombiniere alle Ergebnisse und filtere clientseitig nach Datum und Status
         const bookingsMap = new Map();
         const nowMillis = now.getTime();
-        
+
         // Hilfsfunktion zur Konvertierung von Firestore Timestamp zu Millisekunden
         const getTimestampMillis = (timestamp) => {
             if (!timestamp) return 0;
@@ -871,21 +834,21 @@ class BookingService {
             if (timestamp instanceof Date) return timestamp.getTime();
             return new Date(timestamp).getTime();
         };
-        
+
         // Verarbeite Heimspiele
         homeSnapshot.docs.forEach(doc => {
             const data = doc.data();
             const bookingDate = data.date;
             const bookingDateMillis = getTimestampMillis(bookingDate);
-            
+
             // Prüfe, ob das Spiel in der Zukunft liegt (ab heute)
             const isFuture = bookingDateMillis >= nowMillis;
-            
+
             // Filter: Nur Spiele mit Status 'confirmed' oder 'pending_away_confirm', 
             // oder Spiele mit beiden Teams (homeTeamId und awayTeamId vorhanden)
-            const statusOk = ['confirmed', 'pending_away_confirm'].includes(data.status) || 
-                           (!!data.homeTeamId && !!data.awayTeamId);
-            
+            const statusOk = ['confirmed', 'pending_away_confirm'].includes(data.status) ||
+                (!!data.homeTeamId && !!data.awayTeamId);
+
             if (isFuture && statusOk) {
                 bookingsMap.set(doc.id, { id: doc.id, ...data });
             }
@@ -896,15 +859,15 @@ class BookingService {
             const data = doc.data();
             const bookingDate = data.date;
             const bookingDateMillis = getTimestampMillis(bookingDate);
-            
+
             // Prüfe, ob das Spiel in der Zukunft liegt (ab heute)
             const isFuture = bookingDateMillis >= nowMillis;
-            
+
             // Filter: Nur Spiele mit Status 'confirmed' oder 'pending_away_confirm',
             // oder Spiele mit beiden Teams (homeTeamId und awayTeamId vorhanden)
-            const statusOk = ['confirmed', 'pending_away_confirm'].includes(data.status) || 
-                           (!!data.homeTeamId && !!data.awayTeamId);
-            
+            const statusOk = ['confirmed', 'pending_away_confirm'].includes(data.status) ||
+                (!!data.homeTeamId && !!data.awayTeamId);
+
             if (isFuture && statusOk) {
                 bookingsMap.set(doc.id, { id: doc.id, ...data });
             }

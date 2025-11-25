@@ -12,7 +12,6 @@ import ResultsPage from './pages/ResultsPage';
 import HistoryPage from './pages/HistoryPage';
 import ContactPage from './pages/ContactPage';
 import TeamsPage from './pages/TeamsPage';
-import TeamPage from './pages/TeamPage';
 import ImpressumPage from './pages/ImpressumPage';
 import PrivacyPage from './pages/PrivacyPage';
 import '@fontsource/roboto/300.css';
@@ -28,10 +27,8 @@ import LoginPage from './pages/LoginPage';
 // stattdessen verwenden wir AdminBoard
 import AdminBoard from './pages/AdminBoard';
 import AdminDashboard from './components/Admin/AdminDashboard';
-import UserBoard from './pages/UserBoard';
 import DashboardPage from './pages/DashboardPage';
 import TeamDetailPage from './pages/TeamDetailPage';
-import ResultConfirmationPage from './pages/ResultConfirmationPage';
 import GameManagementPage from './pages/GameManagementPage';
 
 // Eine kleine Helfer-Komponente, um den URL-Parameter an das AdminBoard zu übergeben

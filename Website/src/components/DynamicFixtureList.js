@@ -29,6 +29,7 @@ import * as pitchApi from '../services/pitchApiService';
 import { API_BASE_URL } from '../services/apiClient';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import * as seasonApiService from '../services/seasonApiService';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
@@ -102,6 +103,35 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
   const loadFixtures = useCallback(async () => {
     try {
+      // Lade Saison-Daten, um aktive Teams zu identifizieren
+      let activeTeamIds = [];
+      if (seasonId) {
+        try {
+          // Versuche zuerst die aktive Saison zu laden
+          const activeSeason = await seasonApiService.getActiveSeasonPublic();
+          if (activeSeason && activeSeason.id === seasonId && activeSeason.teams) {
+            activeTeamIds = activeSeason.teams
+              .filter(t => t.status === 'active')
+              .map(t => t.id || t.teamId)
+              .filter(Boolean);
+          } else {
+            // Falls nicht die aktive Saison, lade die Saison direkt aus Firestore
+            const seasonDoc = await getDoc(doc(db, 'seasons', seasonId));
+            if (seasonDoc.exists()) {
+              const seasonData = seasonDoc.data();
+              if (seasonData.teams && Array.isArray(seasonData.teams)) {
+                activeTeamIds = seasonData.teams
+                  .filter(t => t.status === 'active')
+                  .map(t => t.id || t.teamId)
+                  .filter(Boolean);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Fehler beim Laden der Saison-Daten:', error);
+        }
+      }
+
       // Teams laden
       // Wenn Ergebnisse angezeigt werden, lade alle Teams aus Firestore (für vollständige Logo-Daten)
       // Ansonsten nur Teams der aktiven Saison
@@ -138,6 +168,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           }
         }
       }
+
+      // Filtere nur aktive Teams, wenn Saison-Daten verfügbar sind
+      if (seasonId && activeTeamIds.length > 0) {
+        teamsArr = teamsArr.filter(team => activeTeamIds.includes(team.id));
+      }
+
       const teamsMap = teamsArr.reduce((acc, t) => {
         acc[t.id] = {
           name: t.name,
@@ -376,7 +412,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             homeScore: result.homeScore,
             awayScore: result.awayScore,
             isPast: true,
-            location: 'Unbekannt',
+            location: " ",
             homeTeamName: result.homeTeamName,
             awayTeamName: result.awayTeamName,
           };

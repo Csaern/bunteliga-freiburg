@@ -4,10 +4,12 @@ import { ReusableModal } from '../Helpers/modalUtils';
 import { StyledTableCell } from '../Helpers/tableUtils';
 import * as seasonApiService from '../../services/seasonApiService';
 import * as teamApiService from '../../services/teamApiService';
+import * as resultApiService from '../../services/resultApiService';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { List, ListItem, ListItemText } from '@mui/material';
 
 const formatDateForInput = (dateValue) => {
     if (!dateValue) return '';
@@ -84,6 +86,7 @@ const SeasonManager = () => {
     const [activeTab, setActiveTab] = useState(0);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [actionToConfirm, setActionToConfirm] = useState(null);
+    const [teamsBelowMinimum, setTeamsBelowMinimum] = useState([]);
 
     useEffect(() => {
         // Dieser Hook fokussiert das Suchfeld neu, NACHDEM es durch den key-Wechsel zurückgesetzt wurde.
@@ -161,11 +164,81 @@ const SeasonManager = () => {
         } catch (err) { setError('Fehler beim Speichern.'); }
     };
 
-    const handleActionRequest = (action, seasonId) => {
+    const handleActionRequest = async (action, seasonId) => {
         const season = seasons.find(s => s.id === seasonId);
         if (season) {
-            setActionToConfirm({ action, seasonId, seasonName: season.name });
-            setIsConfirmModalOpen(true);
+            if (action === 'finish') {
+                // Berechne Teams, die nicht genug Spiele haben
+                try {
+                    const results = await resultApiService.getResultsForSeason(seasonId);
+                    // Nur bestätigte und gültige Ergebnisse zählen
+                    const validResults = results.filter(r => r.status === 'confirmed' && r.isValid !== false);
+                    
+                    // Nur aktive Teams berücksichtigen
+                    const activeTeams = season.teams.filter(team => team.status !== 'inactive');
+                    
+                    // Zähle Spiele pro Team (nur für aktive Teams)
+                    const gamesPerTeam = {};
+                    activeTeams.forEach(team => {
+                        gamesPerTeam[team.id] = 0;
+                    });
+                    
+                    validResults.forEach(result => {
+                        if (result.homeTeamId && gamesPerTeam[result.homeTeamId] !== undefined) {
+                            gamesPerTeam[result.homeTeamId]++;
+                        }
+                        if (result.awayTeamId && gamesPerTeam[result.awayTeamId] !== undefined) {
+                            gamesPerTeam[result.awayTeamId]++;
+                        }
+                    });
+                    
+                    // Berechne Minimum (Anzahl aktiver Teams / 2, aufgerundet)
+                    const minGames = Math.ceil(activeTeams.length / 2);
+                    
+                    // Finde Teams unter dem Minimum (nur aktive Teams)
+                    const teamsBelowMin = activeTeams
+                        .filter(team => gamesPerTeam[team.id] < minGames)
+                        .map(team => ({
+                            id: team.id,
+                            name: team.name,
+                            gamesPlayed: gamesPerTeam[team.id]
+                        }));
+                    
+                    setTeamsBelowMinimum(teamsBelowMin);
+                    setActionToConfirm({ action, seasonId, seasonName: season.name });
+                    setIsConfirmModalOpen(true);
+                } catch (err) {
+                    setError('Fehler beim Laden der Ergebnisse: ' + err.message);
+                }
+            } else {
+                setActionToConfirm({ action, seasonId, seasonName: season.name });
+                setIsConfirmModalOpen(true);
+            }
+        }
+    };
+
+    // Funktion 2: Ergebnisse von Teams unter Minimum als ungültig markieren
+    const markResultsAsInvalid = async (seasonId, teamIds) => {
+        if (!teamIds || teamIds.length === 0) return;
+        
+        try {
+            // Lade alle Ergebnisse der Saison
+            const results = await resultApiService.getResultsForSeason(seasonId);
+            
+            // Finde alle Ergebnisse, die diese Teams betreffen
+            const resultsToInvalidate = results.filter(result => 
+                (teamIds.includes(result.homeTeamId) || teamIds.includes(result.awayTeamId)) &&
+                result.status === 'confirmed'
+            );
+            
+            // Markiere jedes Ergebnis als ungültig
+            const updatePromises = resultsToInvalidate.map(result =>
+                resultApiService.adminUpdateResult(result.id, { isValid: false })
+            );
+            
+            await Promise.all(updatePromises);
+        } catch (err) {
+            throw new Error('Fehler beim Markieren der Ergebnisse: ' + err.message);
         }
     };
 
@@ -174,9 +247,27 @@ const SeasonManager = () => {
         const { action, seasonId } = actionToConfirm;
         try {
             switch (action) {
-                case 'activate': await seasonApiService.setCurrentSeason(seasonId); break;
-                case 'finish': await seasonApiService.finishSeason(seasonId); break;
-                case 'archive': await seasonApiService.archiveSeason(seasonId); break;
+                case 'activate': 
+                    await seasonApiService.setCurrentSeason(seasonId); 
+                    break;
+                case 'finish': 
+                    // Markiere Ergebnisse von Teams unter Minimum als ungültig
+                    if (teamsBelowMinimum.length > 0) {
+                        const teamIds = teamsBelowMinimum.map(t => t.id);
+                        await markResultsAsInvalid(seasonId, teamIds);
+                    }
+                    
+                    // TODO: Später aktivieren - addToEternalTable(seasonId);
+                    
+                    // Rechne die Saison ab (setzt evaluated = true, Status bleibt active)
+                    await seasonApiService.evaluateSeason(seasonId); 
+                    break;
+                case 'archive': 
+                    await seasonApiService.archiveSeason(seasonId); 
+                    break;
+                case 'delete':
+                    await seasonApiService.deleteSeason(seasonId);
+                    break;
                 default: break;
             }
             fetchData();
@@ -185,6 +276,7 @@ const SeasonManager = () => {
         } finally {
             setIsConfirmModalOpen(false);
             setActionToConfirm(null);
+            setTeamsBelowMinimum([]);
         }
     };
 
@@ -200,7 +292,6 @@ const SeasonManager = () => {
 
     const availableTeams = allTeams.filter(team => !formData.teams.some(selected => selected.id === team.id));
     const isReadOnly = modalMode === 'view';
-    const hasActiveSeason = seasons.some(s => s.status === 'active');
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
 
@@ -218,22 +309,100 @@ const SeasonManager = () => {
 
             <ReusableModal
                 open={isConfirmModalOpen}
-                onClose={() => setIsConfirmModalOpen(false)}
-                title="Aktion bestätigen"
+                onClose={() => {
+                    setIsConfirmModalOpen(false);
+                    setTeamsBelowMinimum([]);
+                }}
+                title={actionToConfirm?.action === 'finish' ? "Saison abrechnen" : actionToConfirm?.action === 'delete' ? "Saison löschen" : "Aktion bestätigen"}
             >
                 {actionToConfirm && (
                     <>
-                        <Typography sx={{ color: 'grey.300', mb: 3 }}>
-                            {`Möchtest du die Aktion "${
-                                { activate: 'Aktivieren', finish: 'Beenden', archive: 'Archivieren' }[actionToConfirm.action]
-                            }" für die Saison "${actionToConfirm.seasonName}" wirklich durchführen?`}
-                        </Typography>
+                        {actionToConfirm.action === 'finish' ? (
+                            <>
+                                <Typography sx={{ color: 'grey.300', mb: 2 }}>
+                                    Die aktuelle Saison wird zur Historischen Tabelle hinzugefügt.
+                                </Typography>
+                                {teamsBelowMinimum.length > 0 ? (
+                                    <>
+                                        <Typography sx={{ color: 'grey.300', mb: 2 }}>
+                                            Folgende Teams fallen für die folgende Saison aus der Wertung weil sie nicht mindestens die Hälfte der Spiele gemacht haben:
+                                        </Typography>
+                                        <List sx={{ bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1, mb: 3, maxHeight: '200px', overflow: 'auto' }}>
+                                            {teamsBelowMinimum.map(team => (
+                                                <ListItem key={team.id}>
+                                                    <ListItemText 
+                                                        primary={team.name}
+                                                        secondary={`${team.gamesPlayed} Spiele gespielt`}
+                                                        primaryTypographyProps={{ sx: { color: 'grey.200' } }}
+                                                        secondaryTypographyProps={{ sx: { color: 'grey.500' } }}
+                                                    />
+                                                </ListItem>
+                                            ))}
+                                        </List>
+                                    </>
+                                ) : (
+                                    <Typography sx={{ color: 'grey.300', mb: 3 }}>
+                                        Alle Teams haben mindestens die Hälfte der Spiele absolviert.
+                                    </Typography>
+                                )}
+                            </>
+                        ) : actionToConfirm.action === 'delete' ? (
+                            <>
+                                <Typography sx={{ color: 'error.light', mb: 2, fontWeight: 'bold' }}>
+                                    WARNUNG: Diese Aktion kann nicht rückgängig gemacht werden!
+                                </Typography>
+                                <Typography sx={{ color: 'grey.300', mb: 2 }}>
+                                    Möchtest du die Saison "{actionToConfirm.seasonName}" und alle zugehörigen Daten wirklich löschen?
+                                </Typography>
+                                <Typography sx={{ color: 'grey.400', mb: 3, fontSize: '0.9rem' }}>
+                                    Folgende Daten werden gelöscht:
+                                </Typography>
+                                <List sx={{ bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1, mb: 3 }}>
+                                    <ListItem>
+                                        <ListItemText 
+                                            primary="Die Saison selbst"
+                                            primaryTypographyProps={{ sx: { color: 'grey.200' } }}
+                                        />
+                                    </ListItem>
+                                    <ListItem>
+                                        <ListItemText 
+                                            primary="Alle Ergebnisse dieser Saison"
+                                            primaryTypographyProps={{ sx: { color: 'grey.200' } }}
+                                        />
+                                    </ListItem>
+                                    <ListItem>
+                                        <ListItemText 
+                                            primary="Alle Spielbuchungen dieser Saison"
+                                            primaryTypographyProps={{ sx: { color: 'grey.200' } }}
+                                        />
+                                    </ListItem>
+                                </List>
+                            </>
+                        ) : (
+                            <Typography sx={{ color: 'grey.300', mb: 3 }}>
+                                {`Möchtest du die Aktion "${
+                                    { activate: 'Aktivieren', archive: 'Archivieren' }[actionToConfirm.action]
+                                }" für die Saison "${actionToConfirm.seasonName}" wirklich durchführen?`}
+                            </Typography>
+                        )}
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                            <Button variant="outlined" onClick={() => setIsConfirmModalOpen(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
+                            <Button variant="outlined" onClick={() => {
+                                setIsConfirmModalOpen(false);
+                                setTeamsBelowMinimum([]);
+                            }} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
                                 Abbrechen
                             </Button>
-                            <Button variant="contained" onClick={handleConfirmAction} sx={{ backgroundColor: '#00A99D' }}>
-                                Bestätigen
+                            <Button 
+                                variant="contained" 
+                                onClick={handleConfirmAction} 
+                                sx={{ 
+                                    backgroundColor: actionToConfirm.action === 'delete' ? 'error.main' : '#00A99D',
+                                    '&:hover': {
+                                        backgroundColor: actionToConfirm.action === 'delete' ? 'error.dark' : '#00897B'
+                                    }
+                                }}
+                            >
+                                {actionToConfirm.action === 'delete' ? 'Endgültig löschen' : 'Bestätigen'}
                             </Button>
                         </Box>
                     </>
@@ -343,10 +512,10 @@ const SeasonManager = () => {
                                 {!isMobile && <StyledTableCell align="center">{season.teams?.length || 0}</StyledTableCell>}
                                 <StyledTableCell align="right">
                                     <Box onClick={e => e.stopPropagation()} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                        <Tooltip title="Saison beenden">
+                                        <Tooltip title={season.evaluated ? "Saison wurde bereits abgerechnet" : "Saison abrechnen"}>
                                             <span>
-                                                <IconButton onClick={() => handleActionRequest('finish', season.id)} disabled={season.status !== 'active'}>
-                                                    <StopCircleOutlinedIcon sx={{ color: season.status === 'active' ? 'warning.light' : 'grey.800' }} />
+                                                <IconButton onClick={() => handleActionRequest('finish', season.id)} disabled={season.status !== 'active' || season.evaluated === true}>
+                                                    <StopCircleOutlinedIcon sx={{ color: (season.status === 'active' && season.evaluated !== true) ? 'warning.light' : 'grey.800' }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
@@ -361,6 +530,13 @@ const SeasonManager = () => {
                                             <span>
                                                 <IconButton onClick={() => handleActionRequest('archive', season.id)} disabled={season.status !== 'finished' && season.status !== 'planning'}>
                                                     <ArchiveOutlinedIcon sx={{ color: season.status === 'finished' || season.status === 'planning' ? 'error.light' : 'grey.800' }} />
+                                                </IconButton>
+                                            </span>
+                                        </Tooltip>
+                                        <Tooltip title="Saison und alle Inhalte löschen">
+                                            <span>
+                                                <IconButton onClick={() => handleActionRequest('delete', season.id)}>
+                                                    <DeleteIcon sx={{ color: 'error.light' }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>

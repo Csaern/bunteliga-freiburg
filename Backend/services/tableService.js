@@ -19,7 +19,8 @@ async function calculateTable(seasonId, applyFinalRules = false) {
     .where('seasonId', '==', seasonId)
     .where('status', '==', 'confirmed')
     .get();
-  const results = resultsSnapshot.docs.map(doc => doc.data());
+  const results = resultsSnapshot.docs.map(doc => doc.data())
+    .filter(result => !result.friendly); // NEU: Freundschaftsspiele ignorieren
 
   // 2. Initialisiere Statistik-Objekt
   let tableStats = {};

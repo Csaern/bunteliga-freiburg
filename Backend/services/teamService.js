@@ -90,7 +90,7 @@ async function updateTeam(teamId, updates) {
     // --- C) Buchungen aktualisieren (NEUE LOGIK) ---
     const bookingsQuery = await bookingsCollection.where('teamId', '==', teamId).get();
     bookingsQuery.forEach(doc => {
-        batch.update(doc.ref, { teamName: newName });
+      batch.update(doc.ref, { teamName: newName });
     });
 
     // 3. Führe alle gesammelten Updates auf einmal aus
@@ -137,9 +137,9 @@ async function deleteTeam(teamId) {
 
 // Dummy-Funktion, falls sie an anderer Stelle benötigt wird
 async function getTeamsByIds(ids) {
-    if (!ids || ids.length === 0) return [];
-    const snapshot = await teamsCollection.where(admin.firestore.FieldPath.documentId(), 'in', ids).get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  if (!ids || ids.length === 0) return [];
+  const snapshot = await teamsCollection.where(admin.firestore.FieldPath.documentId(), 'in', ids).get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 /**
@@ -147,39 +147,39 @@ async function getTeamsByIds(ids) {
  * Sie ruft Teams ab, die zu einer bestimmten Saison gehören.
  */
 async function getTeamsForSeason(seasonId) {
-    if (!seasonId) {
-        throw new Error('Eine Saison-ID ist erforderlich.');
-    }
+  if (!seasonId) {
+    throw new Error('Eine Saison-ID ist erforderlich.');
+  }
 
-    const seasonData = await seasonService.getSeasonById(seasonId);
-    if (!seasonData) {
-        console.warn(`Saison mit ID ${seasonId} nicht gefunden.`);
-        return [];
-    }
+  const seasonData = await seasonService.getSeasonById(seasonId);
+  if (!seasonData) {
+    console.warn(`Saison mit ID ${seasonId} nicht gefunden.`);
+    return [];
+  }
 
-    if (!seasonData.teams || seasonData.teams.length === 0) {
-        return [];
-    }
+  if (!seasonData.teams || seasonData.teams.length === 0) {
+    return [];
+  }
 
-    const teamIds = seasonData.teams.map(t => t.teamId);
+  const teamIds = seasonData.teams.map(t => t.teamId);
 
-    if (teamIds.length === 0) {
-        return [];
-    }
+  if (teamIds.length === 0) {
+    return [];
+  }
 
-    const teamsSnapshot = await teamsCollection.where(admin.firestore.FieldPath.documentId(), 'in', teamIds).get();
+  const teamsSnapshot = await teamsCollection.where(admin.firestore.FieldPath.documentId(), 'in', teamIds).get();
 
-    const teams = teamsSnapshot.docs.map(doc => {
-        const teamData = doc.data();
-        const seasonTeamInfo = seasonData.teams.find(t => t.teamId === doc.id);
-        return {
-            id: doc.id,
-            ...teamData,
-            status: seasonTeamInfo ? seasonTeamInfo.status : 'unknown'
-        };
-    });
+  const teams = teamsSnapshot.docs.map(doc => {
+    const teamData = doc.data();
+    const seasonTeamInfo = seasonData.teams.find(t => t.teamId === doc.id);
+    return {
+      id: doc.id,
+      ...teamData,
+      status: seasonTeamInfo ? seasonTeamInfo.status : 'unknown'
+    };
+  });
 
-    return teams;
+  return teams;
 }
 
 /**
@@ -188,88 +188,95 @@ async function getTeamsForSeason(seasonId) {
  * um den "undefined" Fehler endgültig zu verhindern.
  */
 async function getTeamsForActiveSeason() {
-    // 1. Finde die aktive Saison
-    const activeSeason = await seasonService.getActiveSeason();
+  // 1. Finde die aktive Saison
+  const activeSeason = await seasonService.getActiveSeason();
 
-    // 2. Prüfe, ob Teams in der Saison vorhanden sind
-    if (!activeSeason.teams || activeSeason.teams.length === 0) {
-        return [];
-    }
+  // 2. Prüfe, ob Teams in der Saison vorhanden sind
+  if (!activeSeason.teams || activeSeason.teams.length === 0) {
+    return [];
+  }
 
-    // 3. KORREKTUR: Extrahiere die Team-IDs aus dem korrekten Feld `id` (statt `teamId`)
-    const teamIds = activeSeason.teams
-        .map(t => t.id) // Hier war der Fehler!
-        .filter(id => id); 
+  // 3. KORREKTUR: Extrahiere die Team-IDs aus dem korrekten Feld `id` (statt `teamId`)
+  const teamIds = activeSeason.teams
+    .map(t => t.id) // Hier war der Fehler!
+    .filter(id => id);
 
-    if (teamIds.length === 0) {
-        return [];
-    }
+  if (teamIds.length === 0) {
+    return [];
+  }
 
-    // 4. Rufe die Team-Dokumente ab
-    const teamsSnapshot = await teamsCollection.where(admin.firestore.FieldPath.documentId(), 'in', teamIds).get();
+  // 4. Rufe die Team-Dokumente ab
+  const teamsSnapshot = await teamsCollection.where(admin.firestore.FieldPath.documentId(), 'in', teamIds).get();
 
-    // 5. KORREKTUR: Gib die reinen Team-Daten zurück, ohne den überflüssigen Status
-    const teams = teamsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-    }));
+  // 5. KORREKTUR: Gib die reinen Team-Daten zurück, ohne den überflüssigen Status
+  const teams = teamsSnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
 
-    return teams;
+  return teams;
 }
 
 /**
  * NEU: Ermittelt alle potenziellen Gegner für ein Team in der aktiven Saison.
  * Berücksichtigt Saisonmodus, gespielte Ergebnisse und zukünftige Buchungen.
  */
-async function getPotentialOpponents(teamId) {
-    const activeSeason = await seasonService.getActiveSeason();
-    if (!activeSeason || !activeSeason.teams || activeSeason.teams.length === 0) return [];
+async function getPotentialOpponents(teamId, isFriendly = false) {
+  const activeSeason = await seasonService.getActiveSeason();
+  if (!activeSeason || !activeSeason.teams || activeSeason.teams.length === 0) return [];
 
-    const seasonTeamIds = activeSeason.teams.map(t => t.id).filter(id => id);
-    const [allSeasonTeams, seasonResults, futureBookings, allPitches] = await Promise.all([
-        getTeamsByIds(seasonTeamIds),
-        resultsCollection.where('seasonId', '==', activeSeason.id).get(),
-        bookingService.getFutureBookingsForSeason(activeSeason.id),
-        db.collection('pitches').get()
-    ]);
+  const seasonTeamIds = activeSeason.teams.map(t => t.id).filter(id => id);
 
-    const pitchesData = allPitches.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const getPitchName = (pitchId) => pitchesData.find(p => p.id === pitchId)?.name || 'Unbekannt';
-    const resultsData = seasonResults.docs.map(doc => doc.data());
-    const potentialOpponents = allSeasonTeams.filter(t => t.id !== teamId);
+  // NEU: Wenn es ein Freundschaftsspiel ist, geben wir alle anderen Teams zurück.
+  if (isFriendly) {
+    const allSeasonTeams = await getTeamsByIds(seasonTeamIds);
+    return allSeasonTeams.filter(t => t.id !== teamId);
+  }
 
-    const opponentList = potentialOpponents.map(opponent => {
-        const gamesPlayed = resultsData.filter(r =>
-            (r.homeTeamId === teamId && r.awayTeamId === opponent.id) ||
-            (r.homeTeamId === opponent.id && r.awayTeamId === teamId)
-        ).length;
+  const [allSeasonTeams, seasonResults, futureBookings, allPitches] = await Promise.all([
+    getTeamsByIds(seasonTeamIds),
+    resultsCollection.where('seasonId', '==', activeSeason.id).get(),
+    bookingService.getFutureBookingsForSeason(activeSeason.id),
+    db.collection('pitches').get()
+  ]);
 
-        const futureBookingsForOpponent = futureBookings.filter(b =>
-            (b.homeTeamId === teamId && b.awayTeamId === opponent.id) ||
-            (b.homeTeamId === opponent.id && b.awayTeamId === teamId)
-        );
+  const pitchesData = allPitches.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const getPitchName = (pitchId) => pitchesData.find(p => p.id === pitchId)?.name || 'Unbekannt';
+  const resultsData = seasonResults.docs.map(doc => doc.data());
+  const potentialOpponents = allSeasonTeams.filter(t => t.id !== teamId);
 
-        const totalEncounters = gamesPlayed + futureBookingsForOpponent.length;
+  const opponentList = potentialOpponents.map(opponent => {
+    const gamesPlayed = resultsData.filter(r =>
+      (r.homeTeamId === teamId && r.awayTeamId === opponent.id) ||
+      (r.homeTeamId === opponent.id && r.awayTeamId === teamId)
+    ).length;
 
-        let isEligible = true;
-        // KORREKTUR: Die Prüfung verwendet jetzt das korrekte Feld 'playMode' aus dem Season-Modell.
-        if (activeSeason.playMode === 'single_round_robin' && totalEncounters >= 1) {
-            isEligible = false;
-        }
-        if (activeSeason.playMode === 'double_round_robin' && totalEncounters >= 2) {
-            isEligible = false;
-        }
+    const futureBookingsForOpponent = futureBookings.filter(b =>
+      (b.homeTeamId === teamId && b.awayTeamId === opponent.id) ||
+      (b.homeTeamId === opponent.id && b.awayTeamId === teamId)
+    );
 
-        return {
-            ...opponent,
-            isEligible,
-        };
-    });
+    const totalEncounters = gamesPlayed + futureBookingsForOpponent.length;
 
-    // Filtert die Liste serverseitig und gibt NUR die Teams zurück,
-    // gegen die noch gespielt werden darf.
-    const eligibleOpponents = opponentList.filter(opponent => opponent.isEligible);
-    return eligibleOpponents;
+    let isEligible = true;
+    // KORREKTUR: Die Prüfung verwendet jetzt das korrekte Feld 'playMode' aus dem Season-Modell.
+    if (activeSeason.playMode === 'single_round_robin' && totalEncounters >= 1) {
+      isEligible = false;
+    }
+    if (activeSeason.playMode === 'double_round_robin' && totalEncounters >= 2) {
+      isEligible = false;
+    }
+
+    return {
+      ...opponent,
+      isEligible,
+    };
+  });
+
+  // Filtert die Liste serverseitig und gibt NUR die Teams zurück,
+  // gegen die noch gespielt werden darf.
+  const eligibleOpponents = opponentList.filter(opponent => opponent.isEligible);
+  return eligibleOpponents;
 }
 
 module.exports = {

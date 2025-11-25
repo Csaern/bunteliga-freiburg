@@ -15,8 +15,6 @@ import * as resultApi from '../services/resultApiService';
 // Icons
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
-import EditIcon from '@mui/icons-material/Edit';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -41,9 +39,7 @@ const DashboardPage = () => {
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
   // State for Edit Modal
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
-  const [editFormData, setEditFormData] = useState({ homeScore: '', awayScore: '' });
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportForm, setReportForm] = useState({ bookingId: '', homeScore: '', awayScore: '' });
   const [reportOptions, setReportOptions] = useState([]);
@@ -322,13 +318,6 @@ const DashboardPage = () => {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  const handleUpdateResult = async (e) => {
-    e.preventDefault();
-    if (!selectedResult) return;
-    alert('Ergebniskorrektur folgt über Backend-API in einem nächsten Schritt.');
-    setIsEditModalOpen(false);
-  };
-
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
   }
@@ -405,7 +394,6 @@ const DashboardPage = () => {
             }}
           >
             <Grid container spacing={1} justifyContent="space-around" alignItems="center">
-              {isAdmin && renderIconButton('Verwaltung', <AdminPanelSettingsIcon />, '/admin')}
               {renderIconButton('Platz buchen', <AddCircleOutlineIcon />, '/platzreservierung')}
               {renderIconButton('Ergebnis melden', <PostAddIcon />, null, handleOpenReportModal)}
               {teamId && renderIconButton('Team-Einstellungen', <SettingsIcon />, null, () => setShowTeamSettings(true))}
@@ -647,23 +635,6 @@ const DashboardPage = () => {
       </Grid>
 
       {showTeamSettings && <TeamSettings onClose={() => setShowTeamSettings(false)} />}
-
-      <ReusableModal open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Ergebnis korrigieren">
-        <form onSubmit={handleUpdateResult}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography>Passe das Ergebnis an. Dein Gegner muss die Änderung erneut bestätigen.</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <TextField size="small" label="Tore Heim" type="number" fullWidth required value={editFormData.homeScore} onChange={(e) => setEditFormData({ ...editFormData, homeScore: e.target.value })} sx={darkInputStyle} />
-              <Typography sx={{ color: theme.palette.text.secondary }}>:</Typography>
-              <TextField size="small" label="Tore Auswärts" type="number" fullWidth required value={editFormData.awayScore} onChange={(e) => setEditFormData({ ...editFormData, awayScore: e.target.value })} sx={darkInputStyle} />
-            </Box>
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-              <Button variant="outlined" onClick={() => setIsEditModalOpen(false)} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button>
-              <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Korrektur senden</Button>
-            </Box>
-          </Box>
-        </form>
-      </ReusableModal>
 
       <ReusableModal open={isReportModalOpen} onClose={handleCloseReportModal} title="Ergebnis melden">
         <Box component="form" onSubmit={handleReportSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

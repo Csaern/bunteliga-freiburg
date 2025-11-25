@@ -7,7 +7,8 @@ import * as bookingApi from '../services/bookingApiService';
 import * as teamApi from '../services/teamApiService';
 import { useAuth } from '../context/AuthProvider';
 import { ReusableModal } from './Helpers/modalUtils';
-import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel } from '@mui/material';
+import { StyledTableCell } from './Helpers/tableUtils';
 
 const BookingOverview = () => {
   const theme = useTheme();
@@ -26,6 +27,7 @@ const BookingOverview = () => {
   const [isOpponentLoading, setIsOpponentLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [submitting, setSubmitting] = useState(false);
+  const [isFriendlyGame, setIsFriendlyGame] = useState(false);
 
   const darkInputStyle = {
     '& label.Mui-focused': { color: theme.palette.primary.main },
@@ -96,8 +98,10 @@ const BookingOverview = () => {
       id: booking.id,
       date: bookingDate,
       pitchId: booking.pitchId,
-      time: bookingDate.toTimeString().slice(0, 5)
+      time: bookingDate.toTimeString().slice(0, 5),
+      friendly: booking.friendly || false
     });
+    setIsFriendlyGame(booking.friendly || false);
   };
 
   // Lade potenzielle Gegner, sobald das Modal geöffnet wird
@@ -106,7 +110,7 @@ const BookingOverview = () => {
       if (!selectedSlot || !teamId) { setPotentialOpponents([]); return; }
       setIsOpponentLoading(true);
       try {
-        const opponents = await teamApi.getPotentialOpponents(teamId);
+        const opponents = await teamApi.getPotentialOpponents(teamId, isFriendlyGame);
         setPotentialOpponents(opponents || []);
       } catch (e) {
         setPotentialOpponents([]);
@@ -115,7 +119,7 @@ const BookingOverview = () => {
       }
     };
     loadOpponents();
-  }, [selectedSlot, teamId]);
+  }, [selectedSlot, teamId, isFriendlyGame]);
 
   const submitBooking = async (e) => {
     e.preventDefault();
@@ -143,7 +147,8 @@ const BookingOverview = () => {
         homeTeamId: teamId,
         awayTeamId: awayTeam,
         seasonId: currentSeason.id,
-        userId: currentUser?.uid || 'anonymous'
+        userId: currentUser?.uid || 'anonymous',
+        friendly: isFriendlyGame
       });
 
       setNotification({ open: true, message: "Buchung erfolgreich! Warte auf Bestätigung des Gegners.", severity: 'success' });
@@ -226,9 +231,9 @@ const BookingOverview = () => {
             const pitchName = getPitchName(pitchId);
 
             return (
-              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
-                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="h6" sx={{ color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'Comfortaa', textTransform: 'uppercase' }}>
+              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800', maxWidth: '1200px', margin: '0 auto' }}>
+                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
+                  <Typography variant="h6" sx={{ color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
                     {pitchName}
                   </Typography>
                 </Box>
@@ -269,8 +274,11 @@ const BookingOverview = () => {
                               <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                   <Box sx={{ textAlign: 'center', pr: 2 }}>
-                                    <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
-                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
+                                    <Typography sx={{ fontSize: '0.7rem', color: 'grey.300' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                      {booking.friendly && <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.8rem' }}>F</Typography>}
+                                    </Box>
                                   </Box>
                                   <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
                                     <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</Typography>
@@ -294,15 +302,19 @@ const BookingOverview = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
-                          <TableCell align="center">
+                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                          <StyledTableCell align="center">
                             <Box sx={{ width: '10px', height: '10px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main, borderRadius: '50%', boxShadow: `0 0 8px ${isAvailable ? theme.palette.success.main : theme.palette.error.main}` }} />
-                          </TableCell>
-                          <TableCell sx={{ color: theme.palette.text.primary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</TableCell>
-                          <TableCell sx={{ color: theme.palette.text.primary }}>{timeRange}</TableCell>
-                          <TableCell sx={{ color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</TableCell>
-                          <TableCell sx={{ color: theme.palette.text.primary }}>{displayTeamName(booking.awayTeamId)}</TableCell>
-                          <TableCell align="center">
+                          </StyledTableCell>
+                          <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE')}</StyledTableCell>
+                          <StyledTableCell>
+                            {timeRange}
+                            {booking.friendly && <Typography component="span" sx={{ ml: 1, color: '#FFD700', fontWeight: 'bold' }}>F</Typography>}
+                          </StyledTableCell>
+                          <StyledTableCell>{getPitchName(booking.pitchId)}</StyledTableCell>
+                          <StyledTableCell>{displayTeamName(booking.homeTeamId)}</StyledTableCell>
+                          <StyledTableCell>{displayTeamName(booking.awayTeamId)}</StyledTableCell>
+                          <StyledTableCell align="center">
                             {isAvailable ? (
                               <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
                                 Platz buchen
@@ -312,7 +324,7 @@ const BookingOverview = () => {
                                 Belegt
                               </Button>
                             )}
-                          </TableCell>
+                          </StyledTableCell>
                         </TableRow>
                       );
                     })}
@@ -371,6 +383,21 @@ const BookingOverview = () => {
                 </Select>
               </FormControl>
             </Box>
+
+            <FormControlLabel
+              control={<Checkbox
+                checked={isFriendlyGame}
+                onChange={(e) => setIsFriendlyGame(e.target.checked)}
+                sx={{ color: 'grey.100', '&.Mui-checked': { color: '#FFD700' }, '&.Mui-disabled': { color: 'grey.700' } }}
+                disabled={!selectedSlot.friendly}
+              />}
+              label={
+                <Box>
+                  <Typography sx={{ color: !selectedSlot.friendly ? 'grey.600' : 'grey.100' }}>Freundschaftsspiel</Typography>
+                  {!selectedSlot.friendly && <Typography variant="caption" sx={{ color: 'grey.600' }}>Nicht freigegeben</Typography>}
+                </Box>
+              }
+            />
 
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
               <Button variant="outlined" color="inherit" onClick={() => setSelectedSlot(null)} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button>
