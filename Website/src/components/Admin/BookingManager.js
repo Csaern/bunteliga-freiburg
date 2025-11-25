@@ -128,6 +128,7 @@ const BookingManager = ({ currentSeason }) => {
         const checkCollision = async () => {
             if (modalMode !== 'create' && modalMode !== 'edit') return;
 
+
             const { date, time, pitchId, duration } = formData;
             if (!date || !time || !pitchId || !duration) {
                 setCollisionCheck({ status: 'idle', message: '' });
@@ -138,6 +139,19 @@ const BookingManager = ({ currentSeason }) => {
             if (!selectedPitch || !selectedPitch.isVerified) {
                 setCollisionCheck({ status: 'idle', message: '' });
                 return;
+            }
+
+            // NEU: Beim Bearbeiten prüfen, ob sich Datum/Zeit/Platz geändert haben
+            if (modalMode === 'edit' && selectedBooking) {
+                const originalDate = new Date(selectedBooking.date);
+                const originalDateStr = originalDate.toISOString().split('T')[0];
+                const originalTimeStr = originalDate.toTimeString().slice(0, 5);
+
+                // Wenn Datum, Zeit und Platz unverändert sind, keine Kollisionsprüfung nötig
+                if (date === originalDateStr && time === originalTimeStr && pitchId === selectedBooking.pitchId) {
+                    setCollisionCheck({ status: 'success', message: 'Keine Änderung an Termin/Platz.' });
+                    return;
+                }
             }
 
             setCollisionCheck({ status: 'checking', message: 'Prüfe Verfügbarkeit...' });

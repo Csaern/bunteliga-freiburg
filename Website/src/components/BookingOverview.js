@@ -8,6 +8,7 @@ import * as teamApi from '../services/teamApiService';
 import { useAuth } from '../context/AuthProvider';
 import { ReusableModal } from './Helpers/modalUtils';
 import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel } from '@mui/material';
+import { StyledTableCell } from './Helpers/tableUtils';
 
 const BookingOverview = () => {
   const theme = useTheme();
@@ -230,7 +231,7 @@ const BookingOverview = () => {
             const pitchName = getPitchName(pitchId);
 
             return (
-              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
+              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800', maxWidth: '1200px', margin: '0 auto' }}>
                 <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
                   <Typography variant="h6" sx={{ color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
                     {pitchName}
@@ -244,12 +245,13 @@ const BookingOverview = () => {
                       </TableRow>
                     ) : (
                       <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
-                        <TableCell align="center" sx={{ width: '40px', color: 'grey.100' }}>Status</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Datum</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Zeitraum</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Heim</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Auswärts</TableCell>
-                        <TableCell align="center" sx={{ color: 'grey.100' }}>Aktion</TableCell>
+                        <StyledTableCell align="center" sx={{ width: '40px' }}> </StyledTableCell>
+                        <StyledTableCell>Datum</StyledTableCell>
+                        <StyledTableCell>Zeitraum</StyledTableCell>
+                        <StyledTableCell>Platz</StyledTableCell>
+                        <StyledTableCell>Heim</StyledTableCell>
+                        <StyledTableCell>Auswärts</StyledTableCell>
+                        <StyledTableCell align="center">Aktion</StyledTableCell>
                       </TableRow>
                     )}
                   </TableHead>
@@ -302,17 +304,18 @@ const BookingOverview = () => {
                         </TableRow>
                       ) : (
                         <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
-                          <TableCell align="center">
+                          <StyledTableCell align="center">
                             <Box sx={{ width: '10px', height: '10px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main, borderRadius: '50%', boxShadow: `0 0 8px ${isAvailable ? theme.palette.success.main : theme.palette.error.main}` }} />
-                          </TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>
+                          </StyledTableCell>
+                          <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE')}</StyledTableCell>
+                          <StyledTableCell>
                             {timeRange}
                             {booking.friendly && <Typography component="span" sx={{ ml: 1, color: '#FFD700', fontWeight: 'bold' }}>F</Typography>}
-                          </TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.awayTeamId)}</TableCell>
-                          <TableCell align="center">
+                          </StyledTableCell>
+                          <StyledTableCell>{getPitchName(booking.pitchId)}</StyledTableCell>
+                          <StyledTableCell>{displayTeamName(booking.homeTeamId)}</StyledTableCell>
+                          <StyledTableCell>{displayTeamName(booking.awayTeamId)}</StyledTableCell>
+                          <StyledTableCell align="center">
                             {isAvailable ? (
                               <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
                                 Platz buchen
@@ -322,7 +325,7 @@ const BookingOverview = () => {
                                 Belegt
                               </Button>
                             )}
-                          </TableCell>
+                          </StyledTableCell>
                         </TableRow>
                       );
                     })}

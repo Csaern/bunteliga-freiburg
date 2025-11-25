@@ -234,15 +234,6 @@ class BookingService {
      * Admin aktualisiert eine einzelne Buchung.
      */
     static async adminUpdateBooking(bookingId, updateData) {
-        // 1. Kollisionsprüfung für den Zeitslot
-        const collisionCheck = await BookingService.checkSingleSlot({
-            ...updateData,
-            bookingIdToIgnore: bookingId // Wichtig, damit der Termin nicht mit sich selbst kollidiert
-        });
-        if (!collisionCheck.isAvailable) {
-            throw new Error('Der neue Termin ist bereits belegt und kann nicht gebucht werden.');
-        }
-
         const bookingRef = bookingsCollection.doc(bookingId);
         const doc = await bookingRef.get();
         if (!doc.exists) {
