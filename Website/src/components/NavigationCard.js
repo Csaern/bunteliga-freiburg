@@ -9,9 +9,9 @@ const NavigationCard = ({ icon, title, subtitle, link }) => {
   return (
     <Card
       sx={{
-        backgroundColor: '#111',
-        color: theme.palette.grey[300],
-        border: `1px solid ${theme.palette.grey[800]}`,
+        backgroundColor: theme.palette.background.paper,
+        color: theme.palette.text.primary,
+        border: `1px solid ${theme.palette.divider}`,
         borderRadius: theme.shape.borderRadius,
         display: 'flex',
         flexDirection: 'column'
@@ -21,40 +21,40 @@ const NavigationCard = ({ icon, title, subtitle, link }) => {
         component={RouterLink}
         to={link}
         sx={{
-          height: '100%', 
-            flexGrow: 1, 
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            p: { xs: 2, md: 4 },
-        }} 
+          height: '100%',
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          p: { xs: 2, md: 4 },
+        }}
       >
         <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          
+
           {/* Optionales Icon */}
           {icon && (
-            <Box sx={{ color: theme.palette.error.main, mb: 2 }}>
+            <Box sx={{ color: theme.palette.primary.main, mb: 2 }}>
               {React.cloneElement(icon, { sx: { fontSize: 45 } })}
             </Box>
           )}
 
           {/* Titel */}
-          <Typography 
-            variant="h5" 
-            component="div" 
+          <Typography
+            variant="h5"
+            component="div"
             gutterBottom
-            sx={{ 
-              fontFamily: 'comfortaa', 
+            sx={{
+              fontFamily: 'Comfortaa',
               fontWeight: 700,
-              color: '#fff',
+              color: theme.palette.text.primary,
             }}
           >
             {title}
           </Typography>
-          
+
           {/* Subtitle */}
-          <Typography variant="body2" sx={{ color: theme.palette.grey[400], fontFamily:'comfortaa' }}>
-           {subtitle}
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
+            {subtitle}
           </Typography>
 
         </CardContent>

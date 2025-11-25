@@ -30,9 +30,9 @@ const TeamCard = ({ team }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const details = [
-      { label: 'Teamname', value: team.name },
-      { label: 'Kontakt', value: team.contact },
-      { label: 'Mitglied seit', value: team.memberSince },
+    { label: 'Teamname', value: team.name },
+    { label: 'Kontakt', value: team.contact },
+    { label: 'Mitglied seit', value: team.memberSince },
   ];
 
   return (
@@ -45,9 +45,9 @@ const TeamCard = ({ team }) => {
             backgroundColor: team.logoColor,
             color: theme.palette.getContrastText(team.logoColor),
             fontSize: { xs: '3.5rem', sm: '5rem' },
-            fontFamily: 'comfortaa',
+            fontFamily: 'Comfortaa',
             fontWeight: 'bold',
-            border: `4px solid ${theme.palette.grey[800]}`,
+            border: `4px solid ${theme.palette.divider}`,
           }}
         >
           {team.name.substring(0, 1).toUpperCase()}
@@ -57,9 +57,9 @@ const TeamCard = ({ team }) => {
       <Paper
         sx={{
           p: { xs: 2.5, sm: 4 },
-          backgroundColor: '#1C1C1C',
+          backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.grey[800]}`,
+          border: `1px solid ${theme.palette.divider}`,
         }}
       >
         {isMobile ? (
@@ -69,9 +69,9 @@ const TeamCard = ({ team }) => {
                 <Typography
                   component="div"
                   sx={{
-                    fontFamily: 'comfortaa',
+                    fontFamily: 'Comfortaa',
                     fontWeight: 600,
-                    color: theme.palette.grey[200],
+                    color: theme.palette.text.secondary,
                     fontSize: '0.6rem',
                     mb: 0.25,
                     textTransform: 'uppercase',
@@ -83,8 +83,8 @@ const TeamCard = ({ team }) => {
                 <Typography
                   component="div"
                   sx={{
-                    fontFamily: 'comfortaa',
-                    color: theme.palette.grey[300],
+                    fontFamily: 'Comfortaa',
+                    color: theme.palette.text.primary,
                     fontSize: '1rem',
                     wordBreak: 'break-all',
                   }}
@@ -100,10 +100,10 @@ const TeamCard = ({ team }) => {
               <TableBody>
                 {details.map((detail) => (
                   <TableRow key={detail.label}>
-                    <TableCell sx={{ fontFamily: 'comfortaa', fontWeight: 600, color: theme.palette.grey[200], border: 'none', p: 1.5, width: 150 }}>
+                    <TableCell sx={{ fontFamily: 'Comfortaa', fontWeight: 600, color: theme.palette.text.secondary, border: 'none', p: 1.5, width: 150 }}>
                       {detail.label}:
                     </TableCell>
-                    <TableCell sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[300], border: 'none', p: 1.5, wordBreak: 'break-all' }}>
+                    <TableCell sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, border: 'none', p: 1.5, wordBreak: 'break-all' }}>
                       {detail.value}
                     </TableCell>
                   </TableRow>
@@ -124,31 +124,31 @@ const TeamPage = () => {
 
   return (
     <div>
-    <Container maxWidth="sm" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
-      <Typography
-        variant={isMobile ? 'h5' : 'h4'}
-        component="h1"
-        sx={{
-          mb: 4,
-          mt: 2,
-          color: '#00A99D',
-          fontWeight: 700,
-          fontFamily: 'comfortaa',
-          textAlign: 'center',
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-        }}
-      >
-        {teamData.name}
-      </Typography>
-      
-      <TeamCard team={teamData} />
-    </Container>
-    <Container>
+      <Container maxWidth="sm" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
+        <Typography
+          variant={isMobile ? 'h5' : 'h4'}
+          component="h1"
+          sx={{
+            mb: 4,
+            mt: 2,
+            color: theme.palette.primary.main,
+            fontWeight: 700,
+            fontFamily: 'Comfortaa',
+            textAlign: 'center',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+          }}
+        >
+          {teamData.name}
+        </Typography>
+
+        <TeamCard team={teamData} />
+      </Container>
+      <Container>
         <FixtureList title={'Spiele'} />
-        <LeagueTable title={'Tabelle'}/>
+        <LeagueTable title={'Tabelle'} />
         <RecordsList />
-    </Container>
+      </Container>
     </div>
   );
 };

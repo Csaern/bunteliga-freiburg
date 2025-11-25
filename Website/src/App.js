@@ -1,5 +1,8 @@
 import React from 'react';
 import { Routes, Route, useParams } from 'react-router-dom'; // useParams importieren
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import theme from './theme';
 import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -42,41 +45,44 @@ function AdminBoardWrapper() {
 
 function App() {
   return (
-    <AuthProvider>
-      <div className="app-container">
-        <Header />
-        <main className="main-content">
-          <Routes>
-            <Route path="/ergebnisse" element={<ResultsPage />} />
-            <Route path="/platzreservierung" element={<BookingOverview />} />
-            <Route path="/login" element={<LoginPage />} />
-            
-            {/* --- NEUE ADMIN ROUTEN --- */}
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/:tab" element={<AdminBoardWrapper />} />
-            <Route path="/admin" element={<AdminDashboard />} />
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <div className="app-container">
+          <Header />
+          <main className="main-content">
+            <Routes>
+              <Route path="/ergebnisse" element={<ResultsPage />} />
+              <Route path="/platzreservierung" element={<BookingOverview />} />
+              <Route path="/login" element={<LoginPage />} />
 
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/board" element={<UserBoard />} />
-            <Route path="/historie" element={<HistoryPage />} />
-            <Route path="/kontakt" element={<ContactPage />} />
-            <Route path="/teams" element={<TeamsPage />} />
-            <Route path="/impressum" element={<ImpressumPage />} />
-            <Route path="/datenschutz" element={<PrivacyPage />} />
-            <Route path="/plaetze" element={<VenuesPage />} />
-            <Route path="/regeln" element={<RulesPage />} />
-            <Route path="/team" element={<TeamPage />} />
-            <Route path="/team/:teamId" element={<TeamDetailPage />} />
-            <Route path="/ergebnis-bestaetigen" element={<ResultConfirmationPage />} />
-            <Route path="/spiel-verwaltung" element={<GameManagementPage />} />
+              {/* --- NEUE ADMIN ROUTEN --- */}
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/:tab" element={<AdminBoardWrapper />} />
+              <Route path="/admin" element={<AdminDashboard />} />
 
-            {/* Die Catch-all Route muss immer am Ende stehen */}
-            <Route path="*" element={<HomePage />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-    </AuthProvider>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/board" element={<UserBoard />} />
+              <Route path="/historie" element={<HistoryPage />} />
+              <Route path="/kontakt" element={<ContactPage />} />
+              <Route path="/teams" element={<TeamsPage />} />
+              <Route path="/impressum" element={<ImpressumPage />} />
+              <Route path="/datenschutz" element={<PrivacyPage />} />
+              <Route path="/ueberuns" element={<VenuesPage />} />
+              <Route path="/regeln" element={<RulesPage />} />
+              <Route path="/team" element={<TeamPage />} />
+              <Route path="/team/:teamId" element={<TeamDetailPage />} />
+              <Route path="/ergebnis-bestaetigen" element={<ResultConfirmationPage />} />
+              <Route path="/spiel-verwaltung" element={<GameManagementPage />} />
+
+              {/* Die Catch-all Route muss immer am Ende stehen */}
+              <Route path="*" element={<HomePage />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

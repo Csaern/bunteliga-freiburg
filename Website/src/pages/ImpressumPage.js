@@ -15,31 +15,31 @@ const LegalSection = ({ title, children }) => {
 
   return (
     <Box sx={{ mb: 4 }}>
-      <Typography 
+      <Typography
         variant={isMobile ? 'h6' : 'h5'}
-        component="h2" 
-        sx={{ 
-          fontFamily: 'comfortaa', 
-          fontWeight: 600, 
-          color: '#00A99D', 
+        component="h2"
+        sx={{
+          fontFamily: 'Comfortaa',
+          fontWeight: 600,
+          color: theme.palette.primary.main,
           mb: 1.5,
-          borderBottom: `2px solid ${theme.palette.grey[800]}`,
+          borderBottom: `2px solid ${theme.palette.divider}`,
           pb: 0.5,
           fontSize: isMobile ? '1.1rem' : '1.5rem',
         }}
       >
         {title}
       </Typography>
-      <Typography 
-        variant="body1" 
-        component="div" 
-        sx={{ 
-          fontFamily: 'comfortaa', 
-          lineHeight: 1.7, 
-          color: theme.palette.grey[300],
+      <Typography
+        variant="body1"
+        component="div"
+        sx={{
+          fontFamily: 'Comfortaa',
+          lineHeight: 1.7,
+          color: theme.palette.text.secondary,
           fontSize: { xs: '0.85rem', sm: '1rem' }, // Kleinere Schriftgröße für Mobile
           '& a': { // Link-Styling
-            color: '#FFBF00',
+            color: theme.palette.secondary.main,
             textDecoration: 'none',
             '&:hover': {
               textDecoration: 'underline',
@@ -70,9 +70,9 @@ const LegalNoticePage = () => {
         sx={{
           mb: 4,
           mt: 2,
-          color: '#00A99D',
+          color: theme.palette.primary.main,
           fontWeight: 700,
-          fontFamily: 'comfortaa',
+          fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
@@ -80,12 +80,12 @@ const LegalNoticePage = () => {
       >
         Impressum
       </Typography>
-      
-      <Paper 
-        sx={{ 
-          backgroundColor: '#111', 
-          borderRadius: theme.shape.borderRadius, 
-          border: `1px solid ${theme.palette.grey[800]}`,
+
+      <Paper
+        sx={{
+          backgroundColor: theme.palette.background.paper,
+          borderRadius: theme.shape.borderRadius,
+          border: `1px solid ${theme.palette.divider}`,
           p: { xs: 2.5, sm: 4 },
         }}
       >
@@ -112,7 +112,7 @@ const LegalNoticePage = () => {
             Internet: <a href="https://www.bunteligafreiburg.de" target="_blank" rel="noopener noreferrer">www.bunteligafreiburg.de</a>
           </p>
           <p>
-            Bei Fragen zur Webseite:<br/>
+            Bei Fragen zur Webseite:<br />
             <a href="mailto:webmaster@bunteligafreiburg.de">webmaster@bunteligafreiburg.de</a>
           </p>
         </LegalSection>
@@ -141,11 +141,11 @@ const LegalNoticePage = () => {
         </LegalSection>
 
         <LegalSection title="Copyright">
-           <p>
+          <p>
             Das Copyright für Inhalt und Gestaltung liegt bei der Bunte-Liga-Freiburg e.V.
           </p>
         </LegalSection>
-        
+
         <LegalSection title="EU-Streitschlichtung">
           <p>
             Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener noreferrer">https://ec.europa.eu/consumers/odr</a>.<br />

@@ -12,7 +12,7 @@ import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typo
 const BookingOverview = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
+
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -28,17 +28,17 @@ const BookingOverview = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const darkInputStyle = {
-    '& label.Mui-focused': { color: '#00A99D' },
+    '& label.Mui-focused': { color: theme.palette.primary.main },
     '& .MuiOutlinedInput-root': {
-      '& fieldset': { borderColor: 'grey.700' },
-      '&:hover fieldset': { borderColor: 'grey.500' },
-      '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+      '& fieldset': { borderColor: theme.palette.divider },
+      '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
     },
-    '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark', accentColor: '#00A99D' },
-    '& label': { color: 'grey.400' },
-    '& .MuiSelect-icon': { color: 'grey.400' },
-    '& .Mui-disabled': { WebkitTextFillColor: `rgba(200,200,200,0.85) !important`, color: `rgba(200,200,200,0.85) !important` },
-    '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.800' },
+    '& .MuiInputBase-input': { color: theme.palette.text.primary, colorScheme: 'dark', accentColor: theme.palette.primary.main },
+    '& label': { color: theme.palette.text.secondary },
+    '& .MuiSelect-icon': { color: theme.palette.text.secondary },
+    '& .Mui-disabled': { WebkitTextFillColor: `${theme.palette.text.disabled} !important`, color: `${theme.palette.text.disabled} !important` },
+    '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.action.disabledBackground },
   };
 
   // parseDate-Funktion wie im Admin
@@ -69,14 +69,14 @@ const BookingOverview = () => {
 
       // Formatiere die Daten wie im Admin
       const formattedBookings = bookingsData.map(b => ({ ...b, date: parseDate(b.date) }));
-      
+
       // Konvertiere Teams-Array zu Objekt für einfacheren Zugriff
       const teams = teamsData.reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {});
 
-      setData({ 
-        pitches: pitchesData, 
-        teams, 
-        bookings: formattedBookings 
+      setData({
+        pitches: pitchesData,
+        teams,
+        bookings: formattedBookings
       });
       setLoading(false);
     } catch (error) {
@@ -92,11 +92,11 @@ const BookingOverview = () => {
 
   const handleBookNow = (booking) => {
     const bookingDate = new Date(booking.date);
-    setSelectedSlot({ 
-      id: booking.id, 
-      date: bookingDate, 
-      pitchId: booking.pitchId, 
-      time: bookingDate.toTimeString().slice(0, 5) 
+    setSelectedSlot({
+      id: booking.id,
+      date: bookingDate,
+      pitchId: booking.pitchId,
+      time: bookingDate.toTimeString().slice(0, 5)
     });
   };
 
@@ -116,7 +116,7 @@ const BookingOverview = () => {
     };
     loadOpponents();
   }, [selectedSlot, teamId]);
-  
+
   const submitBooking = async (e) => {
     e.preventDefault();
     // Nur eingeloggte Team-User dürfen buchen
@@ -124,28 +124,28 @@ const BookingOverview = () => {
       setNotification({ open: true, message: "Bitte melden Sie sich mit einem Team-Account an, um zu buchen.", severity: 'error' });
       return;
     }
-    
+
     // Prüfe, ob aktuelle Saison vorhanden ist
     if (!currentSeason) {
       setNotification({ open: true, message: "Keine aktuelle Saison gefunden! Bitte kontaktieren Sie einen Administrator.", severity: 'error' });
       return;
     }
-    
+
     if (!awayTeam) {
       setNotification({ open: true, message: "Bitte wählen Sie ein Auswärtsteam aus.", severity: 'error' });
       return;
     }
-    
+
     setSubmitting(true);
     try {
       // Anfrage an Backend: vorhandenen Slot anfragen
-      await bookingApi.requestBookingSlot(selectedSlot.id, { 
-          homeTeamId: teamId,
+      await bookingApi.requestBookingSlot(selectedSlot.id, {
+        homeTeamId: teamId,
         awayTeamId: awayTeam,
-          seasonId: currentSeason.id,
+        seasonId: currentSeason.id,
         userId: currentUser?.uid || 'anonymous'
       });
-      
+
       setNotification({ open: true, message: "Buchung erfolgreich! Warte auf Bestätigung des Gegners.", severity: 'success' });
       setSelectedSlot(null);
       setAwayTeam('');
@@ -153,7 +153,7 @@ const BookingOverview = () => {
       setContactEmail('');
       setContactPhone('');
       // Refresh data
-      fetchData(); 
+      fetchData();
     } catch (error) {
       console.error("Fehler bei der Buchung:", error);
       setNotification({ open: true, message: error.message || "Buchung fehlgeschlagen.", severity: 'error' });
@@ -200,22 +200,22 @@ const BookingOverview = () => {
   });
 
   if (loading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
+    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: theme.palette.primary.main }} /></Box>;
   }
-  
+
   return (
     <Box sx={{ p: { sm: 3 } }}>
       <Snackbar open={notification.open} autoHideDuration={6000} onClose={() => setNotification({ ...notification, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={() => setNotification({ ...notification, open: false })} severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>
       </Snackbar>
-      
-      <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
+
+      <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'Comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
         Spielplan & Reservierung
       </Typography>
 
       {sortedPitchIds.length === 0 ? (
-        <Paper sx={{ backgroundColor: '#111', borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', border: '1px solid #222' }}>
-          <Typography sx={{ color: 'grey.500', fontFamily: 'comfortaa' }}>
+        <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', border: `1px solid ${theme.palette.divider}` }}>
+          <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
             Keine Zeitslots für die aktuelle Saison vorhanden.
           </Typography>
         </Paper>
@@ -224,28 +224,28 @@ const BookingOverview = () => {
           {sortedPitchIds.map(pitchId => {
             const pitchBookings = bookingsByPitch[pitchId];
             const pitchName = getPitchName(pitchId);
-            
+
             return (
-              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
-                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
-                  <Typography variant="h6" sx={{ color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
+              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
+                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                  <Typography variant="h6" sx={{ color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'Comfortaa', textTransform: 'uppercase' }}>
                     {pitchName}
                   </Typography>
                 </Box>
                 <Table size="small">
                   <TableHead>
                     {isMobile ? (
-                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
-                        <TableCell align="center" colSpan={7} sx={{ color: 'grey.100' }}>Verfügbare Termine</TableCell>
+                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.divider}` }}>
+                        <TableCell align="center" colSpan={7} sx={{ color: theme.palette.text.primary }}>Verfügbare Termine</TableCell>
                       </TableRow>
                     ) : (
-                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
-                        <TableCell align="center" sx={{ width: '40px', color: 'grey.100' }}>Status</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Datum</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Zeitraum</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Heim</TableCell>
-                        <TableCell sx={{ color: 'grey.100' }}>Auswärts</TableCell>
-                        <TableCell align="center" sx={{ color: 'grey.100' }}>Aktion</TableCell>
+                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.divider}` }}>
+                        <TableCell align="center" sx={{ width: '40px', color: theme.palette.text.primary }}>Status</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary }}>Datum</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary }}>Zeitraum</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary }}>Heim</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary }}>Auswärts</TableCell>
+                        <TableCell align="center" sx={{ color: theme.palette.text.primary }}>Aktion</TableCell>
                       </TableRow>
                     )}
                   </TableHead>
@@ -254,30 +254,30 @@ const BookingOverview = () => {
                       const startTime = new Date(booking.date).toTimeString().slice(0, 5);
                       const endTime = booking.duration ? new Date(new Date(booking.date).getTime() + booking.duration * 60000).toTimeString().slice(0, 5) : '-';
                       const timeRange = `${startTime} - ${endTime}`;
-                      
+
                       // Eine Buchung ist verfügbar, wenn: status === 'available' ODER (isAvailable === true UND keine Teams zugewiesen)
-                      const isAvailable = booking.status === 'available' || 
-                                         (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
+                      const isAvailable = booking.status === 'available' ||
+                        (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
                       const isBooked = !isAvailable && booking.homeTeamId && booking.awayTeamId;
                       const isMyBooking = (booking.homeTeamId === teamId || booking.awayTeamId === teamId) && booking.status === 'confirmed';
 
                       return isMobile ? (
-                        <TableRow key={booking.id} sx={{ backgroundColor: '#0e0e0eff', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
-                          <TableCell colSpan={7} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
+                        <TableRow key={booking.id} sx={{ backgroundColor: theme.palette.background.default, cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
+                          <TableCell colSpan={7} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.divider}` }}>
                             <Box sx={{ display: 'flex', alignItems: 'stretch', minHeight: '70px' }}>
                               <Box sx={{ width: '4px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main }} />
                               <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                   <Box sx={{ textAlign: 'center', pr: 2 }}>
-                                    <Typography sx={{ fontSize: '0.7rem', color: 'grey.300' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
-                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                    <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
                                   </Box>
-                                  <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.grey[800]}` }}>
-                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</Typography>
-                                    <Typography sx={{ color: 'grey.500', fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
-                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.awayTeamId)}</Typography>
+                                  <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</Typography>
+                                    <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.awayTeamId)}</Typography>
                                   </Box>
-                                  <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.grey[800]}` }}>
+                                  <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
                                     {isAvailable ? (
                                       <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
                                         Buchen
@@ -294,14 +294,14 @@ const BookingOverview = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
                           <TableCell align="center">
                             <Box sx={{ width: '10px', height: '10px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main, borderRadius: '50%', boxShadow: `0 0 8px ${isAvailable ? theme.palette.success.main : theme.palette.error.main}` }} />
                           </TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{timeRange}</TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</TableCell>
-                          <TableCell sx={{ color: 'grey.100' }}>{displayTeamName(booking.awayTeamId)}</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>{timeRange}</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>{displayTeamName(booking.awayTeamId)}</TableCell>
                           <TableCell align="center">
                             {isAvailable ? (
                               <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
@@ -335,46 +335,46 @@ const BookingOverview = () => {
             <TextField size="small" label="Dauer (Minuten)" type="number" fullWidth value={(data.bookings || []).find(b => b.id === selectedSlot.id)?.duration || 90} sx={darkInputStyle} disabled />
             <FormControl size="small" fullWidth sx={darkInputStyle} disabled>
               <InputLabel>Platz</InputLabel>
-              <Select value={selectedSlot.pitchId} label="Platz" MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }} sx={{ color: 'grey.100' }}>
+              <Select value={selectedSlot.pitchId} label="Platz" MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }} sx={{ color: theme.palette.text.primary }}>
                 {data.pitches.map(p => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
               </Select>
             </FormControl>
 
-            <Divider sx={{ my: 1, borderColor: 'grey.800' }} />
-            
+            <Divider sx={{ my: 1, borderColor: theme.palette.divider }} />
+
             <Box>
-              <Typography sx={{ color: 'grey.100', fontWeight: 'bold', mb: 0.5 }}>Heim-Mannschaft</Typography>
-              <Typography sx={{ color: 'grey.200' }}>{data.teams[teamId] || 'Dein Team'}</Typography>
+              <Typography sx={{ color: theme.palette.text.primary, fontWeight: 'bold', mb: 0.5 }}>Heim-Mannschaft</Typography>
+              <Typography sx={{ color: theme.palette.text.secondary }}>{data.teams[teamId] || 'Dein Team'}</Typography>
             </Box>
 
             <Box>
-            <Typography sx={{ color: 'grey.100', fontWeight: 'bold', mb: 0.5 }}>Auswärts-Mannschaft</Typography>
-            <FormControl fullWidth size="small" sx={{ borderColor: 'grey.700' , bgcolor: '#333' }}>
-              <Select sx={{ color: 'grey.100' }}
-                label="Auswärts-Mannschaft"
-                value={awayTeam} 
-                onChange={(e) => setAwayTeam(e.target.value)}
-                required
-                MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200'} } }}
-                disabled={isOpponentLoading}
-              >
-                <MenuItem value=""><em>-</em></MenuItem>
-                {isOpponentLoading ? (
-                  <MenuItem disabled><em>Lade Gegner...</em></MenuItem>
-                ) : (
-                  potentialOpponents.map(opponent => (
-                    <MenuItem key={opponent.id} value={opponent.id}>
-                      {opponent.name}
-                    </MenuItem>
-                  ))
-                )}
-              </Select>
-            </FormControl>
+              <Typography sx={{ color: theme.palette.text.primary, fontWeight: 'bold', mb: 0.5 }}>Auswärts-Mannschaft</Typography>
+              <FormControl fullWidth size="small" sx={{ borderColor: theme.palette.divider, bgcolor: theme.palette.background.paper }}>
+                <Select sx={{ color: theme.palette.text.primary }}
+                  label="Auswärts-Mannschaft"
+                  value={awayTeam}
+                  onChange={(e) => setAwayTeam(e.target.value)}
+                  required
+                  MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}
+                  disabled={isOpponentLoading}
+                >
+                  <MenuItem value=""><em>-</em></MenuItem>
+                  {isOpponentLoading ? (
+                    <MenuItem disabled><em>Lade Gegner...</em></MenuItem>
+                  ) : (
+                    potentialOpponents.map(opponent => (
+                      <MenuItem key={opponent.id} value={opponent.id}>
+                        {opponent.name}
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+              </FormControl>
             </Box>
 
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
-              <Button variant="outlined" color="inherit" onClick={() => setSelectedSlot(null)}sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
-              <Button variant="contained" sx={{ bgcolor: '#00A99D' }} type="submit" disabled={!awayTeam || submitting}>
+              <Button variant="outlined" color="inherit" onClick={() => setSelectedSlot(null)} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button>
+              <Button variant="contained" sx={{ bgcolor: theme.palette.primary.main }} type="submit" disabled={!awayTeam || submitting}>
                 {submitting ? <CircularProgress size={20} /> : 'Jetzt buchen'}
               </Button>
             </Box>

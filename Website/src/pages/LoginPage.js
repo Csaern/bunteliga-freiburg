@@ -4,7 +4,7 @@ import { auth, db } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthProvider';
 import { useNavigate } from 'react-router-dom';
-import { Container, Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
+import { Container, Box, Paper, Typography, TextField, Button, Alert, useTheme } from '@mui/material';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -12,36 +12,37 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const { currentUser, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(''); // Reset error on new attempt
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      
+
       const udoc = await getDoc(doc(db, 'users', cred.user.uid));
-      
+
       if (!udoc.exists()) {
         console.error('Benutzer-Dokument nicht gefunden für UID:', cred.user.uid);
         setError('Benutzer-Dokument nicht gefunden. Bitte wenden Sie sich an den Administrator.');
         await signOut(auth);
         return;
       }
-      
+
       const userData = udoc.data();
       const isUserAdmin = userData.isAdmin || false;
-      
+
       await setDoc(doc(db, 'users', cred.user.uid), {
         lastLogin: serverTimestamp(),
       }, { merge: true });
-      
+
       // Direkte Weiterleitung basierend auf Admin-Status
       if (isUserAdmin) {
         navigate('/admin/dashboard');
       } else {
         navigate('/dashboard');
       }
-      
+
     } catch (error) {
       console.error('Login-Fehler:', error);
       switch (error.code) {
@@ -68,7 +69,7 @@ const LoginPage = () => {
           navigate('/dashboard');
         }
       }, 100);
-      
+
       return () => clearTimeout(timer);
     }
   }, [currentUser, isAdmin, navigate]);
@@ -93,25 +94,26 @@ const LoginPage = () => {
           flexDirection: 'column',
           alignItems: 'center',
           width: '100%',
-          backgroundColor: 'rgba(20, 20, 20, 0.9)',
-          backdropFilter: 'blur(5px)',
+          backgroundColor: theme.palette.background.paper,
+          backgroundImage: 'none',
           borderRadius: 3,
+          border: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Typography
           component="h1"
           variant="h5"
           sx={{
-            fontFamily: 'comfortaa',
+            fontFamily: 'Comfortaa',
             fontWeight: 700,
-            color: '#00A99D',
+            color: theme.palette.primary.main,
             textTransform: 'uppercase',
             mb: 3,
           }}
         >
           Anmeldung
         </Typography>
-        
+
         <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1, width: '100%' }}>
           <TextField
             margin="normal"
@@ -125,20 +127,20 @@ const LoginPage = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             sx={{
-              '& label.Mui-focused': { color: '#00A99D' },
+              '& label.Mui-focused': { color: theme.palette.primary.main },
               '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: 'grey.700' },
-                '&:hover fieldset': { borderColor: 'grey.500' },
-                '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+                '& fieldset': { borderColor: theme.palette.divider },
+                '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+                '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
               },
               input: {
-                color: 'grey.100',
+                color: theme.palette.text.primary,
                 '&:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px #141414 inset',
-                  WebkitTextFillColor: '#e0e0e0',
+                  WebkitBoxShadow: `0 0 0 100px ${theme.palette.background.paper} inset`,
+                  WebkitTextFillColor: theme.palette.text.primary,
                 },
               },
-              label: { color: 'grey.400' },
+              label: { color: theme.palette.text.secondary },
             }}
           />
           <TextField
@@ -153,20 +155,20 @@ const LoginPage = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             sx={{
-              '& label.Mui-focused': { color: '#00A99D' },
+              '& label.Mui-focused': { color: theme.palette.primary.main },
               '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: 'grey.700' },
-                '&:hover fieldset': { borderColor: 'grey.500' },
-                '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+                '& fieldset': { borderColor: theme.palette.divider },
+                '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+                '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
               },
               input: {
-                color: 'grey.100',
+                color: theme.palette.text.primary,
                 '&:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px #141414 inset',
-                  WebkitTextFillColor: '#e0e0e0',
+                  WebkitBoxShadow: `0 0 0 100px ${theme.palette.background.paper} inset`,
+                  WebkitTextFillColor: theme.palette.text.primary,
                 },
               },
-              label: { color: 'grey.400' },
+              label: { color: theme.palette.text.secondary },
             }}
           />
           {error && (
@@ -182,31 +184,31 @@ const LoginPage = () => {
               mt: 3,
               mb: 2,
               py: 1.5,
-              fontFamily: 'comfortaa',
+              fontFamily: 'Comfortaa',
               fontWeight: 'bold',
-              backgroundColor: '#00A99D',
+              backgroundColor: theme.palette.primary.main,
               '&:hover': {
-                backgroundColor: '#00897B', // Etwas dunklerer Ton für den Hover-Effekt
+                backgroundColor: theme.palette.primary.dark,
               },
             }}
           >
             Anmelden
           </Button>
         </Box>
-        
-        <Box 
-          sx={{ 
-            textAlign: 'center', 
+
+        <Box
+          sx={{
+            textAlign: 'center',
             mt: 3,
             p: 2,
-            backgroundColor: 'rgba(0,0,0,0.2)',
+            backgroundColor: theme.palette.action.hover,
             borderRadius: 2,
             width: '100%'
           }}
         >
-          <Typography variant="body2" sx={{ color: 'grey.400', fontFamily: 'comfortaa' }}>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
             Bunteliga Freiburg<br />
-            <Typography variant="caption" sx={{ color: 'grey.500' }}>
+            <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
               Vereinsmanagement System
             </Typography>
           </Typography>

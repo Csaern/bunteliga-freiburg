@@ -1,11 +1,10 @@
-// src/pages/DashboardPage.js
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthProvider';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import TeamSettings from '../components/TeamSettings';
-import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, FormControl, InputLabel, Select, MenuItem, List, ListItem, ListItemIcon, ListItemText, Card, Divider } from '@mui/material';
 import { API_BASE_URL } from '../services/apiClient';
 import { ReusableModal } from '../components/Helpers/modalUtils';
 import * as seasonApi from '../services/seasonApiService';
@@ -13,7 +12,7 @@ import * as teamApi from '../services/teamApiService';
 import * as bookingApi from '../services/bookingApiService';
 import * as resultApi from '../services/resultApiService';
 
-// Icons for Alerts and the new Icon Bar
+// Icons
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
@@ -21,6 +20,10 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 import SettingsIcon from '@mui/icons-material/Settings';
+import PersonIcon from '@mui/icons-material/Person';
+import EmailIcon from '@mui/icons-material/Email';
+import GroupIcon from '@mui/icons-material/Group';
+import EventIcon from '@mui/icons-material/Event';
 
 const DashboardPage = () => {
   const { currentUser, teamId, isAdmin } = useAuth();
@@ -50,9 +53,9 @@ const DashboardPage = () => {
   const sectionCardSx = {
     borderRadius: 4,
     border: '1px solid',
-    borderColor: 'grey.800',
-    background: 'linear-gradient(135deg, rgba(0, 169, 157, 0.12) 0%, rgba(17, 17, 17, 0.92) 100%)',
-    boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
+    borderColor: theme.palette.divider,
+    background: `linear-gradient(135deg, ${theme.palette.primary.main}1F 0%, ${theme.palette.background.paper} 100%)`,
+    boxShadow: theme.shadows[4],
     p: { xs: 2, sm: 3 },
     display: 'flex',
     flexDirection: 'column',
@@ -60,14 +63,14 @@ const DashboardPage = () => {
   };
 
   const darkInputStyle = {
-    '& label.Mui-focused': { color: '#00A99D' },
+    '& label.Mui-focused': { color: theme.palette.primary.main },
     '& .MuiOutlinedInput-root': {
-        '& fieldset': { borderColor: 'grey.700' },
-        '&:hover fieldset': { borderColor: 'grey.500' },
-        '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+      '& fieldset': { borderColor: theme.palette.grey[700] },
+      '&:hover fieldset': { borderColor: theme.palette.grey[500] },
+      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
     },
-    '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark' },
-    '& label': { color: 'grey.400' },
+    '& .MuiInputBase-input': { color: theme.palette.text.primary },
+    '& label': { color: theme.palette.text.secondary },
   };
 
   const fetchData = useCallback(async () => {
@@ -103,18 +106,17 @@ const DashboardPage = () => {
       }
 
       if (activeSeason?.id && teamId) {
-        // Pending game requests: zukünftige Spiele für mein Team, Status pending_away_confirm und ich bin Auswärtsteam
+        // Pending game requests
         const upcoming = await bookingApi.getUpcomingBookingsForTeam(activeSeason.id, teamId).catch(() => []);
         const pendingRequests = upcoming.filter(b => b.status === 'pending_away_confirm' && b.awayTeamId === teamId);
         setPendingGameRequests(pendingRequests);
 
-        // Pending my requests: Spiele, die von meinem Team angefragt wurden (ich bin Heimteam)
+        // Pending my requests
         const myRequests = upcoming.filter(b => b.status === 'pending_away_confirm' && b.homeTeamId === teamId);
         setPendingMyRequests(myRequests);
 
-        // Pending results for my team
+        // Pending results
         const pendingRes = await resultApi.getPendingResultsForMyTeam().catch(() => []);
-        // Filter sicherstellen (Backend sollte bereits filtern)
         const filteredPendingRes = pendingRes.filter(r => r.seasonId === activeSeason.id && (r.homeTeamId === teamId || r.awayTeamId === teamId));
         setPendingResults(filteredPendingRes);
       }
@@ -128,10 +130,16 @@ const DashboardPage = () => {
   useEffect(() => {
     if (!currentUser) {
       navigate('/login');
-    } else {
-      fetchData();
+      return;
     }
-  }, [currentUser, navigate, fetchData]);
+
+    if (isAdmin && !teamId) {
+      navigate('/admin/dashboard');
+      return;
+    }
+
+    fetchData();
+  }, [currentUser, isAdmin, teamId, navigate, fetchData]);
 
   const handleAcceptBookingRequest = async (bookingId) => {
     try {
@@ -160,7 +168,7 @@ const DashboardPage = () => {
     try {
       const confirmed = window.confirm('Möchten Sie diese Spielanfrage wirklich stornieren?');
       if (!confirmed) return;
-      
+
       await bookingApi.cancelBooking(bookingId);
       alert('Spielanfrage erfolgreich storniert.');
       setPendingMyRequests((prev) => prev.filter((booking) => booking.id !== bookingId));
@@ -314,16 +322,9 @@ const DashboardPage = () => {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  const handleOpenEditModal = (result) => {
-    setSelectedResult(result);
-    setEditFormData({ homeScore: result.homeScore, awayScore: result.awayScore });
-    setIsEditModalOpen(true);
-  };
-
   const handleUpdateResult = async (e) => {
     e.preventDefault();
     if (!selectedResult) return;
-    // Platzhalter: Ergebnis-Korrektur über Backend-API folgt separat
     alert('Ergebniskorrektur folgt über Backend-API in einem nächsten Schritt.');
     setIsEditModalOpen(false);
   };
@@ -342,20 +343,20 @@ const DashboardPage = () => {
             onClick={onClick}
             sx={{
               border: '1px solid',
-              borderColor: 'grey.700',
-              color: 'grey.300',
+              borderColor: theme.palette.divider,
+              color: theme.palette.text.secondary,
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
-                backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                borderColor: '#FFBF00',
-                color: '#FFBF00',
+                backgroundColor: `${theme.palette.secondary.main}1A`,
+                borderColor: theme.palette.secondary.main,
+                color: theme.palette.secondary.main,
               },
             }}
           >
             {icon}
           </IconButton>
           {isDesktop && (
-            <Typography variant="caption" sx={{ mt: 0.5, color: 'grey.400' }}>
+            <Typography variant="caption" sx={{ mt: 0.5, color: theme.palette.text.secondary }}>
               {title}
             </Typography>
           )}
@@ -367,25 +368,25 @@ const DashboardPage = () => {
   return (
     <Container maxWidth="md" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
       <Grid container spacing={3} direction="column">
-        
+
         {/* Header */}
         <Grid sx={{ textAlign: 'center' }}>
-          <Typography variant="h4" component="h1" sx={{ color: '#00A99D', fontFamily: 'comfortaa', fontWeight: 700, mb: 2, textTransform: 'uppercase' }}>
+          <Typography variant="h4" component="h1" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontWeight: 700, mb: 2, textTransform: 'uppercase' }}>
             Teamboard
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-            <Avatar 
-              src={team?.logoUrl ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`) : null} 
-              sx={{ 
-                width: 48, 
-                height: 48, 
-                bgcolor: team?.logoColor || '#00A99D',
-                border: team?.logoUrl ? `1px solid ${team?.logoColor || '#00A99D'}` : 'none'
+            <Avatar
+              src={team?.logoUrl ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`) : null}
+              sx={{
+                width: 48,
+                height: 48,
+                bgcolor: team?.logoColor || theme.palette.primary.main,
+                border: team?.logoUrl ? `1px solid ${team?.logoColor || theme.palette.primary.main}` : 'none'
               }}
             >
               {!team?.logoUrl && team?.name ? team.name.charAt(0).toUpperCase() : null}
             </Avatar>
-            <Typography variant="h6" component="h2" sx={{ fontFamily: 'comfortaa', color: 'common.white' }}>
+            <Typography variant="h6" component="h2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.common.white }}>
               {team?.name || (isAdmin ? 'Administrator' : 'Ohne Team')}
             </Typography>
           </Box>
@@ -398,7 +399,7 @@ const DashboardPage = () => {
             sx={{
               p: 1.5,
               border: '1px solid',
-              borderColor: 'grey.700',
+              borderColor: theme.palette.divider,
               borderRadius: '16px',
               backgroundColor: 'transparent',
             }}
@@ -418,8 +419,8 @@ const DashboardPage = () => {
             <Typography
               variant="h5"
               sx={{
-                fontFamily: 'comfortaa',
-                color: '#FFBF00',
+                fontFamily: 'Comfortaa',
+                color: theme.palette.secondary.main,
                 textAlign: 'center',
                 mb: 3,
                 textTransform: 'uppercase',
@@ -432,7 +433,7 @@ const DashboardPage = () => {
               {pendingResults.map(result => (
                 <Paper key={result.id} sx={sectionCardSx}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontFamily: 'comfortaa', color: 'grey.100', textTransform: 'uppercase' }}>
+                    <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
                       Ergebnisbestätigung
                     </Typography>
                     <Chip
@@ -440,11 +441,11 @@ const DashboardPage = () => {
                       color="warning"
                       size="small"
                       sx={{
-                        fontFamily: 'comfortaa',
+                        fontFamily: 'Comfortaa',
                         fontWeight: 600,
                         letterSpacing: '0.04em',
-                        backgroundColor: 'rgba(255,191,0,0.2)',
-                        color: '#FFBF00',
+                        backgroundColor: `${theme.palette.secondary.main}33`,
+                        color: theme.palette.secondary.main,
                       }}
                     />
                   </Box>
@@ -462,7 +463,7 @@ const DashboardPage = () => {
                     >
                       {!teamsMap[result.homeTeamId]?.logoUrl && (teamsMap[result.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
                     </Avatar>
-                    <Typography variant="body1" sx={{ color: 'grey.200', fontFamily: 'comfortaa', fontSize: '0.9rem' }}>
+                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
                       {teamsMap[result.homeTeamId]?.name} vs. {teamsMap[result.awayTeamId]?.name}
                     </Typography>
                     <Avatar
@@ -479,7 +480,7 @@ const DashboardPage = () => {
                       {!teamsMap[result.awayTeamId]?.logoUrl && (teamsMap[result.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
                     </Avatar>
                   </Box>
-                  <Typography variant="h6" sx={{ color: 'grey.100', fontFamily: 'comfortaa', fontWeight: 700 }}>
+                  <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 700 }}>
                     {result.homeScore} : {result.awayScore}
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -500,18 +501,18 @@ const DashboardPage = () => {
                 return (
                   <Paper key={booking.id} sx={sectionCardSx}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontFamily: 'comfortaa', color: 'grey.100', textTransform: 'uppercase' }}>
+                      <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
                         Spielanfrage
                       </Typography>
                       <Chip
                         label="Antwort erforderlich"
                         size="small"
                         sx={{
-                          fontFamily: 'comfortaa',
+                          fontFamily: 'Comfortaa',
                           fontWeight: 600,
                           letterSpacing: '0.04em',
-                          backgroundColor: 'rgba(0,169,157,0.18)',
-                          color: '#00A99D',
+                          backgroundColor: `${theme.palette.primary.main}2E`,
+                          color: theme.palette.primary.main,
                         }}
                       />
                     </Box>
@@ -529,7 +530,7 @@ const DashboardPage = () => {
                       >
                         {!teamsMap[booking.homeTeamId]?.logoUrl && (teamsMap[booking.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
                       </Avatar>
-                      <Typography variant="body1" sx={{ color: 'grey.200', fontFamily: 'comfortaa', fontSize: '0.9rem' }}>
+                      <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
                         {teamsMap[booking.homeTeamId]?.name} vs. {teamsMap[booking.awayTeamId]?.name}
                       </Typography>
                       <Avatar
@@ -546,7 +547,7 @@ const DashboardPage = () => {
                         {!teamsMap[booking.awayTeamId]?.logoUrl && (teamsMap[booking.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
                       </Avatar>
                     </Box>
-                    <Typography variant="body2" sx={{ color: 'grey.400', fontFamily: 'comfortaa' }}>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
                       {dateStr} • {timeStr} Uhr
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -568,18 +569,18 @@ const DashboardPage = () => {
                 return (
                   <Paper key={booking.id} sx={sectionCardSx}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontFamily: 'comfortaa', color: 'grey.100', textTransform: 'uppercase' }}>
+                      <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
                         Spielanfrage
                       </Typography>
                       <Chip
                         label="Anfrage ausstehend"
                         size="small"
                         sx={{
-                          fontFamily: 'comfortaa',
+                          fontFamily: 'Comfortaa',
                           fontWeight: 600,
                           letterSpacing: '0.04em',
-                          backgroundColor: 'rgba(255,191,0,0.18)',
-                          color: '#FFBF00',
+                          backgroundColor: `${theme.palette.secondary.main}2E`,
+                          color: theme.palette.secondary.main,
                         }}
                       />
                     </Box>
@@ -597,7 +598,7 @@ const DashboardPage = () => {
                       >
                         {!teamsMap[booking.homeTeamId]?.logoUrl && (teamsMap[booking.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
                       </Avatar>
-                      <Typography variant="body1" sx={{ color: 'grey.200', fontFamily: 'comfortaa', fontSize: '0.9rem' }}>
+                      <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
                         {teamsMap[booking.homeTeamId]?.name} vs. {teamsMap[booking.awayTeamId]?.name}
                       </Typography>
                       <Avatar
@@ -614,7 +615,7 @@ const DashboardPage = () => {
                         {!teamsMap[booking.awayTeamId]?.logoUrl && (teamsMap[booking.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
                       </Avatar>
                     </Box>
-                    <Typography variant="body2" sx={{ color: 'grey.400', fontFamily: 'comfortaa' }}>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
                       {dateStr} • {timeStr} Uhr
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -646,19 +647,19 @@ const DashboardPage = () => {
       </Grid>
 
       {showTeamSettings && <TeamSettings onClose={() => setShowTeamSettings(false)} />}
-      
+
       <ReusableModal open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Ergebnis korrigieren">
         <form onSubmit={handleUpdateResult}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography>Passe das Ergebnis an. Dein Gegner muss die Änderung erneut bestätigen.</Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <TextField size="small" label="Tore Heim" type="number" fullWidth required value={editFormData.homeScore} onChange={(e) => setEditFormData({ ...editFormData, homeScore: e.target.value })} sx={darkInputStyle} />
-              <Typography sx={{ color: 'grey.400' }}>:</Typography>
+              <Typography sx={{ color: theme.palette.text.secondary }}>:</Typography>
               <TextField size="small" label="Tore Auswärts" type="number" fullWidth required value={editFormData.awayScore} onChange={(e) => setEditFormData({ ...editFormData, awayScore: e.target.value })} sx={darkInputStyle} />
             </Box>
             <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-              <Button variant="outlined" onClick={() => setIsEditModalOpen(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
-              <Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }}>Korrektur senden</Button>
+              <Button variant="outlined" onClick={() => setIsEditModalOpen(false)} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button>
+              <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Korrektur senden</Button>
             </Box>
           </Box>
         </form>
@@ -668,19 +669,19 @@ const DashboardPage = () => {
         <Box component="form" onSubmit={handleReportSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {reportLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-              <CircularProgress size={32} sx={{ color: '#00A99D' }} />
+              <CircularProgress size={32} sx={{ color: theme.palette.primary.main }} />
             </Box>
           ) : reportOptions.length === 0 ? (
-            <Typography sx={{ color: 'grey.100', fontFamily: 'comfortaa', textAlign: 'center' }}>
+            <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', textAlign: 'center' }}>
               Kein Spiel verfügbar. Sobald ein bestätigtes Spiel ohne Ergebnis vorliegt, kannst du es hier melden.
             </Typography>
           ) : (
             <>
-              <Typography sx={{ color: 'grey.100', fontFamily: 'comfortaa', textAlign: 'center' }}>
+              <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', textAlign: 'center' }}>
                 Wähle das Spiel aus und trage die erzielten Tore ein.
               </Typography>
               <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-                <InputLabel sx={{ color: 'grey.200', fontFamily: 'comfortaa', '&.Mui-focused': { color: '#00A99D' } }}>
+                <InputLabel sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', '&.Mui-focused': { color: theme.palette.primary.main } }}>
                   Spiel auswählen
                 </InputLabel>
                 <Select
@@ -688,15 +689,15 @@ const DashboardPage = () => {
                   value={reportForm.bookingId}
                   onChange={(e) => setReportForm(prev => ({ ...prev, bookingId: e.target.value }))}
                   sx={{
-                    backgroundColor: '#fff',
+                    backgroundColor: theme.palette.background.paper,
                     borderRadius: 2,
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.700' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00A99D' },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00A99D' },
-                    '& .MuiSelect-select': { color: '#000', fontFamily: 'comfortaa', fontWeight: 600 },
-                    '& .MuiSvgIcon-root': { color: '#000' },
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                    '& .MuiSelect-select': { color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 600 },
+                    '& .MuiSvgIcon-root': { color: theme.palette.text.primary },
                   }}
-                  MenuProps={{ PaperProps: { sx: { backgroundColor: '#fff', color: '#000', fontFamily: 'comfortaa' } } }}
+                  MenuProps={{ PaperProps: { sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, fontFamily: 'Comfortaa' } } }}
                 >
                   {reportOptions.map(option => (
                     <MenuItem key={option.id} value={option.id}>
@@ -717,15 +718,15 @@ const DashboardPage = () => {
                   InputProps={{ inputProps: { min: 0 } }}
                   sx={{
                     flex: 1,
-                    '& label': { color: 'grey.300', fontFamily: 'comfortaa' },
-                    '& label.Mui-focused': { color: '#00A99D' },
+                    '& label': { color: theme.palette.text.secondary, fontFamily: 'Comfortaa' },
+                    '& label.Mui-focused': { color: theme.palette.primary.main },
                     '& .MuiOutlinedInput-root': {
                       backgroundColor: 'rgba(255,255,255,0.08)',
-                      color: '#fff',
-                      fontFamily: 'comfortaa',
-                      '& fieldset': { borderColor: 'grey.700' },
-                      '&:hover fieldset': { borderColor: '#00A99D' },
-                      '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+                      color: theme.palette.text.primary,
+                      fontFamily: 'Comfortaa',
+                      '& fieldset': { borderColor: theme.palette.divider },
+                      '&:hover fieldset': { borderColor: theme.palette.primary.main },
+                      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
                     },
                   }}
                 />
@@ -739,28 +740,28 @@ const DashboardPage = () => {
                   InputProps={{ inputProps: { min: 0 } }}
                   sx={{
                     flex: 1,
-                    '& label': { color: 'grey.300', fontFamily: 'comfortaa' },
-                    '& label.Mui-focused': { color: '#00A99D' },
+                    '& label': { color: theme.palette.text.secondary, fontFamily: 'Comfortaa' },
+                    '& label.Mui-focused': { color: theme.palette.primary.main },
                     '& .MuiOutlinedInput-root': {
                       backgroundColor: 'rgba(255,255,255,0.08)',
-                      color: '#fff',
-                      fontFamily: 'comfortaa',
-                      '& fieldset': { borderColor: 'grey.700' },
-                      '&:hover fieldset': { borderColor: '#00A99D' },
-                      '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+                      color: theme.palette.text.primary,
+                      fontFamily: 'Comfortaa',
+                      '& fieldset': { borderColor: theme.palette.divider },
+                      '&:hover fieldset': { borderColor: theme.palette.primary.main },
+                      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
                     },
                   }}
                 />
               </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
-                <Button variant="outlined" onClick={handleCloseReportModal} sx={{ borderColor: '#00A99D', color: '#00A99D' }}>
+                <Button variant="outlined" onClick={handleCloseReportModal} sx={{ borderColor: theme.palette.primary.main, color: theme.palette.primary.main }}>
                   Abbrechen
                 </Button>
                 <Button
                   type="submit"
                   variant="contained"
-                  sx={{ backgroundColor: '#00A99D' }}
+                  sx={{ backgroundColor: theme.palette.primary.main }}
                   disabled={reportSubmitting}
                 >
                   {reportSubmitting ? 'Sende...' : 'Ergebnis melden'}

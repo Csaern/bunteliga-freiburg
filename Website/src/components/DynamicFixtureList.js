@@ -42,9 +42,9 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
     <TableCell
       align={align}
       sx={{
-        color: theme.palette.grey[300],
-        fontFamily: 'comfortaa',
-        borderBottom: `1px solid ${theme.palette.grey[800]}`,
+        color: theme.palette.text.primary,
+        fontFamily: 'Comfortaa',
+        borderBottom: `1px solid ${theme.palette.divider}`,
         py: isMobile ? 0.5 : 1,
         px: isMobile ? 0.3 : 1,
         fontSize: isMobile ? '0.6rem' : '0.85rem',
@@ -77,12 +77,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   // Firestore Timestamps werden als {_seconds, _nanoseconds} serialisiert, wenn sie über JSON gesendet werden
   const normalizeToDate = (maybeDate) => {
     if (!maybeDate) return null;
-    
+
     // Fall 1: Firestore Timestamp Objekt (direkt aus Firestore, hat toDate() Methode)
     if (typeof maybeDate.toDate === 'function') {
       return maybeDate.toDate();
     }
-    
+
     // Fall 2: Serialisiertes Firestore Timestamp Format {_seconds, _nanoseconds}
     // Dies passiert, wenn Firestore Timestamps über JSON/HTTP gesendet werden
     if (typeof maybeDate === 'object' && typeof maybeDate._seconds === 'number') {
@@ -94,7 +94,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       }
       return new Date(milliseconds);
     }
-    
+
     // Fall 3: JavaScript Date Objekt oder ISO String
     const d = new Date(maybeDate);
     return isNaN(d.getTime()) ? null : d;
@@ -244,7 +244,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
       // Kombiniere Ergebnisse und Buchungen basierend auf showType
       let allFixtures = [];
-      
+
       if (showType === 'results' || showType === 'all') {
         // Prüfe, ob Teams aus Ergebnissen fehlen und lade sie nach
         const missingTeamIds = new Set();
@@ -256,7 +256,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             missingTeamIds.add(result.awayTeamId);
           }
         });
-        
+
         // Lade fehlende Teams aus Firestore
         if (missingTeamIds.size > 0) {
           try {
@@ -318,7 +318,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         }
         // Aktualisiere den State mit den erweiterten Teamdaten
         setTeams(teamsMap);
-        
+
         // Lade Buchungen für Ergebnisse, die eine bookingId haben, um das Spieldatum zu bekommen
         const bookingIds = results.filter(r => r.bookingId).map(r => r.bookingId);
         const bookingsMap = {};
@@ -343,12 +343,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             console.error('Fehler beim Laden der Buchungen für Ergebnisse:', error);
           }
         }
-        
+
         allFixtures.push(...results.map(result => {
           // Versuche das Datum aus der zugehörigen Buchung zu bekommen, sonst verwende reportedAt
           let resultDate = null;
           let resultTime = '';
-          
+
           if (result.bookingId && bookingsMap[result.bookingId]) {
             const booking = bookingsMap[result.bookingId];
             const bookingDate = normalizeToDate(booking.date);
@@ -357,7 +357,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
               resultTime = bookingDate.toTimeString().slice(0, 5);
             }
           }
-          
+
           // Fallback: Verwende reportedAt
           if (!resultDate) {
             const reportedDate = normalizeToDate(result.reportedAt);
@@ -366,7 +366,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
               resultTime = reportedDate.toTimeString().slice(0, 5);
             }
           }
-          
+
           return {
             id: `result-${result.id}`,
             date: resultDate || '',
@@ -382,7 +382,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           };
         }));
       }
-      
+
       if (showType === 'upcoming' || showType === 'all') {
         // Lade Pitch-Namen für bevorstehende Spiele
         const pitchIds = [...new Set(bookings.map(b => b.pitchId).filter(Boolean))];
@@ -400,12 +400,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             console.error('Fehler beim Laden der Plätze:', error);
           }
         }
-        
+
         allFixtures.push(...bookings.map(booking => ({
           id: `booking-${booking.id}`,
           bookingId: booking.id,
           date: (() => { const d = normalizeToDate(booking.date); return d ? d.toISOString().split('T')[0] : ''; })(),
-          time: (() => { const d = normalizeToDate(booking.date); return d ? d.toTimeString().slice(0,5) : ''; })(),
+          time: (() => { const d = normalizeToDate(booking.date); return d ? d.toTimeString().slice(0, 5) : ''; })(),
           homeTeamId: booking.homeTeamId,
           awayTeamId: booking.awayTeamId,
           homeScore: null,
@@ -485,10 +485,10 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       setNotification({ open: true, message: "Keinem Team zugeordnet oder keine Buchung gefunden.", severity: 'error' });
       return;
     }
-    
+
     const confirmed = window.confirm('Möchten Sie diese Buchung wirklich absagen?');
     if (!confirmed) return;
-    
+
     try {
       await bookingApi.cancelBooking(selectedFixture.bookingId);
       setNotification({ open: true, message: "Buchung erfolgreich abgesagt.", severity: 'success' });
@@ -546,9 +546,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           sx={{
             mb: isMobile ? 1.5 : 3,
             mt: 2,
-            color: '#00A99D',
+            color: theme.palette.primary.main,
             fontWeight: 700,
-            fontFamily: 'comfortaa',
+            fontFamily: 'Comfortaa',
             textAlign: 'center',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
@@ -557,7 +557,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           {title}
         </Typography>
         <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography color="grey.400">Lade Spiele...</Typography>
+          <Typography color="text.secondary">Lade Spiele...</Typography>
         </Box>
       </Container>
     );
@@ -570,9 +570,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         sx={{
           mb: isMobile ? 1.5 : 3,
           mt: 2,
-          color: '#00A99D',
+          color: theme.palette.primary.main,
           fontWeight: 700,
-          fontFamily: 'comfortaa',
+          fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
@@ -583,31 +583,31 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       <TableContainer
         component={Paper}
         sx={{
-          backgroundColor: '#111',
+          backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.grey[800]}`,
+          border: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Table aria-label="Spielplan Tabelle" size="small">
           <TableHead>
-            <TableRow sx={{ backgroundColor: 'rgba(255,255,255,0.05)', height: rowHeight / 1.5 }}>
+            <TableRow sx={{ backgroundColor: theme.palette.action.hover, height: rowHeight / 1.5 }}>
               {details && (
-                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '25%' : '15%' }}>
+                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '25%' : '15%' }}>
                   {isMobile ? 'Datum/Zeit' : 'Datum'}
                 </StyledTableCell>
               )}
               {details && (
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '10%' }} hideOnMobile={true}>
+                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '10%' }} hideOnMobile={true}>
                   Uhrzeit
                 </StyledTableCell>
               )}
-              
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Heim</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '15%' }}>Erg.</StyledTableCell>
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Auswärts</StyledTableCell>
-              
+
+              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Heim</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '15%' }}>Erg.</StyledTableCell>
+              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Auswärts</StyledTableCell>
+
               {details && (
-                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '15%' }} hideOnMobile={showType !== 'upcoming'}>
+                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '15%' }} hideOnMobile={showType !== 'upcoming'}>
                   Ort
                 </StyledTableCell>
               )}
@@ -617,113 +617,113 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             {fixtures.map((fixture) => {
               const isUpcoming = !fixture.isPast && fixture.bookingId && (userTeamId || teamId);
               const isMyGame = isUpcoming && (fixture.homeTeamId === (userTeamId || teamId) || fixture.awayTeamId === (userTeamId || teamId));
-              
+
               return (
-              <TableRow
-                key={fixture.id}
-                onClick={isMyGame ? () => handleFixtureClick(fixture) : undefined}
-                sx={{
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
-                  opacity: fixture.isPast ? 0.7 : 1,
-                  height: rowHeight,
-                  cursor: isMyGame ? 'pointer' : 'default',
-                }}
-              >
-                {details && (
+                <TableRow
+                  key={fixture.id}
+                  onClick={isMyGame ? () => handleFixtureClick(fixture) : undefined}
+                  sx={{
+                    '&:hover': { backgroundColor: theme.palette.action.hover },
+                    opacity: fixture.isPast ? 0.7 : 1,
+                    height: rowHeight,
+                    cursor: isMyGame ? 'pointer' : 'default',
+                  }}
+                >
+                  {details && (
+                    <StyledTableCell>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'center' : 'flex-start', textAlign: isMobile ? 'center' : 'left' }}>
+                        {!isMobile && (
+                          <Typography variant="caption" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, fontSize: '0.7rem', lineHeight: 1.2 }}>
+                            {getWeekday(fixture.date)}
+                          </Typography>
+                        )}
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: isMobile ? '0.6rem' : '0.8rem', lineHeight: 1.2 }}>
+                          {formatDate(fixture.date)}
+                        </Typography>
+                        {isMobile && (
+                          <Typography variant="caption" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, fontSize: '0.55rem', mt: 0.25, lineHeight: 1.2 }}>
+                            {fixture.time} Uhr
+                          </Typography>
+                        )}
+                      </Box>
+                    </StyledTableCell>
+                  )}
+                  {details && (
+                    <StyledTableCell align="center" hideOnMobile={true}>{fixture.time}</StyledTableCell>
+                  )}
+
                   <StyledTableCell>
-                    <Box sx={{display: 'flex', flexDirection:'column', alignItems: isMobile? 'center' : 'flex-start', textAlign: isMobile? 'center' : 'left'}}>
-                      {!isMobile && (
-                        <Typography variant="caption" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], fontSize: '0.7rem', lineHeight:1.2 }}>
-                          {getWeekday(fixture.date)}
-                        </Typography>
-                      )}
-                      <Typography variant="body2" sx={{ fontFamily: 'comfortaa', fontSize: isMobile ? '0.6rem' : '0.8rem', lineHeight:1.2 }}>
-                        {formatDate(fixture.date)}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
+                      <Avatar
+                        alt={`${teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'} Logo`}
+                        src={teams[fixture.homeTeamId]?.logoUrl ? (teams[fixture.homeTeamId].logoUrl.startsWith('http') ? teams[fixture.homeTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.homeTeamId].logoUrl}`) : null}
+                        sx={{
+                          width: isMobile ? 22 : 20,
+                          height: isMobile ? 22 : 20,
+                          mb: 0.5,
+                          fontSize: isMobile ? '0.7rem' : '0.7rem',
+                          color: theme.palette.getContrastText(teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]),
+                          backgroundColor: teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700],
+                          border: teams[fixture.homeTeamId]?.logoUrl ? `1px solid ${teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
+                        }}
+                      >
+                        {!teams[fixture.homeTeamId]?.logoUrl && (teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'U').substring(0, 1).toUpperCase()}
+                      </Avatar>
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                        {teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'}
                       </Typography>
-                      {isMobile && (
-                        <Typography variant="caption" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], fontSize: '0.55rem', mt:0.25, lineHeight:1.2 }}>
-                          {fixture.time} Uhr
-                        </Typography>
-                      )}
                     </Box>
                   </StyledTableCell>
-                )}
-                {details && (
-                  <StyledTableCell align="center" hideOnMobile={true}>{fixture.time}</StyledTableCell>
-                )}
-                
-                <StyledTableCell>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
-                    <Avatar 
-                      alt={`${teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'} Logo`}
-                      src={teams[fixture.homeTeamId]?.logoUrl ? (teams[fixture.homeTeamId].logoUrl.startsWith('http') ? teams[fixture.homeTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.homeTeamId].logoUrl}`) : null}
-                      sx={{ 
-                        width: isMobile ? 22 : 20, 
-                        height: isMobile ? 22 : 20, 
-                        mb: 0.5, 
-                        fontSize: isMobile ? '0.7rem' : '0.7rem', 
-                        color: theme.palette.getContrastText(teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]), 
-                        backgroundColor: teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700],
-                        border: teams[fixture.homeTeamId]?.logoUrl ? `1px solid ${teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                      }}
-                    >
-                      {!teams[fixture.homeTeamId]?.logoUrl && (teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'U').substring(0,1).toUpperCase()}
-                    </Avatar>
-                    <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width:'100%' }}>
-                      {teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'}
-                    </Typography>
-                  </Box>
-                </StyledTableCell>
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold' }}>
-                  {fixture.isPast ? (
-                    <Chip 
-                      label={`${fixture.homeScore} : ${fixture.awayScore}`} 
-                      size="small" 
-                      sx={{ 
-                        fontFamily: 'comfortaa', 
-                        fontWeight: 'bold', 
-                        backgroundColor: theme.palette.grey[700], 
-                        color: theme.palette.grey[100], 
-                        fontSize: isMobile ? '0.6rem' : '0.8rem', 
-                        height: isMobile ? '16px' : '22px', 
-                        lineHeight: isMobile ? '16px' : '22px', 
-                        px: isMobile ? 0.5 : 1 
-                      }} 
-                    />
-                  ) : (
-                    <Typography variant="caption" sx={{color: theme.palette.grey[500], fontSize: isMobile ? '0.65rem' : 'inherit'}}>vs.</Typography>
-                  )}
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
-                    <Avatar 
-                      alt={`${teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'} Logo`}
-                      src={teams[fixture.awayTeamId]?.logoUrl ? (teams[fixture.awayTeamId].logoUrl.startsWith('http') ? teams[fixture.awayTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.awayTeamId].logoUrl}`) : null}
-                      sx={{ 
-                        width: isMobile ? 22 : 20, 
-                        height: isMobile ? 22 : 20, 
-                        mb: 0.5, 
-                        fontSize: isMobile ? '0.7rem' : '0.7rem', 
-                        color: theme.palette.getContrastText(teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]), 
-                        backgroundColor: teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700],
-                        border: teams[fixture.awayTeamId]?.logoUrl ? `1px solid ${teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                      }}
-                    >
-                      {!teams[fixture.awayTeamId]?.logoUrl && (teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'U').substring(0,1).toUpperCase()}
-                    </Avatar>
-                    <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width:'100%' }}>
-                      {teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'}
-                    </Typography>
-                  </Box>
-                </StyledTableCell>
-                
-                {details && (
-                  <StyledTableCell hideOnMobile={showType !== 'upcoming'}>
-                    {fixture.location || (fixture.pitchId && pitchesMap[fixture.pitchId]) || 'Unbekannt'}
+                  <StyledTableCell align="center" sx={{ fontWeight: 'bold' }}>
+                    {fixture.isPast ? (
+                      <Chip
+                        label={`${fixture.homeScore} : ${fixture.awayScore}`}
+                        size="small"
+                        sx={{
+                          fontFamily: 'Comfortaa',
+                          fontWeight: 'bold',
+                          backgroundColor: theme.palette.action.selected,
+                          color: theme.palette.text.primary,
+                          fontSize: isMobile ? '0.6rem' : '0.8rem',
+                          height: isMobile ? '16px' : '22px',
+                          lineHeight: isMobile ? '16px' : '22px',
+                          px: isMobile ? 0.5 : 1
+                        }}
+                      />
+                    ) : (
+                      <Typography variant="caption" sx={{ color: theme.palette.text.disabled, fontSize: isMobile ? '0.65rem' : 'inherit' }}>vs.</Typography>
+                    )}
                   </StyledTableCell>
-                )}
-              </TableRow>
-            );
+                  <StyledTableCell>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
+                      <Avatar
+                        alt={`${teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'} Logo`}
+                        src={teams[fixture.awayTeamId]?.logoUrl ? (teams[fixture.awayTeamId].logoUrl.startsWith('http') ? teams[fixture.awayTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.awayTeamId].logoUrl}`) : null}
+                        sx={{
+                          width: isMobile ? 22 : 20,
+                          height: isMobile ? 22 : 20,
+                          mb: 0.5,
+                          fontSize: isMobile ? '0.7rem' : '0.7rem',
+                          color: theme.palette.getContrastText(teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]),
+                          backgroundColor: teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700],
+                          border: teams[fixture.awayTeamId]?.logoUrl ? `1px solid ${teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
+                        }}
+                      >
+                        {!teams[fixture.awayTeamId]?.logoUrl && (teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'U').substring(0, 1).toUpperCase()}
+                      </Avatar>
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                        {teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'}
+                      </Typography>
+                    </Box>
+                  </StyledTableCell>
+
+                  {details && (
+                    <StyledTableCell hideOnMobile={showType !== 'upcoming'}>
+                      {fixture.location || (fixture.pitchId && pitchesMap[fixture.pitchId]) || 'Unbekannt'}
+                    </StyledTableCell>
+                  )}
+                </TableRow>
+              );
             })}
           </TableBody>
         </Table>
@@ -731,86 +731,86 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
       {/* Modal für Spiel-Details */}
       {selectedFixture && !showReportModal && (
-        <ReusableModal 
-          open={!!selectedFixture} 
-          onClose={() => setSelectedFixture(null)} 
+        <ReusableModal
+          open={!!selectedFixture}
+          onClose={() => setSelectedFixture(null)}
           title="Spiel-Details"
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box>
-              <Typography variant="subtitle2" sx={{ color: 'grey.400', fontFamily: 'comfortaa', mb: 0.5 }}>Datum</Typography>
-              <Typography sx={{ color: 'grey.100', fontFamily: 'comfortaa' }}>
+              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Datum</Typography>
+              <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>
                 {formatDate(selectedFixture.date)} ({getWeekday(selectedFixture.date)})
               </Typography>
             </Box>
             <Box>
-              <Typography variant="subtitle2" sx={{ color: 'grey.400', fontFamily: 'comfortaa', mb: 0.5 }}>Uhrzeit</Typography>
-              <Typography sx={{ color: 'grey.100', fontFamily: 'comfortaa' }}>{selectedFixture.time} Uhr</Typography>
+              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Uhrzeit</Typography>
+              <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>{selectedFixture.time} Uhr</Typography>
             </Box>
             {pitchName && (
               <Box>
-                <Typography variant="subtitle2" sx={{ color: 'grey.400', fontFamily: 'comfortaa', mb: 0.5 }}>Ort</Typography>
-                <Typography sx={{ color: 'grey.100', fontFamily: 'comfortaa' }}>{pitchName}</Typography>
+                <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Ort</Typography>
+                <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>{pitchName}</Typography>
               </Box>
             )}
             <Box>
-              <Typography variant="subtitle2" sx={{ color: 'grey.400', fontFamily: 'comfortaa', mb: 0.5 }}>Heim</Typography>
+              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Heim</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar 
+                <Avatar
                   src={teams[selectedFixture.homeTeamId]?.logoUrl ? (teams[selectedFixture.homeTeamId].logoUrl.startsWith('http') ? teams[selectedFixture.homeTeamId].logoUrl : `${API_BASE_URL}${teams[selectedFixture.homeTeamId].logoUrl}`) : null}
-                  sx={{ 
-                    width: 32, 
-                    height: 32, 
+                  sx={{
+                    width: 32,
+                    height: 32,
                     bgcolor: teams[selectedFixture.homeTeamId]?.logoColor || theme.palette.grey[700],
                     fontSize: '0.8rem'
                   }}
                 >
                   {!teams[selectedFixture.homeTeamId]?.logoUrl && (teams[selectedFixture.homeTeamId]?.name || selectedFixture.homeTeamName || 'H').charAt(0).toUpperCase()}
                 </Avatar>
-                <Typography sx={{ color: 'grey.100', fontFamily: 'comfortaa' }}>
+                <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>
                   {teams[selectedFixture.homeTeamId]?.name || selectedFixture.homeTeamName || 'Unbekannt'}
                 </Typography>
               </Box>
             </Box>
             <Box>
-              <Typography variant="subtitle2" sx={{ color: 'grey.400', fontFamily: 'comfortaa', mb: 0.5 }}>Auswärts</Typography>
+              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Auswärts</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar 
+                <Avatar
                   src={teams[selectedFixture.awayTeamId]?.logoUrl ? (teams[selectedFixture.awayTeamId].logoUrl.startsWith('http') ? teams[selectedFixture.awayTeamId].logoUrl : `${API_BASE_URL}${teams[selectedFixture.awayTeamId].logoUrl}`) : null}
-                  sx={{ 
-                    width: 32, 
-                    height: 32, 
+                  sx={{
+                    width: 32,
+                    height: 32,
                     bgcolor: teams[selectedFixture.awayTeamId]?.logoColor || theme.palette.grey[700],
                     fontSize: '0.8rem'
                   }}
                 >
                   {!teams[selectedFixture.awayTeamId]?.logoUrl && (teams[selectedFixture.awayTeamId]?.name || selectedFixture.awayTeamName || 'A').charAt(0).toUpperCase()}
                 </Avatar>
-                <Typography sx={{ color: 'grey.100', fontFamily: 'comfortaa' }}>
+                <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>
                   {teams[selectedFixture.awayTeamId]?.name || selectedFixture.awayTeamName || 'Unbekannt'}
                 </Typography>
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'grey.800' }}>
-              <Button 
-                variant="outlined" 
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 2, pt: 2, borderTop: '1px solid', borderColor: theme.palette.divider }}>
+              <Button
+                variant="outlined"
                 onClick={() => setSelectedFixture(null)}
-                sx={{ color: 'grey.400', borderColor: 'grey.700' }}
+                sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}
               >
                 Schließen
               </Button>
               {selectedFixture.bookingId && (
                 <>
-                  <Button 
-                    variant="contained" 
+                  <Button
+                    variant="contained"
                     color="primary"
                     onClick={handleReportResult}
-                    sx={{ bgcolor: '#00A99D' }}
+                    sx={{ bgcolor: theme.palette.primary.main }}
                   >
                     Ergebnis melden
                   </Button>
-                  <Button 
-                    variant="outlined" 
+                  <Button
+                    variant="outlined"
                     color="error"
                     onClick={handleCancelBooking}
                   >
@@ -825,16 +825,16 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
       {/* Modal für Ergebnis melden */}
       {showReportModal && selectedFixture && (
-        <ReusableModal 
-          open={showReportModal} 
+        <ReusableModal
+          open={showReportModal}
           onClose={() => {
             setShowReportModal(false);
             setReportForm({ homeScore: '', awayScore: '' });
-          }} 
+          }}
           title="Ergebnis melden"
         >
           <Box component="form" onSubmit={handleReportSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography sx={{ color: 'grey.200', fontFamily: 'comfortaa', mb: 1 }}>
+            <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', mb: 1 }}>
               {teams[selectedFixture.homeTeamId]?.name || selectedFixture.homeTeamName || 'Unbekannt'} vs. {teams[selectedFixture.awayTeamId]?.name || selectedFixture.awayTeamName || 'Unbekannt'}
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -847,17 +847,17 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                 fullWidth
                 required
                 sx={{
-                  '& label.Mui-focused': { color: '#00A99D' },
+                  '& label.Mui-focused': { color: theme.palette.primary.main },
                   '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: 'grey.700' },
-                    '&:hover fieldset': { borderColor: 'grey.500' },
-                    '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+                    '& fieldset': { borderColor: theme.palette.divider },
+                    '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+                    '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
                   },
-                  '& .MuiInputBase-input': { color: 'grey.100' },
-                  '& label': { color: 'grey.400' },
+                  '& .MuiInputBase-input': { color: theme.palette.text.primary },
+                  '& label': { color: theme.palette.text.secondary },
                 }}
               />
-              <Typography sx={{ color: 'grey.400', fontFamily: 'comfortaa' }}>:</Typography>
+              <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>:</Typography>
               <TextField
                 type="number"
                 size="small"
@@ -867,33 +867,33 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                 fullWidth
                 required
                 sx={{
-                  '& label.Mui-focused': { color: '#00A99D' },
+                  '& label.Mui-focused': { color: theme.palette.primary.main },
                   '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: 'grey.700' },
-                    '&:hover fieldset': { borderColor: 'grey.500' },
-                    '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+                    '& fieldset': { borderColor: theme.palette.divider },
+                    '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+                    '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
                   },
-                  '& .MuiInputBase-input': { color: 'grey.100' },
-                  '& label': { color: 'grey.400' },
+                  '& .MuiInputBase-input': { color: theme.palette.text.primary },
+                  '& label': { color: theme.palette.text.secondary },
                 }}
               />
             </Box>
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 2 }}>
-              <Button 
-                variant="outlined" 
+              <Button
+                variant="outlined"
                 onClick={() => {
                   setShowReportModal(false);
                   setReportForm({ homeScore: '', awayScore: '' });
                 }}
-                sx={{ color: 'grey.400', borderColor: 'grey.700' }}
+                sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}
               >
                 Abbrechen
               </Button>
-              <Button 
+              <Button
                 type="submit"
-                variant="contained" 
+                variant="contained"
                 disabled={reportSubmitting || reportForm.homeScore === '' || reportForm.awayScore === ''}
-                sx={{ bgcolor: '#00A99D' }}
+                sx={{ bgcolor: theme.palette.primary.main }}
               >
                 {reportSubmitting ? 'Wird gespeichert...' : 'Ergebnis melden'}
               </Button>
@@ -902,10 +902,10 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         </ReusableModal>
       )}
 
-      <Snackbar 
-        open={notification.open} 
-        autoHideDuration={6000} 
-        onClose={() => setNotification({ ...notification, open: false })} 
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification({ ...notification, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert onClose={() => setNotification({ ...notification, open: false })} severity={notification.severity} sx={{ width: '100%' }}>

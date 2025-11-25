@@ -24,7 +24,8 @@ import * as seasonApiService from '../services/seasonApiService';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery('(max-width:1020px)'); // Switch to mobile layout below 1020px
+  // const isMediumScreen = useMediaQuery('(max-width:1020px)'); // No longer needed as isMobile covers it
 
   if (isMobile && hideOnMobile) {
     return null;
@@ -34,16 +35,16 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
     <TableCell
       align={align}
       sx={{
-        color: theme.palette.grey[300],
-        fontFamily: 'comfortaa',
-        borderBottom: `1px solid ${theme.palette.grey[800]}`,
+        color: theme.palette.text.primary,
+        fontFamily: 'Comfortaa',
+        borderBottom: `1px solid ${theme.palette.divider}`,
         py: isMobile ? 0.6 : 1,
         px: isMobile ? 0.5 : 1,
         fontSize: isMobile ? '0.7rem' : '0.8rem',
         ...sx,
       }}
       {...props}
-    >{children}</TableCell> 
+    >{children}</TableCell>
   );
 };
 
@@ -54,20 +55,20 @@ const FormDisplay = ({ formArray }) => {
   const getFormStyle = (result, mobile = false) => {
     const baseStyle = {
       width: mobile ? '18%' : 25,
-      height: mobile ? 1.5 : 25, 
+      height: mobile ? 1.5 : 25,
       fontSize: '0.7rem',
       margin: mobile ? '0 1%' : '0 2px',
       borderRadius: mobile ? '1px' : undefined
     };
     switch (result) {
       case 'S':
-        return { ...baseStyle, backgroundColor: theme.palette.success.light, color: theme.palette.common.white };
+        return { ...baseStyle, backgroundColor: theme.palette.success.main, color: theme.palette.success.contrastText };
       case 'U':
-        return { ...baseStyle, backgroundColor: theme.palette.warning.light, color: theme.palette.common.black };
+        return { ...baseStyle, backgroundColor: theme.palette.warning.main, color: theme.palette.warning.contrastText };
       case 'N':
-        return { ...baseStyle, backgroundColor: theme.palette.error.light, color: theme.palette.common.white };
+        return { ...baseStyle, backgroundColor: theme.palette.error.main, color: theme.palette.error.contrastText };
       default:
-        return { ...baseStyle, backgroundColor: theme.palette.grey[700] };
+        return { ...baseStyle, backgroundColor: theme.palette.action.disabledBackground };
     }
   };
 
@@ -92,7 +93,7 @@ const FormDisplay = ({ formArray }) => {
 
 const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery('(max-width:1020px)'); // Switch to mobile layout below 1020px
   const navigate = useNavigate();
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -145,7 +146,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
 
       // Tabellendaten berechnen
       const teamStats = {};
-      
+
       // Initialisiere nur die Teams, die für die Saison registriert sind
       teams.forEach(team => {
         teamStats[team.id] = {
@@ -170,18 +171,18 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
       results.forEach(result => {
         const homeTeam = teamStats[result.homeTeamId];
         const awayTeam = teamStats[result.awayTeamId];
-        
+
         if (homeTeam && awayTeam) {
           // Spiele erhöhen
           homeTeam.played++;
           awayTeam.played++;
-          
+
           // Tore hinzufügen
           homeTeam.goalsFor += result.homeScore;
           homeTeam.goalsAgainst += result.awayScore;
           awayTeam.goalsFor += result.awayScore;
           awayTeam.goalsAgainst += result.homeScore;
-          
+
           // Ergebnis bestimmen
           if (result.homeScore > result.awayScore) {
             // Heim-Sieg
@@ -255,9 +256,9 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
           sx={{
             mb: 2,
             mt: 2,
-            color: '#00A99D',
+            color: theme.palette.primary.main,
             fontWeight: 700,
-            fontFamily: 'comfortaa',
+            fontFamily: 'Comfortaa',
             textAlign: 'center',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
@@ -266,7 +267,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
           {title}
         </Typography>
         <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography color="grey.400">Lade Tabelle...</Typography>
+          <Typography color="text.secondary">Lade Tabelle...</Typography>
         </Box>
       </Container>
     );
@@ -279,9 +280,9 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
         sx={{
           mb: 2,
           mt: 2,
-          color: '#00A99D',
+          color: theme.palette.primary.main,
           fontWeight: 700,
-          fontFamily: 'comfortaa',
+          fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
@@ -292,24 +293,24 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
       <TableContainer
         component={Paper}
         sx={{
-          backgroundColor: '#111',
+          backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.grey[800]}`,
+          border: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Table aria-label="Fußballtabelle" size="small">
           <TableHead>
-            <TableRow sx={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '7%' : '3%' }}>#</StyledTableCell>
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '60%' : '25%' }}>Team</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '11%' : 'auto' }}>Sp.</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }} hideOnMobile>S</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }} hideOnMobile>U</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }} hideOnMobile>N</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }} hideOnMobile>Tore</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '11%' : 'auto' }}>Diff.</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '11%' : 'auto' }}>Pkt.</StyledTableCell>
-              {form && !isMobile && <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '15%' }}>Form</StyledTableCell>}
+            <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '7%' : '3%' }}>#</StyledTableCell>
+              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '60%' : '25%' }}>Team</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '11%' : 'auto' }}>Sp.</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }} hideOnMobile>S</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }} hideOnMobile>U</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }} hideOnMobile>N</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }} hideOnMobile>Tore</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '11%' : 'auto' }}>Diff.</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '11%' : 'auto' }}>Pkt.</StyledTableCell>
+              {form && !isMobile && <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '15%' }}>Form</StyledTableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -320,14 +321,14 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                 sx={{
                   cursor: 'pointer',
                   transition: 'background-color 0.2s ease',
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
-                  ...(userTeamId && row.teamId === userTeamId && { 
-                    backgroundColor: 'rgba(0, 169, 157, 0.3)',
-                    border: '2px solid #00A99D'
+                  '&:hover': { backgroundColor: theme.palette.action.hover },
+                  ...(userTeamId && row.teamId === userTeamId && {
+                    backgroundColor: theme.palette.action.selected,
+                    border: `2px solid ${theme.palette.primary.main}`
                   }),
                 }}
               >
-                <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }}>{row.rank}</StyledTableCell>
+                <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{row.rank}</StyledTableCell>
                 <StyledTableCell>
                   {isMobile ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -339,7 +340,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                             width: 20,
                             height: 20,
                             mr: 0.75,
-                            fontSize: '0.55rem', 
+                            fontSize: '0.55rem',
                             color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
                             backgroundColor: row.logoColor || theme.palette.grey[700],
                             border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none'
@@ -347,7 +348,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                         >
                           {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}
                         </Avatar>
-                        <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.65rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: '0.65rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
                           {row.name}
                         </Typography>
                       </Box>
@@ -370,7 +371,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                       >
                         {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}
                       </Avatar>
-                      <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {row.name}
                       </Typography>
                     </Box>
@@ -381,10 +382,10 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                 <StyledTableCell align="center" hideOnMobile>{row.drawn}</StyledTableCell>
                 <StyledTableCell align="center" hideOnMobile>{row.lost}</StyledTableCell>
                 <StyledTableCell align="center" hideOnMobile>{`${row.goalsFor}:${row.goalsAgainst}`}</StyledTableCell>
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: row.goalDifference > 0 ? theme.palette.success.light : (row.goalDifference < 0 ? theme.palette.error.light : theme.palette.grey[300]) }}>
+                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: row.goalDifference > 0 ? theme.palette.success.main : (row.goalDifference < 0 ? theme.palette.error.main : theme.palette.text.secondary) }}>
                   {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
                 </StyledTableCell>
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }}>{row.points}</StyledTableCell>
+                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{row.points}</StyledTableCell>
                 {form && !isMobile && (
                   <StyledTableCell align="center">
                     <FormDisplay formArray={row.form} />

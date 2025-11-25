@@ -1,8 +1,4 @@
 import * as React from 'react';
-import mrp from '../img/mrp.jpg';
-import psv from '../img/psv.jpg';
-import seepark from '../img/seepark.jpg';
-
 import {
   Box,
   Container,
@@ -11,95 +7,98 @@ import {
   Button,
   useTheme,
   useMediaQuery,
-  Grid,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
-
-// Daten für die Sportplätze
-const venuesData = [
-  {
-    id: 1,
-    name: 'Marian-Rutka-Platz',
-    address: '79108 Freiburg',
-    imageUrl: mrp,
-    mapUrl: 'https://www.google.com/maps/place/Marian+Rutka+Platz/@48.0393479,7.8515957,386m/data=!3m1!1e3!4m15!1m8!3m7!1s0x47911ce06e6287d5:0x31c5180a88570c8!2sSportplatz+Post+Jahn,+Schwarzwaldstra%C3%9Fe+189,+79117+Freiburg+im+Breisgau!3b1!8m2!3d47.9892117!4d7.8894597!16s%2Fg%2F11x2h4k2mr!3m5!1s0x47911bf76e7fc355:0xc81e0a93bf9a4df1!8m2!3d48.0398962!4d7.8524517!16s%2Fg%2F11g8v1x3ys?entry=ttu&g_ep=EgoyMDI1MDYwMy4wIKXMDSoASAFQAw%3D%3D',
-  },
-  {
-    id: 2,
-    name: 'Seeparkstadion',
-    address: 'Siedlerweg, 79110 Freiburg',
-    imageUrl: seepark,
-    mapUrl: 'https://www.google.com/maps/place/Seepark+Stadion/@48.0122702,7.8187205,234m/data=!3m1!1e3!4m15!1m8!3m7!1s0x47911bfa652f0e5d:0xe46f50aea5dfaa3d!2sL%C3%B6rracher+Str.+12,+79115+Freiburg+im+Breisgau!3b1!8m2!3d47.9808942!4d7.8230486!16s%2Fg%2F11y1c2rjh1!3m5!1s0x47911b0a1b9a1c37:0x35d267d40616702d!8m2!3d48.0124077!4d7.8186686!16s%2Fg%2F11bxc5k38v?entry=ttu&g_ep=EgoyMDI1MDYwMy4wIKXMDSoASAFQAw%3D%3D',
-  },
-  {
-    id: 3,
-    name: 'Kunstrasen PSV Freiburg',
-    address: 'Lörracher Str. 20, 79115 Freiburg',
-    imageUrl: psv,
-    mapUrl: 'https://www.google.com/maps/place/Polizei-Sportverein+Freiburg+e.V./@47.980813,7.817535,1014m/data=!3m1!1e3!4m12!1m5!3m4!2zNDfCsDU4JzUwLjkiTiA3wrA0OScwMy4xIkU!8m2!3d47.980813!4d7.817535!3m5!1s0x47911b4854640211:0x57dfeef1f77fe0a0!8m2!3d47.9795719!4d7.8176925!16s%2Fg%2F1trtt73g?entry=ttu&g_ep=EgoyMDI1MDYwMy4wIKXMDSoASAFQAw%3D%3D',
-  },
-];
+import { getPublicPitches } from '../services/pitchApiService';
+import { API_BASE_URL } from '../services/apiClient';
+import ContactContent from '../components/ContactContent';
+import mrp from '../img/mrp.jpg'; // Fallback image
 
 // Sub-Komponente für eine einzelne Platz-Karte
 const VenueCard = ({ venue }) => {
   const theme = useTheme();
+
+  // Konstruiere die Bild-URL
+  // Wenn venue.imageUrl existiert, hänge die Basis-URL an (falls es ein relativer Pfad ist)
+  // Ansonsten verwende das Fallback-Bild
+  const imageUrl = venue.imageUrl
+    ? (venue.imageUrl.startsWith('http') ? venue.imageUrl : `${API_BASE_URL}${venue.imageUrl}`)
+    : mrp;
+
   return (
     <Paper
       sx={{
-        backgroundColor: '#1C1C1C',
+        backgroundColor: theme.palette.background.paper,
         borderRadius: theme.shape.borderRadius,
-        border: `1px solid ${theme.palette.grey[800]}`,
+        border: `1px solid ${theme.palette.divider}`,
         overflow: 'hidden',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
+        height: '100%', // Ensure cards are same height
       }}
     >
       <Box
         component="img"
-        src={venue.imageUrl}
+        src={imageUrl}
         alt={`Bild von ${venue.name}`}
         sx={{
           width: '100%',
-          aspectRatio: '4 / 3', // Stellt ein 4:3 Seitenverhältnis sicher
-          objectFit: 'cover',   // Füllt den Bereich, schneidet bei Bedarf ab
-          display: 'block',     // Verhindert unerwünschten Leerraum unter dem Bild
+          height: '250px', // Fixed height for uniformity
+          objectFit: 'cover',
+          display: 'block',
         }}
+        onError={(e) => { e.target.src = mrp; }} // Fallback bei Ladefehler
       />
-      <Box sx={{ p: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        <Typography 
-          variant="h6" 
+      <Box sx={{ p: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', flexGrow: 1 }}>
+        <Typography
+          variant="h6"
           component="h3"
-          sx={{ fontFamily: 'comfortaa', color: theme.palette.common.white, fontWeight: 'bold' }}
+          sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontWeight: 'bold' }}
         >
           {venue.name}
         </Typography>
-        <Typography 
-          variant="body2" 
-          sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], my: 1.5 }}
+        <Typography
+          variant="body2"
+          sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, my: 1.5 }}
         >
           {venue.address}
         </Typography>
-        <Button
-          variant="contained"
-          href={venue.mapUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          startIcon={<MapIcon />}
-          sx={{
-            mt: 1,
-            fontFamily: 'comfortaa',
-            fontWeight: 'bold',
-            backgroundColor: '#00A99D',
-            color: theme.palette.common.white,
-            transition: 'background-color 0.3s ease',
-            '&:hover': {
-              backgroundColor: '#00877D',
-            },
-          }}
-        >
-          Auf Karte anzeigen
-        </Button>
+
+        {/* Optional: Notizen anzeigen */}
+        {venue.notes && (
+          <Typography
+            variant="body2"
+            sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, mb: 1.5, fontStyle: 'italic' }}
+          >
+            {venue.notes}
+          </Typography>
+        )}
+
+        <Box sx={{ mt: 'auto' }}>
+          <Button
+            variant="contained"
+            href={venue.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}`} // Fallback zu Google Maps Suche
+            target="_blank"
+            rel="noopener noreferrer"
+            startIcon={<MapIcon />}
+            sx={{
+              mt: 1,
+              fontFamily: 'Comfortaa',
+              fontWeight: 'bold',
+              backgroundColor: theme.palette.primary.main,
+              color: theme.palette.common.black,
+              transition: 'background-color 0.3s ease',
+              '&:hover': {
+                backgroundColor: theme.palette.primary.dark,
+              },
+            }}
+          >
+            Auf Karte anzeigen
+          </Button>
+        </Box>
       </Box>
     </Paper>
   );
@@ -109,18 +108,37 @@ const VenueCard = ({ venue }) => {
 const VenuesPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [venues, setVenues] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    const fetchPitches = async () => {
+      try {
+        const data = await getPublicPitches();
+        setVenues(data);
+      } catch (err) {
+        console.error("Fehler beim Laden der Plätze:", err);
+        setError("Die Plätze konnten nicht geladen werden.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPitches();
+  }, []);
 
   return (
-    <Container maxWidth="md" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
+    <Container maxWidth="lg" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
       <Typography
         variant={isMobile ? 'h4' : 'h3'}
         component="h1"
         sx={{
           mb: 3,
           mt: 2,
-          color: '#00A99D',
+          color: theme.palette.primary.main,
           fontWeight: 700,
-          fontFamily: 'comfortaa',
+          fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
@@ -128,13 +146,13 @@ const VenuesPage = () => {
       >
         Über uns
       </Typography>
-      
+
       {/* Beschreibung über die Bunte Liga */}
       <Paper
         sx={{
-          backgroundColor: '#1C1C1C',
+          backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.grey[800]}`,
+          border: `1px solid ${theme.palette.divider}`,
           p: { xs: 2, sm: 3 },
           mb: 4,
         }}
@@ -142,8 +160,8 @@ const VenuesPage = () => {
         <Typography
           variant="h5"
           sx={{
-            color: '#00A99D',
-            fontFamily: 'comfortaa',
+            color: theme.palette.primary.main,
+            fontFamily: 'Comfortaa',
             fontWeight: 700,
             mb: 2,
             textAlign: 'center',
@@ -154,15 +172,15 @@ const VenuesPage = () => {
         <Typography
           variant="body1"
           sx={{
-            color: theme.palette.grey[300],
-            fontFamily: 'comfortaa',
+            color: theme.palette.text.secondary,
+            fontFamily: 'Comfortaa',
             lineHeight: 1.8,
             textAlign: 'justify',
           }}
         >
-          Die Bunte Liga Freiburg ist eine inklusive Hans Fußballliga, die Menschen aller Hintergründe zusammenbringt. 
-          Wir fördern Fairplay, Gemeinschaft und den Spaß am Fußball. Unsere Liga steht für Vielfalt, Respekt und 
-          sportliche Begeisterung. Egal ob Anfänger oder erfahrener Spieler – bei uns ist jeder willkommen, der 
+          Die Bunte Liga Freiburg ist eine inklusive Hans Fußballliga, die Menschen aller Hintergründe zusammenbringt.
+          Wir fördern Fairplay, Gemeinschaft und den Spaß am Fußball. Unsere Liga steht für Vielfalt, Respekt und
+          sportliche Begeisterung. Egal ob Anfänger oder erfahrener Spieler – bei uns ist jeder willkommen, der
           die Leidenschaft für den Fußball teilt.
 
           Dumm wer nicht mitmacht!
@@ -175,9 +193,9 @@ const VenuesPage = () => {
         sx={{
           mb: 3,
           mt: 2,
-          color: '#00A99D',
+          color: theme.palette.primary.main,
           fontWeight: 700,
-          fontFamily: 'comfortaa',
+          fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
@@ -185,17 +203,37 @@ const VenuesPage = () => {
       >
         Unsere Plätze
       </Typography>
-      
-      <Grid container spacing={3}>
-        {venuesData.map((venue) => (
-          <Grid item xs={12} sm={6} md={4} key={venue.id} sx={{ display: 'flex' }}>
-            <VenueCard venue={venue} />
-          </Grid>
-        ))}
-      </Grid>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress color="secondary" />
+        </Box>
+      ) : error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+      ) : venues.length === 0 ? (
+        <Alert severity="info" sx={{ mb: 2 }}>Keine Plätze gefunden.</Alert>
+      ) : (
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: 3,
+          }}
+        >
+          {venues.map((venue) => (
+            <Box key={venue.id} sx={{ display: 'flex', width: { xs: '100%', md: '350px' } }}>
+              <VenueCard venue={venue} />
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      <Box sx={{ mt: 8 }}>
+        <ContactContent />
+      </Box>
     </Container>
   );
 };
 
 export default VenuesPage;
-

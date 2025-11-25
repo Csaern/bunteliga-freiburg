@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Box } from '@mui/material';
 import NewsCarousel from '../components/News/News';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
@@ -26,37 +27,37 @@ const HomePage = () => {
 
   if (loading) {
     return (
-      <div className="homepage">
+      <Box className="homepage" sx={{ width: '100%', minHeight: '100vh', pb: 4 }}>
         <NewsCarousel />
-        <div style={{ textAlign: 'center', padding: '20px' }}>
+        <Box sx={{ textAlign: 'center', p: 3, color: 'text.secondary' }}>
           Lade Spiele...
-        </div>
-      </div>
+        </Box>
+      </Box>
     );
   }
 
   return (
-    <div className="homepage">
+    <Box className="homepage" sx={{ width: '100%', minHeight: '100vh', pb: 4 }}>
       <NewsCarousel />
-       <DynamicFixtureList 
-        title="Neueste Ergebnisse" 
+      <DynamicFixtureList
+        title="Neueste Ergebnisse"
         details={false}
         seasonId={currentSeason?.id}
         showType="results"
       />
-      <DynamicLeagueTable 
-        title="Aktuelle Tabelle" 
-        form={false} 
+      <DynamicLeagueTable
+        title="Aktuelle Tabelle"
+        form={false}
         seasonId={currentSeason?.id}
       />
-     
-      <DynamicFixtureList 
+
+      <DynamicFixtureList
         title="Nächste Spiele"
         details={true}
         seasonId={currentSeason?.id}
         showType="upcoming"
       />
-    </div>
+    </Box>
   );
 };
 

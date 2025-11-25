@@ -24,18 +24,18 @@ const ResultsPage = () => {
         seasonApi.getActiveSeasonPublic().catch(() => null),
         getDocs(collection(db, 'seasons'))
       ]);
-      
-      const allSeasonsData = seasonsSnap.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
+
+      const allSeasonsData = seasonsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
       }));
-      
+
       // Filtere nur finished und active Saisons (nicht planning)
       const availableSeasons = allSeasonsData.filter(s => s.status === 'finished' || s.status === 'active');
       // Sortiere nach Name (Jahr) absteigend
       availableSeasons.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
       setAllSeasons(availableSeasons);
-      
+
       // Setze die aktive Saison als Standard, falls vorhanden
       if (seasonData) {
         setCurrentSeason(seasonData);
@@ -62,7 +62,7 @@ const ResultsPage = () => {
     return (
       <div>
         <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography color="grey.400">Lade Ergebnisse...</Typography>
+          <Typography color="text.secondary">Lade Ergebnisse...</Typography>
         </Box>
       </div>
     );
@@ -75,33 +75,33 @@ const ResultsPage = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
           {allSeasons.length > 0 && (
             <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel sx={{ color: 'grey.400', fontSize: '0.875rem' }}>Saison</InputLabel>
+              <InputLabel sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>Saison</InputLabel>
               <Select
                 value={selectedSeasonId || ''}
                 onChange={handleSeasonChange}
                 label="Saison"
                 sx={{
-                  color: 'grey.100',
+                  color: 'text.primary',
                   fontSize: '0.875rem',
                   height: '36px',
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'grey.700',
+                    borderColor: 'divider',
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'grey.500',
+                    borderColor: 'action.hover',
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#00A99D',
+                    borderColor: 'primary.main',
                   },
                   '& .MuiSelect-icon': {
-                    color: 'grey.400',
+                    color: 'text.secondary',
                   },
                 }}
                 MenuProps={{
                   PaperProps: {
                     sx: {
-                      bgcolor: '#333',
-                      color: 'grey.200',
+                      bgcolor: 'background.paper',
+                      color: 'text.primary',
                     },
                   },
                 }}
@@ -115,16 +115,16 @@ const ResultsPage = () => {
             </FormControl>
           )}
         </Box>
-        <DynamicLeagueTable 
+        <DynamicLeagueTable
           title={`Liga-Tabelle`}
-          form={true} 
+          form={true}
           seasonId={selectedSeasonId}
         />
       </Box>
-      
-      <DynamicFixtureList 
-        title="Alle Spiele" 
-        details={true} 
+
+      <DynamicFixtureList
+        title="Alle Spiele"
+        details={true}
         seasonId={selectedSeasonId}
         showType="all"
       />

@@ -72,7 +72,7 @@ const AdminDashboard = () => {
       const totalBookings = bookingsArr.length;
       const confirmedResults = resultsArr.filter(r => r.status === 'confirmed');
       const pendingResults = resultsArr.filter(r => r.status === 'pending');
-      
+
       // Offene Partien: Buchungen mit beiden Teams, aber ohne Ergebnis
       const scheduledMatches = bookingsArr.filter(b => b.homeTeamId && b.awayTeamId && b.status === 'confirmed');
       const resultBookingIds = new Set(confirmedResults.map(r => r.bookingId));
@@ -140,17 +140,17 @@ const AdminDashboard = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
       <Grid container spacing={3} direction="column">
-        
+
         {/* Header */}
         <Grid sx={{ textAlign: 'center' }}>
           <Typography variant="h4" component="h1" sx={{ color: '#00A99D', fontFamily: 'comfortaa', fontWeight: 700, mb: 2, textTransform: 'uppercase' }}>
             Admin Dashboard
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-            <Avatar 
-              sx={{ 
-                width: 48, 
-                height: 48, 
+            <Avatar
+              sx={{
+                width: 48,
+                height: 48,
                 bgcolor: '#00A99D',
               }}
             >
@@ -193,7 +193,7 @@ const AdminDashboard = () => {
         {/* Statistics Cards */}
         <Grid>
           <Grid container spacing={2} sx={{ width: '100%', display: 'flex' }}>
-            <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
+            <Grid xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
               <Paper sx={{ ...sectionCardSx, width: '100%', flex: 1 }}>
                 <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: 'grey.400', mb: 1 }}>
                   Aktuelle Saison
@@ -203,7 +203,7 @@ const AdminDashboard = () => {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
+            <Grid xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
               <Paper sx={{ ...sectionCardSx, width: '100%', flex: 1 }}>
                 <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: 'grey.400', mb: 1 }}>
                   Teams
@@ -213,7 +213,7 @@ const AdminDashboard = () => {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
+            <Grid xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
               <Paper sx={{ ...sectionCardSx, width: '100%', flex: 1 }}>
                 <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: 'grey.400', mb: 1 }}>
                   Offene Partien
@@ -223,7 +223,7 @@ const AdminDashboard = () => {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
+            <Grid xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
               <Paper sx={{ ...sectionCardSx, width: '100%', flex: 1 }}>
                 <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: 'grey.400', mb: 1 }}>
                   Ausstehende Ergebnisse
@@ -239,10 +239,10 @@ const AdminDashboard = () => {
         {/* League Table */}
         {currentSeason && (
           <Grid>
-            <DynamicLeagueTable 
-              title="AKTUELLE TABELLE" 
-              form={true} 
-              seasonId={currentSeason.id} 
+            <DynamicLeagueTable
+              title="AKTUELLE TABELLE"
+              form={true}
+              seasonId={currentSeason.id}
             />
           </Grid>
         )}
@@ -250,11 +250,11 @@ const AdminDashboard = () => {
         {/* Upcoming Games */}
         {currentSeason && (
           <Grid>
-            <DynamicFixtureList 
-              title="BEVORSTEHENDE SPIELE" 
-              details={true} 
-              seasonId={currentSeason.id} 
-              showType="upcoming" 
+            <DynamicFixtureList
+              title="BEVORSTEHENDE SPIELE"
+              details={true}
+              seasonId={currentSeason.id}
+              showType="upcoming"
             />
           </Grid>
         )}
@@ -262,11 +262,11 @@ const AdminDashboard = () => {
         {/* Recent Results */}
         {currentSeason && (
           <Grid>
-            <DynamicFixtureList 
-              title="NEUESTE ERGEBNISSE" 
-              details={true} 
-              seasonId={currentSeason.id} 
-              showType="results" 
+            <DynamicFixtureList
+              title="NEUESTE ERGEBNISSE"
+              details={true}
+              seasonId={currentSeason.id}
+              showType="results"
             />
           </Grid>
         )}
