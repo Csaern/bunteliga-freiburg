@@ -14,7 +14,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import RecordsList from '../components/RecordsList';
-import LeagueTable from '../components/LeagueTable';
+import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import FixtureList from '../components/FixtureList';
 
 const teamData = {
@@ -146,7 +146,7 @@ const TeamPage = () => {
       </Container>
       <Container>
         <FixtureList title={'Spiele'} />
-        <LeagueTable title={'Tabelle'} />
+        <DynamicLeagueTable title={'Tabelle'} userTeamId={teamData.id} />
         <RecordsList />
       </Container>
     </div>

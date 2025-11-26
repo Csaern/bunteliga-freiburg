@@ -13,68 +13,68 @@ const tableService = require('./tableService');
  * Wandelt einen Datums-String (YYYY-MM-DD) sicher in ein Firestore Timestamp-Objekt um.
  */
 const safeCreateTimestampFromString = (dateString) => {
-  if (!dateString || typeof dateString !== 'string') return null;
-  const parts = dateString.split('T')[0].split('-');
-  if (parts.length !== 3) return null;
-  const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1;
-  const day = parseInt(parts[2], 10);
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
-  const utcDate = new Date(Date.UTC(year, month, day));
-  return admin.firestore.Timestamp.fromDate(utcDate);
+    if (!dateString || typeof dateString !== 'string') return null;
+    const parts = dateString.split('T')[0].split('-');
+    if (parts.length !== 3) return null;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+    const utcDate = new Date(Date.UTC(year, month, day));
+    return admin.firestore.Timestamp.fromDate(utcDate);
 };
 
 async function getAllSeasons() {
-  const snapshot = await seasonsCollection.orderBy('name', 'desc').get();
-  if (snapshot.empty) return [];
-  return snapshot.docs.map(doc => {
-    const data = doc.data();
+    const snapshot = await seasonsCollection.orderBy('name', 'desc').get();
+    if (snapshot.empty) return [];
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
 
-    // FINALE KORREKTUR: Robuste Prüfung, um den ".toDate is not a function"-Fehler zu beheben.
-    // Diese Funktion prüft, ob das Feld ein gültiger Timestamp ist, bevor es konvertiert wird.
-    const formattedData = {
-      ...data,
-      startDate: (data.startDate && typeof data.startDate.toDate === 'function') 
-                   ? data.startDate.toDate().toISOString().split('T')[0] 
-                   : null,
-      endDate: (data.endDate && typeof data.endDate.toDate === 'function') 
-                 ? data.endDate.toDate().toISOString().split('T')[0] 
-                 : null,
-      createdAt: (data.createdAt && typeof data.createdAt.toDate === 'function') 
-                   ? data.createdAt.toDate().toISOString() 
-                   : null,
-      updatedAt: (data.updatedAt && typeof data.updatedAt.toDate === 'function') 
-                   ? data.updatedAt.toDate().toISOString() 
-                   : null,
-    };
-    return { id: doc.id, ...formattedData };
-  });
+        // FINALE KORREKTUR: Robuste Prüfung, um den ".toDate is not a function"-Fehler zu beheben.
+        // Diese Funktion prüft, ob das Feld ein gültiger Timestamp ist, bevor es konvertiert wird.
+        const formattedData = {
+            ...data,
+            startDate: (data.startDate && typeof data.startDate.toDate === 'function')
+                ? data.startDate.toDate().toISOString().split('T')[0]
+                : null,
+            endDate: (data.endDate && typeof data.endDate.toDate === 'function')
+                ? data.endDate.toDate().toISOString().split('T')[0]
+                : null,
+            createdAt: (data.createdAt && typeof data.createdAt.toDate === 'function')
+                ? data.createdAt.toDate().toISOString()
+                : null,
+            updatedAt: (data.updatedAt && typeof data.updatedAt.toDate === 'function')
+                ? data.updatedAt.toDate().toISOString()
+                : null,
+        };
+        return { id: doc.id, ...formattedData };
+    });
 }
 
 async function createSeason(seasonData) {
-  if (seasonData.teams && seasonData.teams.length > 0) {
-    const teamPromises = seasonData.teams.map(team => teamsCollection.doc(team.id).get());
-    const teamSnapshots = await Promise.all(teamPromises);
-    const missingTeams = teamSnapshots.map((doc, i) => !doc.exists ? seasonData.teams[i].id : null).filter(Boolean);
-    if (missingTeams.length > 0) {
-      throw new Error(`Folgende Teams wurden nicht gefunden: ${missingTeams.join(', ')}`);
+    if (seasonData.teams && seasonData.teams.length > 0) {
+        const teamPromises = seasonData.teams.map(team => teamsCollection.doc(team.id).get());
+        const teamSnapshots = await Promise.all(teamPromises);
+        const missingTeams = teamSnapshots.map((doc, i) => !doc.exists ? seasonData.teams[i].id : null).filter(Boolean);
+        if (missingTeams.length > 0) {
+            throw new Error(`Folgende Teams wurden nicht gefunden: ${missingTeams.join(', ')}`);
+        }
     }
-  }
 
-  const processedData = {
-    ...seasonData,
-    startDate: safeCreateTimestampFromString(seasonData.startDate),
-    endDate: safeCreateTimestampFromString(seasonData.endDate),
-  };
+    const processedData = {
+        ...seasonData,
+        startDate: safeCreateTimestampFromString(seasonData.startDate),
+        endDate: safeCreateTimestampFromString(seasonData.endDate),
+    };
 
-  const newSeason = new Season(processedData);
-  const firestoreObject = newSeason.toFirestoreObject();
-  
-  firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
-  firestoreObject.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    const newSeason = new Season(processedData);
+    const firestoreObject = newSeason.toFirestoreObject();
 
-  const docRef = await seasonsCollection.add(firestoreObject);
-  return { id: docRef.id, ...firestoreObject };
+    firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    firestoreObject.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+    const docRef = await seasonsCollection.add(firestoreObject);
+    return { id: docRef.id, ...firestoreObject };
 }
 
 async function updateSeason(seasonId, updateData) {
@@ -82,14 +82,14 @@ async function updateSeason(seasonId, updateData) {
     const allowedUpdates = { ...updateData };
     delete allowedUpdates.id;
     delete allowedUpdates.createdBy;
-    
+
     if (allowedUpdates.hasOwnProperty('startDate')) {
         allowedUpdates.startDate = safeCreateTimestampFromString(allowedUpdates.startDate);
     }
     if (allowedUpdates.hasOwnProperty('endDate')) {
         allowedUpdates.endDate = safeCreateTimestampFromString(allowedUpdates.endDate);
     }
-    
+
     allowedUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await seasonRef.update(allowedUpdates);
     return { message: 'Saison erfolgreich aktualisiert.' };
@@ -99,9 +99,9 @@ async function updateSeason(seasonId, updateData) {
  * Ruft eine einzelne Saison anhand ihrer ID ab.
  */
 async function getSeasonById(seasonId) {
-  const doc = await seasonsCollection.doc(seasonId).get();
-  if (!doc.exists) throw new Error('Saison nicht gefunden.');
-  return { id: doc.id, ...doc.data() };
+    const doc = await seasonsCollection.doc(seasonId).get();
+    if (!doc.exists) throw new Error('Saison nicht gefunden.');
+    return { id: doc.id, ...doc.data() };
 }
 
 /**
@@ -141,10 +141,10 @@ async function finishSeason(seasonId, adminUid) {
         throw new Error('Saison nicht gefunden.');
     }
     const seasonData = doc.data();
-    if (seasonData.status !== 'active') {
-        throw new Error('Nur aktive Saisons können beendet werden.');
+    if (seasonData.status !== 'active' && seasonData.status !== 'inactive') {
+        throw new Error('Nur aktive oder inaktive Saisons können beendet werden.');
     }
-    
+
     await seasonRef.update({
         status: 'finished',
         isFinished: true,
@@ -152,7 +152,7 @@ async function finishSeason(seasonId, adminUid) {
         finishedBy: adminUid,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     return { message: 'Saison erfolgreich beendet.' };
 }
 
@@ -167,28 +167,29 @@ async function setCurrentSeason(seasonId) {
         throw new Error('Saison nicht gefunden.');
     }
     const seasonData = doc.data();
-    if (seasonData.status !== 'planning') {
-        throw new Error('Nur Saisons in Planung können aktiviert werden.');
+    if (seasonData.status !== 'planning' && seasonData.status !== 'inactive') {
+        throw new Error('Nur Saisons in Planung oder inaktive Saisons können aktiviert werden.');
     }
-    
-    // Setze alle anderen aktiven Saisons auf 'finished'
+
+    // Setze alle anderen aktiven Saisons auf 'inactive'
     const activeSeasons = await seasonsCollection.where('status', '==', 'active').get();
     const batch = db.batch();
-    
+
     activeSeasons.docs.forEach(activeDoc => {
         batch.update(activeDoc.ref, {
-            status: 'finished',
+            status: 'inactive',
+            isCurrent: false,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
     });
-    
+
     // Setze die neue Saison auf 'active'
     batch.update(seasonRef, {
         status: 'active',
         isCurrent: true,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     await batch.commit();
     return { message: 'Saison erfolgreich aktiviert.' };
 }
@@ -203,15 +204,15 @@ async function archiveSeason(seasonId) {
         throw new Error('Saison nicht gefunden.');
     }
     const seasonData = doc.data();
-    if (seasonData.status !== 'finished' && seasonData.status !== 'planning') {
-        throw new Error('Nur beendete oder geplante Saisons können archiviert werden.');
+    if (seasonData.status !== 'finished' && seasonData.status !== 'planning' && seasonData.status !== 'inactive') {
+        throw new Error('Nur beendete, geplante oder inaktive Saisons können archiviert werden.');
     }
-    
+
     await seasonRef.update({
         status: 'archived',
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     return { message: 'Saison erfolgreich archiviert.' };
 }
 
@@ -225,8 +226,8 @@ async function evaluateSeason(seasonId, adminUid) {
         throw new Error('Saison nicht gefunden.');
     }
     const seasonData = doc.data();
-    if (seasonData.status !== 'active') {
-        throw new Error('Nur aktive Saisons können abgerechnet werden.');
+    if (seasonData.status !== 'active' && seasonData.status !== 'inactive') {
+        throw new Error('Nur aktive oder inaktive Saisons können abgerechnet werden.');
     }
     if (seasonData.evaluated === true) {
         throw new Error('Saison wurde bereits abgerechnet.');
@@ -240,14 +241,14 @@ async function evaluateSeason(seasonId, adminUid) {
             await applySeasonStatsToAllTimeTable(seasonId, seasonData, seasonTeams);
         }
     }
-    
+
     await seasonRef.update({
         evaluated: true,
         evaluatedAt: admin.firestore.FieldValue.serverTimestamp(),
         evaluatedBy: adminUid,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     return { message: 'Saison erfolgreich abgerechnet.' };
 }
 
@@ -356,29 +357,29 @@ async function deleteSeasonWithAllData(seasonId, adminUid) {
     if (!doc.exists) {
         throw new Error('Saison nicht gefunden.');
     }
-    
+
     // Verwende eine Batch-Operation für atomare Löschung
     const batch = db.batch();
-    
+
     // 1. Lösche alle Ergebnisse dieser Saison
     const resultsSnapshot = await resultsCollection.where('seasonId', '==', seasonId).get();
     resultsSnapshot.docs.forEach(doc => {
         batch.delete(doc.ref);
     });
-    
+
     // 2. Lösche alle Buchungen dieser Saison
     const bookingsSnapshot = await bookingsCollection.where('seasonId', '==', seasonId).get();
     bookingsSnapshot.docs.forEach(doc => {
         batch.delete(doc.ref);
     });
-    
+
     // 3. Lösche die Saison selbst
     batch.delete(seasonRef);
-    
+
     // Führe alle Löschungen in einer Transaktion aus
     await batch.commit();
-    
-    return { 
+
+    return {
         message: 'Saison und alle zugehörigen Daten erfolgreich gelöscht.',
         deletedResults: resultsSnapshot.size,
         deletedBookings: bookingsSnapshot.size

@@ -152,7 +152,7 @@ router.post('/:bookingId/action', checkAuth, async (req, res) => {
             return res.status(400).json({ message: 'Kein Team dem Benutzer zugeordnet.' });
         }
 
-        const result = await BookingService.handleBookingAction(bookingId, actingTeamId, action, reason);
+        const result = await BookingService.respondToBookingRequest(bookingId, action, reason, actingTeamId);
         res.status(200).json(result);
     } catch (error) {
         res.status(400).json({ message: error.message });

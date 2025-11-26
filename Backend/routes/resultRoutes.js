@@ -85,6 +85,19 @@ router.post('/:resultId/action', checkAuth, async (req, res) => {
     }
 });
 
+// Ein Team zieht eine Ergebnismeldung zurück
+// POST /api/results/:resultId/cancel
+router.post('/:resultId/cancel', checkAuth, async (req, res) => {
+    try {
+        const { resultId } = req.params;
+        const { actingTeamId } = req.body;
+        const result = await resultService.cancelReport(resultId, actingTeamId);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
 // Alle strittigen Ergebnisse abrufen
 router.get('/disputed', checkAuth, checkAdmin, async (req, res) => {
     try {

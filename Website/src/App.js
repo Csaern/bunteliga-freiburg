@@ -28,6 +28,7 @@ import LoginPage from './pages/LoginPage';
 import AdminBoard from './pages/AdminBoard';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import DashboardPage from './pages/DashboardPage';
+import TeamPage from './pages/TeamPage';
 import TeamDetailPage from './pages/TeamDetailPage';
 import GameManagementPage from './pages/GameManagementPage';
 
@@ -59,7 +60,7 @@ function App() {
               <Route path="/admin" element={<AdminDashboard />} />
 
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/board" element={<UserBoard />} />
+              {/* <Route path="/board" element={<UserBoard />} /> */}
               <Route path="/historie" element={<HistoryPage />} />
               <Route path="/kontakt" element={<ContactPage />} />
               <Route path="/teams" element={<TeamsPage />} />
@@ -69,7 +70,7 @@ function App() {
               <Route path="/regeln" element={<RulesPage />} />
               <Route path="/team" element={<TeamPage />} />
               <Route path="/team/:teamId" element={<TeamDetailPage />} />
-              <Route path="/ergebnis-bestaetigen" element={<ResultConfirmationPage />} />
+              {/* <Route path="/ergebnis-bestaetigen" element={<ResultConfirmationPage />} /> */}
               <Route path="/spiel-verwaltung" element={<GameManagementPage />} />
 
               {/* Die Catch-all Route muss immer am Ende stehen */}

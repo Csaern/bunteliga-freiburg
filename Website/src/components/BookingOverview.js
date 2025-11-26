@@ -143,13 +143,12 @@ const BookingOverview = () => {
     setSubmitting(true);
     try {
       // Anfrage an Backend: vorhandenen Slot anfragen
-      await bookingApi.requestBookingSlot(selectedSlot.id, {
-        homeTeamId: teamId,
-        awayTeamId: awayTeam,
-        seasonId: currentSeason.id,
-        userId: currentUser?.uid || 'anonymous',
-        friendly: isFriendlyGame
-      });
+      await bookingApi.requestBookingSlot(
+        selectedSlot.id,
+        teamId,
+        awayTeam,
+        isFriendlyGame
+      );
 
       setNotification({ open: true, message: "Buchung erfolgreich! Warte auf Bestätigung des Gegners.", severity: 'success' });
       setSelectedSlot(null);
@@ -167,16 +166,14 @@ const BookingOverview = () => {
     }
   };
 
-
-
   const getPitchName = (pitchId) => {
-    const pitch = data.pitches.find(p => p.id === pitchId);
+    const pitch = data.pitches?.find(p => p.id === pitchId);
     return pitch ? pitch.name : 'Unbekannter Platz';
   };
 
   const getTeamName = (teamId) => {
     if (!teamId) return null;
-    const team = data.teams[teamId];
+    const team = data.teams?.[teamId];
     return team || 'Unbekannt';
   };
 

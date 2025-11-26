@@ -39,6 +39,7 @@ const StatusIndicator = ({ status }) => {
         active: theme.palette.success.main,
         finished: theme.palette.error.main,
         planning: theme.palette.grey[700],
+        inactive: theme.palette.warning.main,
     }[status] || theme.palette.grey[700];
     return <Box sx={{ width: 12, height: 12, backgroundColor: color, borderRadius: '50%' }} />;
 };
@@ -78,7 +79,7 @@ const SeasonManager = () => {
     const [allTeams, setAllTeams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState('view');
     const [selectedSeason, setSelectedSeason] = useState(null);
@@ -173,16 +174,16 @@ const SeasonManager = () => {
                     const results = await resultApiService.getResultsForSeason(seasonId);
                     // Nur bestätigte und gültige Ergebnisse zählen
                     const validResults = results.filter(r => r.status === 'confirmed' && r.isValid !== false);
-                    
+
                     // Nur aktive Teams berücksichtigen
                     const activeTeams = season.teams.filter(team => team.status !== 'inactive');
-                    
+
                     // Zähle Spiele pro Team (nur für aktive Teams)
                     const gamesPerTeam = {};
                     activeTeams.forEach(team => {
                         gamesPerTeam[team.id] = 0;
                     });
-                    
+
                     validResults.forEach(result => {
                         if (result.homeTeamId && gamesPerTeam[result.homeTeamId] !== undefined) {
                             gamesPerTeam[result.homeTeamId]++;
@@ -191,10 +192,10 @@ const SeasonManager = () => {
                             gamesPerTeam[result.awayTeamId]++;
                         }
                     });
-                    
+
                     // Berechne Minimum (Anzahl aktiver Teams / 2, aufgerundet)
                     const minGames = Math.ceil(activeTeams.length / 2);
-                    
+
                     // Finde Teams unter dem Minimum (nur aktive Teams)
                     const teamsBelowMin = activeTeams
                         .filter(team => gamesPerTeam[team.id] < minGames)
@@ -203,7 +204,7 @@ const SeasonManager = () => {
                             name: team.name,
                             gamesPlayed: gamesPerTeam[team.id]
                         }));
-                    
+
                     setTeamsBelowMinimum(teamsBelowMin);
                     setActionToConfirm({ action, seasonId, seasonName: season.name });
                     setIsConfirmModalOpen(true);
@@ -220,22 +221,22 @@ const SeasonManager = () => {
     // Funktion 2: Ergebnisse von Teams unter Minimum als ungültig markieren
     const markResultsAsInvalid = async (seasonId, teamIds) => {
         if (!teamIds || teamIds.length === 0) return;
-        
+
         try {
             // Lade alle Ergebnisse der Saison
             const results = await resultApiService.getResultsForSeason(seasonId);
-            
+
             // Finde alle Ergebnisse, die diese Teams betreffen
-            const resultsToInvalidate = results.filter(result => 
+            const resultsToInvalidate = results.filter(result =>
                 (teamIds.includes(result.homeTeamId) || teamIds.includes(result.awayTeamId)) &&
                 result.status === 'confirmed'
             );
-            
+
             // Markiere jedes Ergebnis als ungültig
             const updatePromises = resultsToInvalidate.map(result =>
                 resultApiService.adminUpdateResult(result.id, { isValid: false })
             );
-            
+
             await Promise.all(updatePromises);
         } catch (err) {
             throw new Error('Fehler beim Markieren der Ergebnisse: ' + err.message);
@@ -247,23 +248,23 @@ const SeasonManager = () => {
         const { action, seasonId } = actionToConfirm;
         try {
             switch (action) {
-                case 'activate': 
-                    await seasonApiService.setCurrentSeason(seasonId); 
+                case 'activate':
+                    await seasonApiService.setCurrentSeason(seasonId);
                     break;
-                case 'finish': 
+                case 'finish':
                     // Markiere Ergebnisse von Teams unter Minimum als ungültig
                     if (teamsBelowMinimum.length > 0) {
                         const teamIds = teamsBelowMinimum.map(t => t.id);
                         await markResultsAsInvalid(seasonId, teamIds);
                     }
-                    
+
                     // TODO: Später aktivieren - addToEternalTable(seasonId);
-                    
+
                     // Rechne die Saison ab (setzt evaluated = true, Status bleibt active)
-                    await seasonApiService.evaluateSeason(seasonId); 
+                    await seasonApiService.evaluateSeason(seasonId);
                     break;
-                case 'archive': 
-                    await seasonApiService.archiveSeason(seasonId); 
+                case 'archive':
+                    await seasonApiService.archiveSeason(seasonId);
                     break;
                 case 'delete':
                     await seasonApiService.deleteSeason(seasonId);
@@ -330,7 +331,7 @@ const SeasonManager = () => {
                                         <List sx={{ bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1, mb: 3, maxHeight: '200px', overflow: 'auto' }}>
                                             {teamsBelowMinimum.map(team => (
                                                 <ListItem key={team.id}>
-                                                    <ListItemText 
+                                                    <ListItemText
                                                         primary={team.name}
                                                         secondary={`${team.gamesPlayed} Spiele gespielt`}
                                                         primaryTypographyProps={{ sx: { color: 'grey.200' } }}
@@ -359,19 +360,19 @@ const SeasonManager = () => {
                                 </Typography>
                                 <List sx={{ bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1, mb: 3 }}>
                                     <ListItem>
-                                        <ListItemText 
+                                        <ListItemText
                                             primary="Die Saison selbst"
                                             primaryTypographyProps={{ sx: { color: 'grey.200' } }}
                                         />
                                     </ListItem>
                                     <ListItem>
-                                        <ListItemText 
+                                        <ListItemText
                                             primary="Alle Ergebnisse dieser Saison"
                                             primaryTypographyProps={{ sx: { color: 'grey.200' } }}
                                         />
                                     </ListItem>
                                     <ListItem>
-                                        <ListItemText 
+                                        <ListItemText
                                             primary="Alle Spielbuchungen dieser Saison"
                                             primaryTypographyProps={{ sx: { color: 'grey.200' } }}
                                         />
@@ -380,9 +381,8 @@ const SeasonManager = () => {
                             </>
                         ) : (
                             <Typography sx={{ color: 'grey.300', mb: 3 }}>
-                                {`Möchtest du die Aktion "${
-                                    { activate: 'Aktivieren', archive: 'Archivieren' }[actionToConfirm.action]
-                                }" für die Saison "${actionToConfirm.seasonName}" wirklich durchführen?`}
+                                {`Möchtest du die Aktion "${{ activate: 'Aktivieren', archive: 'Archivieren' }[actionToConfirm.action]
+                                    }" für die Saison "${actionToConfirm.seasonName}" wirklich durchführen?`}
                             </Typography>
                         )}
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
@@ -392,10 +392,10 @@ const SeasonManager = () => {
                             }} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
                                 Abbrechen
                             </Button>
-                            <Button 
-                                variant="contained" 
-                                onClick={handleConfirmAction} 
-                                sx={{ 
+                            <Button
+                                variant="contained"
+                                onClick={handleConfirmAction}
+                                sx={{
                                     backgroundColor: actionToConfirm.action === 'delete' ? 'error.main' : '#00A99D',
                                     '&:hover': {
                                         backgroundColor: actionToConfirm.action === 'delete' ? 'error.dark' : '#00897B'
@@ -514,22 +514,22 @@ const SeasonManager = () => {
                                     <Box onClick={e => e.stopPropagation()} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                                         <Tooltip title={season.evaluated ? "Saison wurde bereits abgerechnet" : "Saison abrechnen"}>
                                             <span>
-                                                <IconButton onClick={() => handleActionRequest('finish', season.id)} disabled={season.status !== 'active' || season.evaluated === true}>
-                                                    <StopCircleOutlinedIcon sx={{ color: (season.status === 'active' && season.evaluated !== true) ? 'warning.light' : 'grey.800' }} />
+                                                <IconButton onClick={() => handleActionRequest('finish', season.id)} disabled={(season.status !== 'active' && season.status !== 'inactive') || season.evaluated === true}>
+                                                    <StopCircleOutlinedIcon sx={{ color: ((season.status === 'active' || season.status === 'inactive') && season.evaluated !== true) ? 'warning.light' : 'grey.800' }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
-                                        <Tooltip title={season.status === 'planning' ? "Saison aktivieren" : "Nur Saisons in Planung können aktiviert werden"}>
+                                        <Tooltip title={season.status === 'planning' || season.status === 'inactive' ? "Saison aktivieren" : "Nur Saisons in Planung oder inaktive Saisons können aktiviert werden"}>
                                             <span>
-                                                <IconButton onClick={() => handleActionRequest('activate', season.id)} disabled={season.status !== 'planning'}>
-                                                    <PlayCircleOutlineIcon sx={{ color: season.status === 'planning' ? 'success.light' : 'grey.800' }} />
+                                                <IconButton onClick={() => handleActionRequest('activate', season.id)} disabled={season.status !== 'planning' && season.status !== 'inactive'}>
+                                                    <PlayCircleOutlineIcon sx={{ color: season.status === 'planning' || season.status === 'inactive' ? 'success.light' : 'grey.800' }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
                                         <Tooltip title="Saison archivieren">
                                             <span>
-                                                <IconButton onClick={() => handleActionRequest('archive', season.id)} disabled={season.status !== 'finished' && season.status !== 'planning'}>
-                                                    <ArchiveOutlinedIcon sx={{ color: season.status === 'finished' || season.status === 'planning' ? 'error.light' : 'grey.800' }} />
+                                                <IconButton onClick={() => handleActionRequest('archive', season.id)} disabled={season.status !== 'finished' && season.status !== 'planning' && season.status !== 'inactive'}>
+                                                    <ArchiveOutlinedIcon sx={{ color: season.status === 'finished' || season.status === 'planning' || season.status === 'inactive' ? 'error.light' : 'grey.800' }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>

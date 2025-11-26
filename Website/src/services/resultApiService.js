@@ -34,3 +34,8 @@ export const getPendingResultsForMyTeam = async () => {
 export const respondToResultAction = async (resultId, actingTeamId, action, reason = '') => {
     return apiClient(`/api/results/${resultId}/action`, 'POST', { actingTeamId, action, reason });
 };
+
+// Team zieht eine Ergebnismeldung zurück
+export const cancelReport = async (resultId, actingTeamId) => {
+    return apiClient(`/api/results/${resultId}/cancel`, 'POST', { actingTeamId });
+};

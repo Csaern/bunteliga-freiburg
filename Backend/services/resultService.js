@@ -3,7 +3,7 @@ const Result = require('../models/result');
 const db = admin.firestore();
 const resultsCollection = db.collection('results');
 const teamsCollection = db.collection('teams');
-const seasonsCollection = db.collection('seasons'); // Referenz zu Saisons hinzufügen
+const seasonsCollection = db.collection('seasons');
 const bookingsCollection = db.collection('bookings');
 const { checkCaptainOfActingTeam } = require('../middleware/permissionMiddleware');
 
@@ -35,8 +35,8 @@ async function createForfeitResult({ seasonId, winningTeamId, losingTeamId, book
     homeTeamName: winningTeamName,
     awayTeamId: losingTeamId,
     awayTeamName: losingTeamName,
-    homeScore: winScore, // Dynamischer Wert
-    awayScore: lossScore, // Dynamischer Wert
+    homeScore: winScore,
+    awayScore: lossScore,
     seasonId: seasonId,
     reportedByTeamId: 'system_forfeit',
     reportedByUserId: 'system',
@@ -83,7 +83,7 @@ async function reportResult(bookingId, resultData) {
       awayTeamName: awayTeamDoc.data().name,
       seasonId: bookingData.seasonId,
       bookingId: bookingId,
-      friendly: bookingData.friendly || false, // NEU: Übernehme Friendly-Status
+      friendly: bookingData.friendly || false,
     });
 
     const firestoreObject = newResult.toFirestoreObject();
@@ -105,8 +105,53 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
   if (!resultDoc.exists || resultDoc.data().status !== 'pending') {
     throw new Error('Diese Aktion ist für dieses Ergebnis nicht möglich.');
   }
+
+  // Wenn das meldende Team agiert (nur 'reject' erlaubt, um zu stornieren/löschen)
   if (resultDoc.data().reportedByTeamId === actingTeamId) {
-    throw new Error('Du kannst dein eigenes Ergebnis nicht bestätigen oder ablehnen.');
+    if (action === 'reject') {
+      // Wenn abgelehnt wird (hier als Stornierung interpretiert), löschen wir das Ergebnis und setzen die Buchung zurück.
+      return db.runTransaction(async (transaction) => {
+        let bookingRef = null;
+        if (resultDoc.data().bookingId) {
+          bookingRef = bookingsCollection.doc(resultDoc.data().bookingId);
+          await transaction.get(bookingRef); // Read before write
+        }
+
+        transaction.delete(resultRef);
+
+        if (bookingRef) {
+          // We already read it, but to be safe and clean in logic we can rely on the fact we have the ref
+          // But inside transaction we need to use transaction methods.
+          // Since we read it, we can update it.
+          // Note: We don't need to re-read if we don't use the data, but we need to check status.
+          // The first read gave us the doc snapshot implicitly if we assigned it, but here we just awaited.
+          // Let's do it properly:
+          // We already did the read. Now we update.
+          transaction.update(bookingRef, { status: 'confirmed' });
+        }
+        return { message: 'Ergebnis zurückgezogen. Es kann nun neu gemeldet werden.' };
+      });
+    }
+    throw new Error('Du kannst dein eigenes Ergebnis nicht bestätigen.');
+  }
+
+  // Wenn das gegnerische Team agiert
+  if (action === 'reject') {
+    // Ablehnung durch Gegner -> Ergebnis löschen, Buchung resetten
+    return db.runTransaction(async (transaction) => {
+      let bookingRef = null;
+      if (resultDoc.data().bookingId) {
+        bookingRef = bookingsCollection.doc(resultDoc.data().bookingId);
+        await transaction.get(bookingRef); // Read before write
+      }
+
+      transaction.delete(resultRef);
+
+      if (bookingRef) {
+        transaction.update(bookingRef, { status: 'confirmed' });
+      }
+      return { message: 'Ergebnis abgelehnt. Es kann nun neu gemeldet werden.' };
+    });
   }
 
   if (action === 'confirm') {
@@ -119,17 +164,55 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
     return { message: 'Ergebnis erfolgreich bestätigt.' };
   }
 
-  if (action === 'reject') {
+  if (action === 'dispute') {
     await resultRef.update({
       status: 'disputed',
-      rejectedByTeamId: actingTeamId,
-      rejectedByUserId: actingUserId,
-      rejectionReason: reason,
-      rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      disputedReason: reason,
+      disputedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    return { message: 'Ergebnis abgelehnt und zur Prüfung an den Admin weitergeleitet.' };
+    return { message: 'Ergebnis angefochten. Ein Admin wird benachrichtigt.' };
   }
+
   throw new Error('Ungültige Aktion.');
+}
+
+/**
+ * Ein Team zieht eine Ergebnismeldung zurück (Stornierung).
+ */
+async function cancelReport(resultId, actingTeamId) {
+  const resultRef = resultsCollection.doc(resultId);
+
+  return db.runTransaction(async (transaction) => {
+    const resultDoc = await transaction.get(resultRef);
+    if (!resultDoc.exists) {
+      throw new Error('Ergebnis nicht gefunden.');
+    }
+    const resultData = resultDoc.data();
+
+    if (resultData.status !== 'pending') {
+      throw new Error('Nur ausstehende Ergebnisse können storniert werden.');
+    }
+    if (resultData.reportedByTeamId !== actingTeamId) {
+      throw new Error('Du kannst nur eigene Ergebnismeldungen stornieren.');
+    }
+
+    // Read booking before deleting result
+    let bookingRef = null;
+    if (resultData.bookingId) {
+      bookingRef = bookingsCollection.doc(resultData.bookingId);
+      await transaction.get(bookingRef);
+    }
+
+    // 1. Ergebnis löschen
+    transaction.delete(resultRef);
+
+    // 2. Buchung zurücksetzen (falls vorhanden)
+    if (bookingRef) {
+      transaction.update(bookingRef, { status: 'confirmed' });
+    }
+
+    return { message: 'Ergebnismeldung erfolgreich zurückgezogen.' };
+  });
 }
 
 /**
@@ -162,7 +245,7 @@ async function getResultsForTeam(teamId) {
 async function getRecentResults(limitNum = 5) {
   const snapshot = await resultsCollection
     .where('status', '==', 'confirmed')
-    .orderBy('confirmedAt', 'desc') // Sortiert nach dem Bestätigungsdatum
+    .orderBy('confirmedAt', 'desc')
     .limit(limitNum)
     .get();
 
@@ -176,7 +259,6 @@ async function getRecentResults(limitNum = 5) {
  * Holt alle Ergebnisse für eine bestimmte Saison.
  */
 async function getResultsForSeason(seasonId) {
-  // KORREKTUR: Wir entfernen die .orderBy()-Klausel, um den Index-Zwang zu umgehen.
   const snapshot = await resultsCollection
     .where('seasonId', '==', seasonId)
     .get();
@@ -187,12 +269,10 @@ async function getResultsForSeason(seasonId) {
 
   const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // KORREKTUR: Die Sortierung der Ergebnisse erfolgt jetzt hier im Backend-Code.
-  // Wir sortieren absteigend nach dem Meldedatum (neueste zuerst).
   results.sort((a, b) => {
     const dateA = a.reportedAt?.toDate ? a.reportedAt.toDate() : new Date(0);
     const dateB = b.reportedAt?.toDate ? b.reportedAt.toDate() : new Date(0);
-    return dateB - dateA; // Neuestes Datum zuerst
+    return dateB - dateA;
   });
 
   return results;
@@ -212,13 +292,10 @@ async function updateResult(resultId, updateData, user) {
   const resultDoc = await resultRef.get();
   if (!resultDoc.exists) throw new Error('Ergebnis nicht gefunden.');
 
-  // TODO: Hier könnte eine zusätzliche Berechtigungsprüfung stattfinden,
-  // ob der 'user' überhaupt Teil dieses Spiels war.
-
   const payload = {
     homeScore: parseInt(homeScore),
     awayScore: parseInt(awayScore),
-    status: 'pending', // Wichtig: Status wird zurückgesetzt
+    status: 'pending',
     editedBy: user.uid,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -247,35 +324,27 @@ async function adminOverrideResult(resultId, scores, adminUid) {
  * Ruft Ergebnisse für ein bestimmtes Team mit einem bestimmten Status ab.
  */
 async function getResultsByStatusForTeam(teamId, status) {
-  // Ein Team muss auf ein Ergebnis reagieren, wenn es nicht der Melder war.
   const snapshot = await resultsCollection
     .where('status', '==', status)
-    // Firestore kann leider nicht auf "ungleich" filtern.
-    // Wir holen alle 'pending' und filtern im Code.
     .get();
 
   if (snapshot.empty) return [];
 
   const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // Filtere serverseitig, um nur die Ergebnisse zu liefern, bei denen das Team reagieren muss.
   return results.filter(result => {
-    const reportedByTeamId = result.reportedByTeamId || result.reportedBy;
     const isHomeTeam = result.homeTeamId === teamId;
     const isAwayTeam = result.awayTeamId === teamId;
-    const wasReportedByThisTeam = reportedByTeamId === teamId;
 
     if (!isHomeTeam && !isAwayTeam) {
       return false;
     }
-
-    return !wasReportedByThisTeam;
+    return true;
   });
 }
 
 /**
  * NEU: Admin erstellt ein Ergebnis, das sofort bestätigt wird.
- * Optional wird eine zugehörige Buchung als 'gespielt' markiert.
  */
 async function adminCreateResult(resultData, adminUid) {
   const { homeTeamId, awayTeamId, homeScore, awayScore, seasonId, bookingId } = resultData;
@@ -297,7 +366,7 @@ async function adminCreateResult(resultData, adminUid) {
     awayScore: parseInt(awayScore),
     seasonId,
     bookingId: bookingId || null,
-    status: 'confirmed', // Admin-Erstellung ist sofort bestätigt
+    status: 'confirmed',
     reportedBy: 'admin',
     reportedByUserId: adminUid,
     reportedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -338,7 +407,6 @@ async function adminUpdateResult(resultId, updateData, adminUid) {
     updatedBy: adminUid,
   };
 
-  // Nur Felder hinzufügen, die tatsächlich übergeben wurden
   if (homeScore !== undefined) payload.homeScore = parseInt(homeScore);
   if (awayScore !== undefined) payload.awayScore = parseInt(awayScore);
   if (homeTeamId) payload.homeTeamId = homeTeamId;
@@ -382,11 +450,11 @@ async function adminDeleteResult(resultId) {
   });
 }
 
-
 module.exports = {
   createForfeitResult,
   reportResult,
   handleResultAction,
+  cancelReport,
   getDisputedResults,
   getResultsForTeam,
   getRecentResults,
@@ -394,7 +462,6 @@ module.exports = {
   updateResult,
   adminOverrideResult,
   getResultsByStatusForTeam,
-  // NEU
   adminCreateResult,
   adminUpdateResult,
   adminDeleteResult,

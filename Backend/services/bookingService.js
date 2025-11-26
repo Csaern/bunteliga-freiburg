@@ -406,8 +406,55 @@ class BookingService {
         const bookingRef = bookingsCollection.doc(bookingId);
         const bookingDoc = await bookingRef.get();
 
-        if (!bookingDoc.exists || bookingData.status !== 'pending_away_confirm' || bookingData.awayTeamId !== actingTeamId) {
-            throw new Error('Diese Aktion kann nicht ausgeführt werden.');
+        if (!bookingDoc.exists) {
+            throw new Error('Buchung nicht gefunden.');
+        }
+        const bookingData = bookingDoc.data();
+
+        // Prüfe, ob der Slot verfügbar ist
+        const isAvailable = bookingData.status === 'available' || (bookingData.isAvailable === true && !bookingData.homeTeamId && !bookingData.awayTeamId);
+        if (!isAvailable) {
+            throw new Error('Dieser Termin ist nicht mehr verfügbar.');
+        }
+
+        // Saison-Regeln prüfen (nur wenn kein Freundschaftsspiel)
+        if (!friendly) {
+            await BookingService._checkSeasonRulesForPairing(homeTeamId, awayTeamId, bookingData.seasonId);
+        }
+
+        // Status setzen: Wenn Auswärtsmannschaft dabei ist, muss sie bestätigen
+        const status = awayTeamId ? 'pending_away_confirm' : 'confirmed';
+
+        await bookingRef.update({
+            homeTeamId,
+            awayTeamId,
+            status,
+            friendly,
+            requestedBy: requestingUserId,
+            requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return { message: 'Buchung erfolgreich angefragt.' };
+    }
+
+    /**
+     * Team reagiert auf eine Spielanfrage (annehmen/ablehnen).
+     */
+    static async respondToBookingRequest(bookingId, action, reason = '', actingTeamId) {
+        const bookingRef = bookingsCollection.doc(bookingId);
+        const bookingDoc = await bookingRef.get();
+
+        if (!bookingDoc.exists) {
+            throw new Error('Buchung nicht gefunden.');
+        }
+        const bookingData = bookingDoc.data();
+
+        if (bookingData.status !== 'pending_away_confirm') {
+            throw new Error('Es liegt keine offene Anfrage für dieses Spiel vor.');
+        }
+
+        if (bookingData.awayTeamId !== actingTeamId) {
+            throw new Error('Nur das Auswärtsteam kann diese Anfrage beantworten.');
         }
 
         if (action === 'confirm') {
@@ -420,35 +467,15 @@ class BookingService {
 
         if (action === 'deny') {
             await bookingRef.update({
-                status: 'denied',
+                status: 'available',
+                homeTeamId: null,
+                awayTeamId: null,
+                friendly: false,
                 deniedByTeamId: actingTeamId,
                 deniedAt: admin.firestore.FieldValue.serverTimestamp(),
                 denialReason: reason,
             });
-
-            const seasonDoc = await seasonsCollection.doc(bookingData.seasonId).get();
-            if (!seasonDoc.exists) throw new Error(`Saison nicht gefunden.`);
-
-            const denialLimit = seasonDoc.data().maxDenials || 0;
-
-            if (denialLimit > 0) {
-                const denialsQuery = await bookingsCollection
-                    .where('seasonId', '==', bookingData.seasonId)
-                    .where('deniedByTeamId', '==', actingTeamId)
-                    .get();
-
-                if (denialsQuery.size >= denialLimit) {
-                    await resultService.createForfeitResult({
-                        seasonId: bookingData.seasonId,
-                        winningTeamId: bookingData.homeTeamId,
-                        losingTeamId: actingTeamId,
-                        bookingId: bookingId,
-                    });
-                    return { message: `Anfrage abgelehnt. ACHTUNG: Dies war die ${denialLimit}. Ablehnung, ein Straf-Ergebnis wurde erstellt.` };
-                }
-            }
-
-            return { message: 'Anfrage abgelehnt.' };
+            return { message: 'Anfrage abgelehnt. Der Termin ist wieder frei.' };
         }
 
         throw new Error('Ungültige Aktion.');
@@ -880,6 +907,24 @@ class BookingService {
             const dateB = getTimestampMillis(b.date);
             return dateA - dateB; // Aufsteigend: früheste Spiele zuerst
         });
+
+        // NEU: Platznamen hinzufügen
+        const pitchIds = new Set(bookings.map(b => b.pitchId).filter(Boolean));
+        if (pitchIds.size > 0) {
+            const pitchDocs = await Promise.all(Array.from(pitchIds).map(id => pitchesCollection.doc(id).get()));
+            const pitchMap = new Map();
+            pitchDocs.forEach(doc => {
+                if (doc.exists) {
+                    pitchMap.set(doc.id, doc.data().name);
+                }
+            });
+
+            bookings.forEach(booking => {
+                if (booking.pitchId) {
+                    booking.pitchName = pitchMap.get(booking.pitchId) || 'Unbekannter Platz';
+                }
+            });
+        }
 
         return bookings;
     }

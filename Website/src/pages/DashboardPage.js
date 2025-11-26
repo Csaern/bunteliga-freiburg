@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthProvider';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import TeamSettings from '../components/TeamSettings';
-import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, FormControl, InputLabel, Select, MenuItem, List, ListItem, ListItemIcon, ListItemText, Card, Divider } from '@mui/material';
+import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, FormControl, InputLabel, Select, MenuItem, List, ListItem, ListItemIcon, ListItemText, Card, Divider, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { API_BASE_URL } from '../services/apiClient';
 import { ReusableModal } from '../components/Helpers/modalUtils';
 import * as seasonApi from '../services/seasonApiService';
@@ -33,6 +33,7 @@ const DashboardPage = () => {
   const [pendingGameRequests, setPendingGameRequests] = useState([]);
   const [pendingMyRequests, setPendingMyRequests] = useState([]);
   const [pendingResults, setPendingResults] = useState([]);
+  const [pendingMyResults, setPendingMyResults] = useState([]);
   const [teamsMap, setTeamsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentSeason, setCurrentSeason] = useState(null);
@@ -45,6 +46,36 @@ const DashboardPage = () => {
   const [reportOptions, setReportOptions] = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  // UI State for Notifications and Dialogs
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
+  const [promptDialog, setPromptDialog] = useState({ open: false, title: '', label: '', value: '', onConfirm: null });
+
+  const showSnackbar = (message, severity = 'info') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  const openConfirmDialog = (title, message, onConfirm) => {
+    setConfirmDialog({ open: true, title, message, onConfirm });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog((prev) => ({ ...prev, open: false, onConfirm: null }));
+  };
+
+  const openPromptDialog = (title, label, onConfirm) => {
+    setPromptDialog({ open: true, title, label, value: '', onConfirm });
+  };
+
+  const closePromptDialog = () => {
+    setPromptDialog((prev) => ({ ...prev, open: false, onConfirm: null }));
+  };
 
   const sectionCardSx = {
     borderRadius: 4,
@@ -114,7 +145,12 @@ const DashboardPage = () => {
         // Pending results
         const pendingRes = await resultApi.getPendingResultsForMyTeam().catch(() => []);
         const filteredPendingRes = pendingRes.filter(r => r.seasonId === activeSeason.id && (r.homeTeamId === teamId || r.awayTeamId === teamId));
-        setPendingResults(filteredPendingRes);
+
+        const toConfirm = filteredPendingRes.filter(r => r.reportedByTeamId !== teamId);
+        const myReports = filteredPendingRes.filter(r => r.reportedByTeamId === teamId);
+
+        setPendingResults(toConfirm);
+        setPendingMyResults(myReports);
       }
     } catch (error) {
       console.error("Fehler beim Laden der Dashboard-Daten:", error);
@@ -140,38 +176,42 @@ const DashboardPage = () => {
   const handleAcceptBookingRequest = async (bookingId) => {
     try {
       const response = await bookingApi.respondToBookingRequest(bookingId, 'confirm');
-      alert(response.message || 'Spiel bestätigt!');
+      showSnackbar(response.message || 'Spiel bestätigt!', 'success');
       setPendingGameRequests((prev) => prev.filter((booking) => booking.id !== bookingId));
       fetchData();
     } catch (error) {
-      alert(error.message || 'Fehler beim Bestätigen der Spielanfrage.');
+      showSnackbar(error.message || 'Fehler beim Bestätigen der Spielanfrage.', 'error');
     }
   };
 
   const handleDeclineBookingRequest = async (bookingId) => {
     try {
-      const reason = window.prompt('Optional: Grund für die Ablehnung angeben', '') || '';
-      const response = await bookingApi.respondToBookingRequest(bookingId, 'deny', reason);
-      alert(response.message || 'Anfrage abgelehnt.');
-      setPendingGameRequests((prev) => prev.filter((booking) => booking.id !== bookingId));
-      fetchData();
+      openPromptDialog('Spielanfrage ablehnen', 'Grund für die Ablehnung (optional)', async (reason) => {
+        try {
+          const response = await bookingApi.respondToBookingRequest(bookingId, 'deny', reason);
+          showSnackbar(response.message || 'Anfrage abgelehnt.', 'success');
+          setPendingGameRequests((prev) => prev.filter((booking) => booking.id !== bookingId));
+          fetchData();
+        } catch (error) {
+          showSnackbar(error.message || 'Fehler beim Ablehnen der Spielanfrage.', 'error');
+        }
+      });
     } catch (error) {
-      alert(error.message || 'Fehler beim Ablehnen der Spielanfrage.');
+      console.error(error);
     }
   };
 
   const handleCancelMyRequest = async (bookingId) => {
-    try {
-      const confirmed = window.confirm('Möchten Sie diese Spielanfrage wirklich stornieren?');
-      if (!confirmed) return;
-
-      await bookingApi.cancelBooking(bookingId);
-      alert('Spielanfrage erfolgreich storniert.');
-      setPendingMyRequests((prev) => prev.filter((booking) => booking.id !== bookingId));
-      fetchData();
-    } catch (error) {
-      alert(error.message || 'Fehler beim Stornieren der Spielanfrage.');
-    }
+    openConfirmDialog('Stornierung bestätigen', 'Möchten Sie diese Spielanfrage wirklich stornieren?', async () => {
+      try {
+        await bookingApi.cancelBooking(bookingId);
+        showSnackbar('Spielanfrage erfolgreich storniert.', 'success');
+        setPendingMyRequests((prev) => prev.filter((booking) => booking.id !== bookingId));
+        fetchData();
+      } catch (error) {
+        showSnackbar(error.message || 'Fehler beim Stornieren der Spielanfrage.', 'error');
+      }
+    });
   };
 
   const loadReportOptions = useCallback(async () => {
@@ -222,7 +262,7 @@ const DashboardPage = () => {
       }));
     } catch (error) {
       console.error('Fehler beim Laden der Spiele für die Ergebnismeldung:', error);
-      alert(error.message || 'Fehler beim Laden der Spiele für die Ergebnismeldung.');
+      showSnackbar(error.message || 'Fehler beim Laden der Spiele für die Ergebnismeldung.', 'error');
     } finally {
       setReportLoading(false);
     }
@@ -241,15 +281,15 @@ const DashboardPage = () => {
   const handleReportSubmit = async (e) => {
     e.preventDefault();
     if (!reportForm.bookingId) {
-      alert('Bitte wähle ein Spiel aus.');
+      showSnackbar('Bitte wähle ein Spiel aus.', 'warning');
       return;
     }
     if (reportForm.homeScore === '' || reportForm.awayScore === '') {
-      alert('Bitte gib beide Ergebnisse ein.');
+      showSnackbar('Bitte gib beide Ergebnisse ein.', 'warning');
       return;
     }
     if (!teamId) {
-      alert('Keinem Team zugeordnet.');
+      showSnackbar('Keinem Team zugeordnet.', 'error');
       return;
     }
 
@@ -260,12 +300,12 @@ const DashboardPage = () => {
         awayScore: parseInt(reportForm.awayScore, 10),
         reportedByTeamId: teamId,
       });
-      alert('Ergebnis erfolgreich gemeldet!');
+      showSnackbar('Ergebnis erfolgreich gemeldet!', 'success');
       handleCloseReportModal();
       fetchData();
     } catch (error) {
       console.error('Fehler beim Melden des Ergebnisses:', error);
-      alert(error.message || 'Fehler beim Melden des Ergebnisses.');
+      showSnackbar(error.message || 'Fehler beim Melden des Ergebnisses.', 'error');
     } finally {
       setReportSubmitting(false);
     }
@@ -273,35 +313,50 @@ const DashboardPage = () => {
 
   const handleConfirmPendingResult = async (result) => {
     if (!teamId) {
-      alert('Keinem Team zugeordnet.');
+      showSnackbar('Keinem Team zugeordnet.', 'error');
       return;
     }
     try {
       const response = await resultApi.respondToResultAction(result.id, teamId, 'confirm');
-      alert(response.message || 'Ergebnis bestätigt.');
+      showSnackbar(response.message || 'Ergebnis bestätigt.', 'success');
       setPendingResults(prev => prev.filter(r => r.id !== result.id));
       fetchData();
     } catch (error) {
       console.error('Fehler beim Bestätigen des Ergebnisses:', error);
-      alert(error.message || 'Fehler beim Bestätigen des Ergebnisses.');
+      showSnackbar(error.message || 'Fehler beim Bestätigen des Ergebnisses.', 'error');
     }
   };
 
   const handleRejectPendingResult = async (result) => {
     if (!teamId) {
-      alert('Keinem Team zugeordnet.');
+      showSnackbar('Keinem Team zugeordnet.', 'error');
       return;
     }
-    const reason = window.prompt('Optional: Grund für die Ablehnung angeben', '') || '';
-    try {
-      const response = await resultApi.respondToResultAction(result.id, teamId, 'reject', reason);
-      alert(response.message || 'Ergebnis wurde abgelehnt.');
-      setPendingResults(prev => prev.filter(r => r.id !== result.id));
-      fetchData();
-    } catch (error) {
-      console.error('Fehler beim Ablehnen des Ergebnisses:', error);
-      alert(error.message || 'Fehler beim Ablehnen des Ergebnisses.');
-    }
+    openPromptDialog('Ergebnis ablehnen', 'Grund für die Ablehnung (optional)', async (reason) => {
+      try {
+        const response = await resultApi.respondToResultAction(result.id, teamId, 'reject', reason);
+        showSnackbar(response.message || 'Ergebnis wurde abgelehnt.', 'success');
+        setPendingResults(prev => prev.filter(r => r.id !== result.id));
+        fetchData();
+      } catch (error) {
+        console.error('Fehler beim Ablehnen des Ergebnisses:', error);
+        showSnackbar(error.message || 'Fehler beim Ablehnen des Ergebnisses.', 'error');
+      }
+    });
+  };
+
+  const handleCancelReport = async (resultId) => {
+    openConfirmDialog('Meldung zurückziehen', 'Möchtest du diese Ergebnismeldung wirklich zurückziehen?', async () => {
+      try {
+        await resultApi.cancelReport(resultId, teamId);
+        showSnackbar('Ergebnismeldung zurückgezogen.', 'success');
+        setPendingMyResults(prev => prev.filter(r => r.id !== resultId));
+        fetchData();
+      } catch (error) {
+        console.error('Fehler beim Zurückziehen:', error);
+        showSnackbar(error.message || 'Fehler beim Zurückziehen.', 'error');
+      }
+    });
   };
 
   const normalizeDate = (maybeDate) => {
@@ -402,7 +457,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* Pending Requests */}
-        {(pendingResults.length > 0 || pendingGameRequests.length > 0 || pendingMyRequests.length > 0) && (
+        {(pendingResults.length > 0 || pendingGameRequests.length > 0 || pendingMyRequests.length > 0 || pendingMyResults.length > 0) && (
           <Grid>
             <Typography
               variant="h5"
@@ -481,6 +536,65 @@ const DashboardPage = () => {
                   </Box>
                 </Paper>
               ))}
+              {pendingMyResults.map(result => (
+                <Paper key={result.id} sx={sectionCardSx}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
+                      Ergebnis gemeldet
+                    </Typography>
+                    <Chip
+                      label="Warte auf Bestätigung"
+                      size="small"
+                      sx={{
+                        fontFamily: 'Comfortaa',
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                        backgroundColor: `${theme.palette.info.main}33`,
+                        color: theme.palette.info.main,
+                      }}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <Avatar
+                      src={teamsMap[result.homeTeamId]?.logoUrl ? (teamsMap[result.homeTeamId].logoUrl.startsWith('http') ? teamsMap[result.homeTeamId].logoUrl : `${API_BASE_URL}${teamsMap[result.homeTeamId].logoUrl}`) : null}
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        fontSize: '0.7rem',
+                        color: theme.palette.getContrastText(teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700]),
+                        backgroundColor: teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700],
+                        border: teamsMap[result.homeTeamId]?.logoUrl ? `1px solid ${teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
+                      }}
+                    >
+                      {!teamsMap[result.homeTeamId]?.logoUrl && (teamsMap[result.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
+                    </Avatar>
+                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
+                      {teamsMap[result.homeTeamId]?.name} vs. {teamsMap[result.awayTeamId]?.name}
+                    </Typography>
+                    <Avatar
+                      src={teamsMap[result.awayTeamId]?.logoUrl ? (teamsMap[result.awayTeamId].logoUrl.startsWith('http') ? teamsMap[result.awayTeamId].logoUrl : `${API_BASE_URL}${teamsMap[result.awayTeamId].logoUrl}`) : null}
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        fontSize: '0.7rem',
+                        color: theme.palette.getContrastText(teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700]),
+                        backgroundColor: teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700],
+                        border: teamsMap[result.awayTeamId]?.logoUrl ? `1px solid ${teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
+                      }}
+                    >
+                      {!teamsMap[result.awayTeamId]?.logoUrl && (teamsMap[result.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
+                    </Avatar>
+                  </Box>
+                  <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 700 }}>
+                    {result.homeScore} : {result.awayScore}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelReport(result.id)}>
+                      Stornieren
+                    </Button>
+                  </Box>
+                </Paper>
+              ))}
               {pendingGameRequests.map(booking => {
                 const d = normalizeDate(booking.date);
                 const dateStr = d ? d.toLocaleDateString('de-DE') : '-';
@@ -492,17 +606,32 @@ const DashboardPage = () => {
                       <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
                         Spielanfrage
                       </Typography>
-                      <Chip
-                        label="Antwort erforderlich"
-                        size="small"
-                        sx={{
-                          fontFamily: 'Comfortaa',
-                          fontWeight: 600,
-                          letterSpacing: '0.04em',
-                          backgroundColor: `${theme.palette.primary.main}2E`,
-                          color: theme.palette.primary.main,
-                        }}
-                      />
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        {booking.friendly && (
+                          <Chip
+                            label="Freundschaftsspiel"
+                            size="small"
+                            sx={{
+                              fontFamily: 'Comfortaa',
+                              fontWeight: 600,
+                              letterSpacing: '0.04em',
+                              backgroundColor: `${theme.palette.warning.main}2E`,
+                              color: theme.palette.warning.main,
+                            }}
+                          />
+                        )}
+                        <Chip
+                          label="Antwort erforderlich"
+                          size="small"
+                          sx={{
+                            fontFamily: 'Comfortaa',
+                            fontWeight: 600,
+                            letterSpacing: '0.04em',
+                            backgroundColor: `${theme.palette.primary.main}2E`,
+                            color: theme.palette.primary.main,
+                          }}
+                        />
+                      </Box>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                       <Avatar
@@ -536,7 +665,7 @@ const DashboardPage = () => {
                       </Avatar>
                     </Box>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
-                      {dateStr} • {timeStr} Uhr
+                      {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                       <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleAcceptBookingRequest(booking.id)}>
@@ -560,17 +689,32 @@ const DashboardPage = () => {
                       <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
                         Spielanfrage
                       </Typography>
-                      <Chip
-                        label="Anfrage ausstehend"
-                        size="small"
-                        sx={{
-                          fontFamily: 'Comfortaa',
-                          fontWeight: 600,
-                          letterSpacing: '0.04em',
-                          backgroundColor: `${theme.palette.secondary.main}2E`,
-                          color: theme.palette.secondary.main,
-                        }}
-                      />
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        {booking.friendly && (
+                          <Chip
+                            label="Freundschaftsspiel"
+                            size="small"
+                            sx={{
+                              fontFamily: 'Comfortaa',
+                              fontWeight: 600,
+                              letterSpacing: '0.04em',
+                              backgroundColor: `${theme.palette.warning.main}2E`,
+                              color: theme.palette.warning.main,
+                            }}
+                          />
+                        )}
+                        <Chip
+                          label="Anfrage ausstehend"
+                          size="small"
+                          sx={{
+                            fontFamily: 'Comfortaa',
+                            fontWeight: 600,
+                            letterSpacing: '0.04em',
+                            backgroundColor: `${theme.palette.secondary.main}2E`,
+                            color: theme.palette.secondary.main,
+                          }}
+                        />
+                      </Box>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                       <Avatar
@@ -604,7 +748,7 @@ const DashboardPage = () => {
                       </Avatar>
                     </Box>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
-                      {dateStr} • {timeStr} Uhr
+                      {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                       <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelMyRequest(booking.id)}>
@@ -742,6 +886,110 @@ const DashboardPage = () => {
           )}
         </Box>
       </ReusableModal>
+      {/* Snackbar for Notifications */}
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', fontFamily: 'Comfortaa' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={closeConfirmDialog}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+            border: `1px solid ${theme.palette.divider}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.primary }}>
+          {confirmDialog.title}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary }}>
+            {confirmDialog.message}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closeConfirmDialog} sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary }}>
+            Abbrechen
+          </Button>
+          <Button
+            onClick={() => {
+              if (confirmDialog.onConfirm) confirmDialog.onConfirm();
+              closeConfirmDialog();
+            }}
+            variant="contained"
+            color="primary"
+            sx={{ fontFamily: 'Comfortaa', borderRadius: 2 }}
+          >
+            Bestätigen
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Prompt Dialog */}
+      <Dialog
+        open={promptDialog.open}
+        onClose={closePromptDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+            border: `1px solid ${theme.palette.divider}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.primary }}>
+          {promptDialog.title}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label={promptDialog.label}
+            type="text"
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            value={promptDialog.value}
+            onChange={(e) => setPromptDialog(prev => ({ ...prev, value: e.target.value }))}
+            sx={{
+              mt: 1,
+              '& label': { color: theme.palette.text.secondary, fontFamily: 'Comfortaa' },
+              '& label.Mui-focused': { color: theme.palette.primary.main },
+              '& .MuiOutlinedInput-root': {
+                fontFamily: 'Comfortaa',
+                '& fieldset': { borderColor: theme.palette.divider },
+                '&:hover fieldset': { borderColor: theme.palette.primary.main },
+                '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closePromptDialog} sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary }}>
+            Abbrechen
+          </Button>
+          <Button
+            onClick={() => {
+              if (promptDialog.onConfirm) promptDialog.onConfirm(promptDialog.value);
+              closePromptDialog();
+            }}
+            variant="contained"
+            color="primary"
+            sx={{ fontFamily: 'Comfortaa', borderRadius: 2 }}
+          >
+            Bestätigen
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

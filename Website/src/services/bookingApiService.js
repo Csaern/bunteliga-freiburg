@@ -82,18 +82,6 @@ export const adminUpdateBooking = (bookingId, updateData) => {
     return apiClient(`/api/bookings/admin/${bookingId}`, 'PUT', updateData);
 };
 
-// Hier kommen später die Funktionen für die Teams hin (request, confirm etc.)
-
-// Team: verfügbaren Slot anfragen
-export const requestBookingSlot = (bookingId, { homeTeamId, awayTeamId }) => {
-    return apiClient(`/api/bookings/${bookingId}/request`, 'POST', { homeTeamId, awayTeamId });
-};
-
-// Team: auf eine Spielanfrage reagieren (annehmen/ablehnen)
-export const respondToBookingRequest = (bookingId, action, reason = '') => {
-    return apiClient(`/api/bookings/${bookingId}/action`, 'POST', { action, reason });
-};
-
 // Team: Buchungen ohne Ergebnis für mein Team
 export const getBookingsNeedingResultForMyTeam = (seasonId) => {
     const q = encodeURIComponent(seasonId);
@@ -116,4 +104,14 @@ export const getUpcomingBookingsForTeam = (seasonId, teamId) => {
 // Team: Buchung absagen
 export const cancelBooking = (bookingId, reason = '') => {
     return apiClient(`/api/bookings/${bookingId}/cancel`, 'POST', { reason });
+};
+
+// Team: Buchung anfragen
+export const requestBookingSlot = (bookingId, homeTeamId, awayTeamId, friendly = false) => {
+    return apiClient(`/api/bookings/${bookingId}/request`, 'POST', { homeTeamId, awayTeamId, friendly });
+};
+
+// Team: Auf Buchungsanfrage reagieren
+export const respondToBookingRequest = (bookingId, action, reason = '') => {
+    return apiClient(`/api/bookings/${bookingId}/action`, 'POST', { action, reason });
 };

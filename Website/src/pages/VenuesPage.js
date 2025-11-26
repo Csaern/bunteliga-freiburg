@@ -236,36 +236,10 @@ const VenuesPage = () => {
           <ContactContent />
         </Box>
 
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 3,
-            justifyContent: 'center',
-          }}
-        >
-          {venuesData.map((venue) => (
-            <Box
-              key={venue.id}
-              sx={{
-                width: {
-                  xs: '100%', // Mobile: volle Breite
-                  sm: venuesData.length === 1 ? '100%' :
-                    venuesData.length === 2 ? 'calc(50% - 12px)' :
-                      venuesData.length === 3 ? 'calc(33.333% - 16px)' :
-                        'calc(25% - 18px)' // Maximal 4 pro Zeile
-                },
-                minWidth: { sm: venuesData.length > 4 ? 'calc(25% - 18px)' : 'auto' },
-                maxWidth: { sm: venuesData.length > 4 ? 'calc(25% - 18px)' : 'none' },
-                display: 'flex',
-              }}
-            >
-              <VenueCard venue={venue} />
-            </Box>
-          ))}
-        </Box>
+
       </Container>
-      );
+    </Container>
+  );
 };
 
-      export default VenuesPage;
+export default VenuesPage;
