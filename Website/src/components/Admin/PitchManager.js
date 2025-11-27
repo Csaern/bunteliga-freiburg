@@ -190,7 +190,7 @@ const PitchManager = ({ teams }) => {
     };
 
     const getTeamName = (teamId) => teams.find(t => t.id === teamId)?.name || '-';
-    const searchableFields = [{ key: 'name' }, { key: 'address' }, { key: 'teamId', accessor: getTeamName }];
+    const searchableFields = [{ key: 'name' }, { key: 'address' }, { key: 'teamId', accessor: (item) => getTeamName(item.teamId) }];
     const filteredPitches = filterData(pitches, searchTerm, searchableFields);
 
     // KORREKTUR: Sortiert die Plätze, sodass offizielle immer oben stehen.

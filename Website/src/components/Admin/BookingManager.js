@@ -414,10 +414,10 @@ const BookingManager = ({ currentSeason }) => {
     const displayTeamName = (teamId) => getTeamName(teamId) || '-';
 
     const searchableFields = [
-        { key: 'date', accessor: (date) => formatDateForSearch(date) },
-        { key: 'pitchId', accessor: getPitchName },
-        { key: 'homeTeamId', accessor: getTeamName },
-        { key: 'awayTeamId', accessor: getTeamName },
+        { key: 'date', accessor: (item) => formatDateForSearch(item.date) },
+        { key: 'pitchId', accessor: (item) => getPitchName(item.pitchId) },
+        { key: 'homeTeamId', accessor: (item) => getTeamName(item.homeTeamId) },
+        { key: 'awayTeamId', accessor: (item) => getTeamName(item.awayTeamId) },
     ];
 
     const filteredBookings = filterData(localBookings, searchTerm, searchableFields);
@@ -442,9 +442,27 @@ const BookingManager = ({ currentSeason }) => {
                 </Button>
             </Box>
 
-            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Datum, Platz, Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...darkInputStyle, mb: 2 }}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }}
-            />
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+                <TextField 
+                fullWidth 
+                variant="outlined" 
+                size="small" 
+                placeholder="Suche nach Datum, Platz, Team..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                sx={{ 
+                    ...darkInputStyle, 
+                    maxWidth: '600px'
+                }}
+                InputProps={{ 
+                    startAdornment: (
+                    <InputAdornment position="start">
+                        <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                    </InputAdornment>
+                    ), 
+                }}
+                />
+            </Box>
 
             <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neue Buchung erstellen' : 'Buchungsdetails'}>
                 <form onSubmit={handleSubmit}>

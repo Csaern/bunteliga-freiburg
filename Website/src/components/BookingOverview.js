@@ -7,8 +7,10 @@ import * as bookingApi from '../services/bookingApiService';
 import * as teamApi from '../services/teamApiService';
 import { useAuth } from '../context/AuthProvider';
 import { ReusableModal } from './Helpers/modalUtils';
-import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel } from '@mui/material';
-import { StyledTableCell } from './Helpers/tableUtils';
+import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel, InputAdornment } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import { StyledTableCell, filterData } from './Helpers/tableUtils';
+import { formatDateForSearch } from './Helpers/dateUtils';
 
 const BookingOverview = () => {
   const theme = useTheme();
@@ -28,6 +30,7 @@ const BookingOverview = () => {
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [submitting, setSubmitting] = useState(false);
   const [isFriendlyGame, setIsFriendlyGame] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const darkInputStyle = {
     '& label.Mui-focused': { color: theme.palette.primary.main },
@@ -179,8 +182,19 @@ const BookingOverview = () => {
 
   const displayTeamName = (teamId) => getTeamName(teamId) || '-';
 
-  // Gruppiere Buchungen nach Platz
-  const bookingsByPitch = (data.bookings || []).reduce((acc, booking) => {
+  // Suchfelder für die Volltextsuche
+  const searchableFields = [
+    { key: 'date', accessor: (item) => formatDateForSearch(item.date) },
+    { key: 'pitchId', accessor: (item) => getPitchName(item.pitchId) },
+    { key: 'homeTeamId', accessor: (item) => getTeamName(item.homeTeamId) },
+    { key: 'awayTeamId', accessor: (item) => getTeamName(item.awayTeamId) },
+  ];
+
+  // Filtere Buchungen basierend auf Suchbegriff
+  const filteredBookings = filterData(data.bookings || [], searchTerm, searchableFields);
+
+  // Gruppiere gefilterte Buchungen nach Platz
+  const bookingsByPitch = filteredBookings.reduce((acc, booking) => {
     const pitchId = booking.pitchId;
     if (!acc[pitchId]) {
       acc[pitchId] = [];
@@ -215,10 +229,32 @@ const BookingOverview = () => {
         Spielplan & Reservierung
       </Typography>
 
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+        <TextField 
+          fullWidth 
+          variant="outlined" 
+          size="small" 
+          placeholder="Suche nach Datum, Platz, Team..." 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+          sx={{ 
+            ...darkInputStyle, 
+            maxWidth: '600px'
+          }}
+          InputProps={{ 
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+              </InputAdornment>
+            ), 
+          }}
+        />
+      </Box>
+
       {sortedPitchIds.length === 0 ? (
         <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', border: `1px solid ${theme.palette.divider}` }}>
           <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
-            Keine Zeitslots für die aktuelle Saison vorhanden.
+            {searchTerm ? 'Keine passenden Buchungen gefunden.' : 'Keine Zeitslots für die aktuelle Saison vorhanden.'}
           </Typography>
         </Paper>
       ) : (
