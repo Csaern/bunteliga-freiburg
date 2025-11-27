@@ -219,7 +219,7 @@ const AdminDashboard = () => {
                   Offene Partien
                 </Typography>
                 <Typography variant="h4" sx={{ fontFamily: 'comfortaa', color: stats.openMatches > 0 ? '#FFBF00' : '#00A99D', fontWeight: 700 }}>
-                  {currentSeason?.openMatches?.length || 0}
+                  {currentSeason?.openMatchesCount || 0}
                 </Typography>
               </Paper>
             </Grid>

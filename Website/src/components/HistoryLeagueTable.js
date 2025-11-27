@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import * as seasonApi from '../services/seasonApiService';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
@@ -50,12 +51,27 @@ const LeagueTable = ({ title }) => {
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeTeamIds, setActiveTeamIds] = useState(new Set());
 
   useEffect(() => {
     const loadAllTimeTable = async () => {
       try {
         setError('');
         setLoading(true);
+        
+        // Lade aktive Saison parallel
+        let activeTeamIdsSet = new Set();
+        try {
+          const activeSeason = await seasonApi.getActiveSeasonPublic();
+          if (activeSeason && activeSeason.teams && Array.isArray(activeSeason.teams)) {
+            activeTeamIdsSet = new Set(activeSeason.teams.map(team => team.id).filter(id => id));
+            setActiveTeamIds(activeTeamIdsSet);
+          }
+        } catch (seasonErr) {
+          console.warn('Aktive Saison konnte nicht geladen werden:', seasonErr);
+          // Fehler ignorieren, da es keine aktive Saison geben muss
+        }
+
         const snap = await getDocs(collection(db, 'teams'));
         const teams = snap.docs.map(doc => {
           const data = doc.data() || {};
@@ -74,6 +90,7 @@ const LeagueTable = ({ title }) => {
             conceded,
             diff,
             points: Number(data.allTimePoints) || 0,
+            isActive: activeTeamIdsSet.has(doc.id),
           };
         });
 
@@ -172,6 +189,24 @@ const LeagueTable = ({ title }) => {
                         <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.65rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 /* Erlaubt dem Namen, den verfügbaren Platz zu nehmen */ }}>
                           {row.name}
                         </Typography>
+                        {row.isActive && (
+                          <Chip
+                            label="A"
+                            size="small"
+                            sx={{
+                              ml: 0.5,
+                              height: 16,
+                              minWidth: 16,
+                              fontSize: '0.6rem',
+                              fontWeight: 'bold',
+                              backgroundColor: '#4caf50',
+                              color: '#000',
+                              '& .MuiChip-label': {
+                                px: 0.5,
+                              },
+                            }}
+                          />
+                        )}
                       </Box>
                     </Box>
                   ) : (
@@ -191,6 +226,24 @@ const LeagueTable = ({ title }) => {
                       <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {row.name}
                       </Typography>
+                      {row.isActive && (
+                        <Chip
+                          label="A"
+                          size="small"
+                          sx={{
+                            ml: 1,
+                            height: 20,
+                            minWidth: 20,
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
+                            backgroundColor: '#4caf50',
+                            color: '#000',
+                            '& .MuiChip-label': {
+                              px: 0.5,
+                            },
+                          }}
+                        />
+                      )}
                     </Box>
                   )}
                 </StyledTableCell>
