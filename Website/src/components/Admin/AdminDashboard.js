@@ -66,15 +66,26 @@ const AdminDashboard = () => {
         userApiService.getAllUsers().catch(() => []),
       ]);
 
-      // Berechne Statistiken
+      // Stelle sicher, dass wirklich nur Daten der aktiven Saison berücksichtigt werden
+      const seasonBookings = activeSeason?.id
+        ? bookingsArr.filter(b => b.seasonId === activeSeason.id)
+        : bookingsArr;
+      const seasonResults = activeSeason?.id
+        ? resultsArr.filter(r => r.seasonId === activeSeason.id)
+        : resultsArr;
+
+      // Berechne Statistiken für die aktuelle Saison
       const totalTeams = teamsArr.length;
       const totalUsers = usersArr.length;
-      const totalBookings = bookingsArr.length;
-      const confirmedResults = resultsArr.filter(r => r.status === 'confirmed');
-      const pendingResults = resultsArr.filter(r => r.status === 'pending');
+      const totalBookings = seasonBookings.length;
+      const confirmedResults = seasonResults.filter(r => r.status === 'confirmed');
+      const pendingResults = seasonResults.filter(r => r.status === 'pending');
 
-      // Offene Partien: Buchungen mit beiden Teams, aber ohne Ergebnis
-      const scheduledMatches = bookingsArr.filter(b => b.homeTeamId && b.awayTeamId && b.status === 'confirmed');
+      // Offene Partien der aktuellen Saison:
+      // Buchungen mit beiden Teams, Status "confirmed" und ohne bestätigtes Ergebnis
+      const scheduledMatches = seasonBookings.filter(
+        b => b.homeTeamId && b.awayTeamId && b.status === 'confirmed'
+      );
       const resultBookingIds = new Set(confirmedResults.map(r => r.bookingId));
       const openMatches = scheduledMatches.filter(match => !resultBookingIds.has(match.id));
 
@@ -219,17 +230,17 @@ const AdminDashboard = () => {
                   Offene Partien
                 </Typography>
                 <Typography variant="h4" sx={{ fontFamily: 'comfortaa', color: stats.openMatches > 0 ? '#FFBF00' : '#00A99D', fontWeight: 700 }}>
-                  {currentSeason?.openMatchesCount || 0}
+                  {stats.openMatches}
                 </Typography>
               </Paper>
             </Grid>
             <Grid xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
               <Paper sx={{ ...sectionCardSx, width: '100%', flex: 1 }}>
                 <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: 'grey.400', mb: 1 }}>
-                  Ausstehende Ergebnisse
+                  Offene Ergebnisse
                 </Typography>
                 <Typography variant="h4" sx={{ fontFamily: 'comfortaa', color: stats.pendingResults > 0 ? '#FFBF00' : '#00A99D', fontWeight: 700 }}>
-                  {currentSeason?.pendingResults?.length || 0}
+                  {stats.pendingResults}
                 </Typography>
               </Paper>
             </Grid>
