@@ -43,10 +43,13 @@ export const filterData = (data, searchTerm, searchableFields) => {
     return data.filter(item => {
         const searchableContent = searchableFields.map(field => {
             const value = field.accessor ? field.accessor(item) : item[field.key];
+            if (value === null || value === undefined) {
+                return '';
+            }
             if (Array.isArray(value)) {
                 return value.join(' ');
             }
-            return value;
+            return String(value);
         }).join(' ').toLowerCase();
 
         return searchTags.every(tag => searchableContent.includes(tag));

@@ -447,9 +447,27 @@ const BookingManager = ({ currentSeason }) => {
                 </Button>
             </Box>
 
-            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Datum, Platz, Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...darkInputStyle, mb: 2 }}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }}
-            />
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+                <TextField
+                    fullWidth
+                    variant="outlined"
+                    size="small"
+                    placeholder="Suche nach Datum, Platz, Team..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    sx={{
+                        ...darkInputStyle,
+                        maxWidth: '600px'
+                    }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
+            </Box>
 
             <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neue Buchung erstellen' : 'Buchungsdetails'}>
                 <form onSubmit={handleSubmit}>
