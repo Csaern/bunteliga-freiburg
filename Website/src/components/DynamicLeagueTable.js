@@ -21,6 +21,7 @@ import {
 import { db } from '../firebase';
 import { API_BASE_URL } from '../services/apiClient';
 import * as seasonApiService from '../services/seasonApiService';
+import * as bookingApiService from '../services/bookingApiService';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
@@ -156,8 +157,35 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
         resultsQuery = query(collection(db, 'results'), where('seasonId', '==', seasonId));
       }
       const resultsSnap = await getDocs(resultsQuery);
-      const results = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      let results = resultsSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(result => result.status === 'confirmed' && result.isValid !== false); // Nur bestätigte und gültige Ergebnisse
+
+      // Freundschaftsspiele nicht in die Wertung aufnehmen:
+      // Wenn ein Ergebnis an eine Buchung gekoppelt ist und diese Buchung als "friendly" markiert ist,
+      // wird dieses Ergebnis für die Tabelle ignoriert.
+      if (seasonId) {
+        try {
+          const seasonBookings = await bookingApiService.getPublicBookingsForSeason(seasonId);
+          const friendlyBookingIds = new Set(
+            (seasonBookings || [])
+              .filter(b => b.friendly)
+              .map(b => b.id)
+          );
+
+          results = results.filter(result => {
+            if (!result.bookingId) {
+              // Freie Ergebnisse (ohne Buchung) zählen weiter für die Tabelle
+              return true;
+            }
+            return !friendlyBookingIds.has(result.bookingId);
+          });
+        } catch (error) {
+          console.error('Fehler beim Laden der Buchungen für Freundschaftsspiel-Filter:', error);
+          // Fallback: Wenn die Buchungen nicht geladen werden können, lieber alle Ergebnisse zählen,
+          // damit die Tabelle nicht leer ist.
+        }
+      }
 
       // Tabellendaten berechnen
       const teamStats = {};

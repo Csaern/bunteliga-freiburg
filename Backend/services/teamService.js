@@ -233,25 +233,46 @@ async function getPotentialOpponents(teamId, isFriendly = false) {
     return allSeasonTeams.filter(t => t.id !== teamId);
   }
 
-  const [allSeasonTeams, seasonResults, futureBookings, allPitches] = await Promise.all([
+  const [allSeasonTeams, seasonResults, futureBookings, allPitches, seasonBookingsSnapshot] = await Promise.all([
     getTeamsByIds(seasonTeamIds),
     resultsCollection.where('seasonId', '==', activeSeason.id).get(),
     bookingService.getFutureBookingsForSeason(activeSeason.id),
-    db.collection('pitches').get()
+    db.collection('pitches').get(),
+    bookingsCollection.where('seasonId', '==', activeSeason.id).get(),
   ]);
 
   const pitchesData = allPitches.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   const getPitchName = (pitchId) => pitchesData.find(p => p.id === pitchId)?.name || 'Unbekannt';
   const resultsData = seasonResults.docs.map(doc => doc.data());
+
+  // Buchungen der Saison mappen, um Freundschaftsspiele erkennen zu können
+  const seasonBookings = seasonBookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const bookingById = new Map(seasonBookings.map(b => [b.id, b]));
+
+  // Nur Liga-Ergebnisse (keine Freundschaftsspiele) für die Wertung der Paarungen zählen
+  const leagueResults = resultsData.filter(result => {
+    if (!result.bookingId) {
+      // Ergebnisse ohne Booking-Bezug gelten standardmäßig als Ligaspiele
+      return true;
+    }
+    const booking = bookingById.get(result.bookingId);
+    // Falls die zugehörige Buchung fehlt oder nicht als freundlich markiert ist → als Ligaspiel werten
+    return !booking || booking.friendly !== true;
+  });
+
+  // Nur zukünftige Ligaspiele für die Blockierung weiterer Paarungen berücksichtigen
+  const futureLeagueBookings = futureBookings.filter(b => !b.friendly);
   const potentialOpponents = allSeasonTeams.filter(t => t.id !== teamId);
 
   const opponentList = potentialOpponents.map(opponent => {
-    const gamesPlayed = resultsData.filter(r =>
+    // Anzahl gespielter Ligaspiele zwischen den Teams
+    const gamesPlayed = leagueResults.filter(r =>
       (r.homeTeamId === teamId && r.awayTeamId === opponent.id) ||
       (r.homeTeamId === opponent.id && r.awayTeamId === teamId)
     ).length;
 
-    const futureBookingsForOpponent = futureBookings.filter(b =>
+    // Zukünftige Ligaspiele (keine Freundschaftsspiele) zwischen den Teams
+    const futureBookingsForOpponent = futureLeagueBookings.filter(b =>
       (b.homeTeamId === teamId && b.awayTeamId === opponent.id) ||
       (b.homeTeamId === opponent.id && b.awayTeamId === teamId)
     );
