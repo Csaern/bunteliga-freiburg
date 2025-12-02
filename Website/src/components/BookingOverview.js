@@ -179,8 +179,19 @@ const BookingOverview = () => {
     const team = data.teams?.[teamId];
     return team || 'Unbekannt';
   };
-
   const displayTeamName = (teamId) => getTeamName(teamId) || '-';
+
+  // Nur zukünftige Buchungen anzeigen (Vergangenheit ausblenden)
+  const now = new Date();
+  const upcomingBookings = (data.bookings || []).filter((booking) => {
+    try {
+      const bookingDate = new Date(booking.date);
+      return bookingDate >= now;
+    } catch {
+      // Falls das Datum nicht geparst werden kann, sicherheitshalber ausblenden
+      return false;
+    }
+  });
 
   // Suchfelder für die Volltextsuche
   const searchableFields = [
@@ -191,7 +202,7 @@ const BookingOverview = () => {
   ];
 
   // Filtere Buchungen basierend auf Suchbegriff
-  const filteredBookings = filterData(data.bookings || [], searchTerm, searchableFields);
+  const filteredBookings = filterData(upcomingBookings, searchTerm, searchableFields);
 
   // Gruppiere gefilterte Buchungen nach Platz
   const bookingsByPitch = filteredBookings.reduce((acc, booking) => {
