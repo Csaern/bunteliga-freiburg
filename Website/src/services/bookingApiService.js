@@ -13,9 +13,11 @@ export const getBookingsForSeason = (seasonId) => {
  * NEU: Holt alle verfügbaren Buchungen für eine bestimmte Saison (öffentlich, ohne Authentifizierung).
  * @param {string} seasonId Die ID der Saison.
  */
-export const getAvailableBookingsForSeason = (seasonId) => {
+export const getAvailableBookings = (seasonId) => {
     return publicApiClient(`/api/bookings/public/available/${seasonId}`, 'GET');
 };
+
+export const getAvailableBookingsForSeason = getAvailableBookings; // Alias for compatibility
 
 // NEU: Öffentliche Route – alle Buchungen (inkl. belegter) für eine Saison
 export const getPublicBookingsForSeason = (seasonId) => {
@@ -107,11 +109,16 @@ export const cancelBooking = (bookingId, reason = '') => {
 };
 
 // Team: Buchung anfragen
-export const requestBookingSlot = (bookingId, homeTeamId, awayTeamId, friendly = false) => {
+export const requestBookingSlot = (bookingId, { homeTeamId, awayTeamId, friendly = false }) => {
     return apiClient(`/api/bookings/${bookingId}/request`, 'POST', { homeTeamId, awayTeamId, friendly });
 };
 
 // Team: Auf Buchungsanfrage reagieren
 export const respondToBookingRequest = (bookingId, action, reason = '') => {
     return apiClient(`/api/bookings/${bookingId}/action`, 'POST', { action, reason });
+};
+
+// NEU: Team erstellt individuelle Buchung
+export const createCustomBooking = async (bookingData) => {
+    return apiClient('/api/bookings/custom', 'POST', bookingData);
 };

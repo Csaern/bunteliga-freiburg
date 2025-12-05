@@ -129,6 +129,16 @@ router.put('/:id', checkAuth, checkAdmin, async (req, res) => {
 });
 
 // --- TEAM ROUTEN ---
+
+// Team erstellt eine individuelle Buchung (auf eigenem Platz)
+router.post('/custom', checkAuth, async (req, res) => {
+    try {
+        const result = await BookingService.createCustomBooking(req.body, req.user);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
 // Ein Team fordert einen verfügbaren Spieltermin an
 router.post('/:bookingId/request', checkAuth, async (req, res) => {
     try {

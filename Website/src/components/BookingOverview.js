@@ -148,9 +148,11 @@ const BookingOverview = () => {
       // Anfrage an Backend: vorhandenen Slot anfragen
       await bookingApi.requestBookingSlot(
         selectedSlot.id,
-        teamId,
-        awayTeam,
-        isFriendlyGame
+        {
+          homeTeamId: teamId,
+          awayTeamId: awayTeam,
+          friendly: isFriendlyGame
+        }
       );
 
       setNotification({ open: true, message: "Buchung erfolgreich! Warte auf Bestätigung des Gegners.", severity: 'success' });
@@ -181,14 +183,58 @@ const BookingOverview = () => {
   };
   const displayTeamName = (teamId) => getTeamName(teamId) || '-';
 
+  // Helper to check league limit
+  const hasReachedLeagueLimit = () => {
+    if (!currentSeason || !teamId || !data.bookings || !data.teams) return false;
+
+    const totalTeams = Object.keys(data.teams).length;
+    if (totalTeams < 2) return false;
+
+    const maxGamesPerOpponent = currentSeason.playMode === 'double_round_robin' ? 2 : 1;
+    const maxLeagueGames = (totalTeams - 1) * maxGamesPerOpponent;
+
+    const myLeagueGames = data.bookings.filter(b =>
+      (b.homeTeamId === teamId || b.awayTeamId === teamId) &&
+      ['confirmed', 'pending_home_confirm', 'pending_away_confirm'].includes(b.status) &&
+      !b.friendly
+    ).length;
+
+    return myLeagueGames >= maxLeagueGames;
+  };
+
+  const leagueLimitReached = hasReachedLeagueLimit();
+
+  // Helper for status labels and colors
+  const getStatusConfig = (status, isAvailable) => {
+    if (isAvailable) return { label: 'Frei', color: theme.palette.success.main, buttonColor: 'success', buttonText: 'Platz buchen' };
+
+    // Status mapping for colors and labels
+    switch (status) {
+      case 'booked':
+      case 'confirmed':
+        return { label: 'Belegt', color: theme.palette.error.main, buttonColor: 'warning', buttonText: 'Belegt' };
+      case 'pending_home_confirm':
+      case 'pending_away_confirm':
+        return { label: 'Bestätigung ausstehend', color: theme.palette.warning.main, buttonColor: 'warning', buttonText: 'Belegt' };
+      case 'blocked':
+        return { label: 'Gesperrt', color: theme.palette.grey[500], buttonColor: 'inherit', buttonText: 'Gesperrt' };
+      case 'maintenance':
+        return { label: 'Wartung', color: theme.palette.warning.main, buttonColor: 'inherit', buttonText: 'Gesperrt' };
+      default:
+        return { label: 'Belegt', color: theme.palette.grey[500], buttonColor: 'inherit', buttonText: 'Belegt' };
+    }
+  };
+
   // Nur zukünftige Buchungen anzeigen (Vergangenheit ausblenden)
+  // UND nur Buchungen auf offiziellen Plätzen anzeigen
   const now = new Date();
   const upcomingBookings = (data.bookings || []).filter((booking) => {
     try {
       const bookingDate = new Date(booking.date);
-      return bookingDate >= now;
+      // Check if pitch is in the loaded (official) pitches list
+      const isOfficialPitch = data.pitches?.some(p => p.id === booking.pitchId);
+      return bookingDate >= now && isOfficialPitch;
     } catch {
-      // Falls das Datum nicht geparst werden kann, sicherheitshalber ausblenden
       return false;
     }
   });
@@ -199,6 +245,7 @@ const BookingOverview = () => {
     { key: 'pitchId', accessor: (item) => getPitchName(item.pitchId) },
     { key: 'homeTeamId', accessor: (item) => getTeamName(item.homeTeamId) },
     { key: 'awayTeamId', accessor: (item) => getTeamName(item.awayTeamId) },
+    { key: 'status', accessor: (item) => item.status === 'available' ? 'Frei' : (item.status === 'blocked' ? 'Gesperrt' : 'Belegt') }
   ];
 
   // Filtere Buchungen basierend auf Suchbegriff
@@ -241,23 +288,23 @@ const BookingOverview = () => {
       </Typography>
 
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-        <TextField 
-          fullWidth 
-          variant="outlined" 
-          size="small" 
-          placeholder="Suche nach Datum, Platz, Team..." 
-          value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} 
-          sx={{ 
-            ...darkInputStyle, 
+        <TextField
+          fullWidth
+          variant="outlined"
+          size="small"
+          placeholder="Suche nach Datum, Platz, Team..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          sx={{
+            ...darkInputStyle,
             maxWidth: '600px'
           }}
-          InputProps={{ 
+          InputProps={{
             startAdornment: (
               <InputAdornment position="start">
                 <SearchIcon sx={{ color: theme.palette.text.secondary }} />
               </InputAdornment>
-            ), 
+            ),
           }}
         />
       </Box>
@@ -307,14 +354,23 @@ const BookingOverview = () => {
                       // Eine Buchung ist verfügbar, wenn: status === 'available' ODER (isAvailable === true UND keine Teams zugewiesen)
                       const isAvailable = booking.status === 'available' ||
                         (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
-                      const isBooked = !isAvailable && booking.homeTeamId && booking.awayTeamId;
-                      const isMyBooking = (booking.homeTeamId === teamId || booking.awayTeamId === teamId) && booking.status === 'confirmed';
+
+                      const statusConfig = getStatusConfig(booking.status, isAvailable);
+
+                      // Check if booking is allowed for this user
+                      let isBookable = isAvailable;
+                      let disabledReason = '';
+
+                      if (isAvailable && leagueLimitReached && !booking.friendly) {
+                        isBookable = false;
+                        disabledReason = 'Ligaspiel-Limit erreicht';
+                      }
 
                       return isMobile ? (
                         <TableRow key={booking.id} sx={{ backgroundColor: theme.palette.background.default, cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
                           <TableCell colSpan={7} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.divider}` }}>
                             <Box sx={{ display: 'flex', alignItems: 'stretch', minHeight: '70px' }}>
-                              <Box sx={{ width: '4px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main }} />
+                              <Box sx={{ width: '4px', bgcolor: statusConfig.color }} />
                               <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                   <Box sx={{ textAlign: 'center', pr: 2 }}>
@@ -325,18 +381,24 @@ const BookingOverview = () => {
                                     </Box>
                                   </Box>
                                   <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
-                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</Typography>
-                                    <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
-                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.awayTeamId)}</Typography>
+                                    {isAvailable ? (
+                                      <Typography sx={{ fontSize: '0.8rem', color: theme.palette.success.main }}>Frei</Typography>
+                                    ) : (
+                                      <>
+                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</Typography>
+                                        <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
+                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.awayTeamId)}</Typography>
+                                      </>
+                                    )}
                                   </Box>
                                   <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
-                                    {isAvailable ? (
+                                    {isBookable ? (
                                       <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
-                                        Buchen
+                                        Platz buchen
                                       </Button>
                                     ) : (
-                                      <Button size="small" variant="contained" color="warning" disabled>
-                                        Belegt
+                                      <Button size="small" variant="contained" color={statusConfig.buttonColor} disabled>
+                                        {statusConfig.buttonText}
                                       </Button>
                                     )}
                                   </Box>
@@ -348,24 +410,23 @@ const BookingOverview = () => {
                       ) : (
                         <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
                           <StyledTableCell align="center">
-                            <Box sx={{ width: '10px', height: '10px', bgcolor: isAvailable ? theme.palette.success.main : theme.palette.error.main, borderRadius: '50%', boxShadow: `0 0 8px ${isAvailable ? theme.palette.success.main : theme.palette.error.main}` }} />
+                            <Box sx={{ width: '10px', height: '10px', bgcolor: statusConfig.color, borderRadius: '50%', boxShadow: `0 0 8px ${statusConfig.color}` }} title={statusConfig.label} />
                           </StyledTableCell>
                           <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE')}</StyledTableCell>
                           <StyledTableCell>
                             {timeRange}
                             {booking.friendly && <Typography component="span" sx={{ ml: 1, color: '#FFD700', fontWeight: 'bold' }}>F</Typography>}
                           </StyledTableCell>
-                          <StyledTableCell>{getPitchName(booking.pitchId)}</StyledTableCell>
-                          <StyledTableCell>{displayTeamName(booking.homeTeamId)}</StyledTableCell>
-                          <StyledTableCell>{displayTeamName(booking.awayTeamId)}</StyledTableCell>
+                          <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.homeTeamId)}</StyledTableCell>
+                          <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.awayTeamId)}</StyledTableCell>
                           <StyledTableCell align="center">
-                            {isAvailable ? (
+                            {isBookable ? (
                               <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
                                 Platz buchen
                               </Button>
                             ) : (
-                              <Button size="small" variant="contained" color="warning" disabled>
-                                Belegt
+                              <Button size="small" variant="contained" color={statusConfig.buttonColor} disabled>
+                                {statusConfig.buttonText}
                               </Button>
                             )}
                           </StyledTableCell>

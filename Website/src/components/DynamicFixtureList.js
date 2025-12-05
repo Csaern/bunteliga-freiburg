@@ -384,6 +384,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           // Versuche das Datum aus der zugehörigen Buchung zu bekommen, sonst verwende reportedAt
           let resultDate = null;
           let resultTime = '';
+          let resultPitchId = null; // NEU
 
           if (result.bookingId && bookingsMap[result.bookingId]) {
             const booking = bookingsMap[result.bookingId];
@@ -392,6 +393,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
               resultDate = bookingDate.toISOString().split('T')[0];
               resultTime = bookingDate.toTimeString().slice(0, 5);
             }
+            resultPitchId = booking.pitchId; // NEU
           }
 
           // Fallback: Verwende reportedAt
@@ -412,31 +414,56 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             homeScore: result.homeScore,
             awayScore: result.awayScore,
             isPast: true,
-            location: " ",
+            location: " ", // Wird später gefüllt
+            pitchId: resultPitchId, // NEU
             homeTeamName: result.homeTeamName,
             awayTeamName: result.awayTeamName,
           };
         }));
       }
 
-      if (showType === 'upcoming' || showType === 'all') {
-        // Lade Pitch-Namen für bevorstehende Spiele
-        const pitchIds = [...new Set(bookings.map(b => b.pitchId).filter(Boolean))];
-        const pitchesData = {};
-        if (pitchIds.length > 0) {
-          try {
-            const pitches = await pitchApi.getPublicPitches();
-            pitches.forEach(pitch => {
-              if (pitchIds.includes(pitch.id)) {
-                pitchesData[pitch.id] = pitch.name;
-              }
-            });
-            setPitchesMap(pitchesData);
-          } catch (error) {
-            console.error('Fehler beim Laden der Plätze:', error);
-          }
-        }
+      // Sammle alle Pitch-IDs (aus Ergebnissen und zukünftigen Buchungen)
+      const pitchIds = new Set();
 
+      // IDs aus Ergebnissen
+      allFixtures.forEach(f => {
+        if (f.pitchId) pitchIds.add(f.pitchId);
+      });
+
+      // IDs aus zukünftigen Buchungen
+      if (showType === 'upcoming' || showType === 'all') {
+        bookings.forEach(b => {
+          if (b.pitchId) pitchIds.add(b.pitchId);
+        });
+      }
+
+      // Lade Pitch-Namen
+      const pitchesData = {};
+      if (pitchIds.size > 0) {
+        try {
+          // Optimierung: Wir könnten hier cachen oder nur fehlende laden, aber getPublicPitches lädt eh alle (meistens wenige)
+          const pitches = await pitchApi.getPublicPitches();
+          pitches.forEach(pitch => {
+            if (pitchIds.has(pitch.id)) {
+              pitchesData[pitch.id] = pitch.name;
+            }
+          });
+          setPitchesMap(pitchesData);
+        } catch (error) {
+          console.error('Fehler beim Laden der Plätze:', error);
+        }
+      }
+
+      // Update Locations für Ergebnisse
+      allFixtures.forEach(f => {
+        if (f.pitchId && pitchesData[f.pitchId]) {
+          f.location = pitchesData[f.pitchId];
+        } else {
+          f.location = 'Unbekannt';
+        }
+      });
+
+      if (showType === 'upcoming' || showType === 'all') {
         allFixtures.push(...bookings.map(booking => ({
           id: `booking-${booking.id}`,
           bookingId: booking.id,
@@ -462,6 +489,37 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           allFixtures = allFixtures.slice(0, 5);
         }
       }
+
+      // NEU: Lade Pitch-Namen auch für Ergebnisse, wenn sie angezeigt werden sollen
+      if (showType === 'results' || showType === 'all') {
+        const resultPitchIds = [...new Set(allFixtures.filter(f => f.isPast && !f.location && f.bookingId).map(f => {
+          // Wir müssen die bookingId in der bookingsMap finden, um die pitchId zu bekommen
+          // Aber wir haben bookingsMap nur im Scope oben.
+          // Besser: Wir sammeln alle bookingIds der Ergebnisse
+          return null; // Platzhalter, Logik muss angepasst werden
+        }))];
+
+        // Korrektur: Wir machen das direkter. Wir haben oben schon bookingsMap gefüllt.
+        // Wir iterieren über allFixtures und holen die Pitch-Namen.
+
+        const pitchIdsToFetch = new Set();
+        allFixtures.forEach(fixture => {
+          if (fixture.isPast && fixture.id.startsWith('result-')) {
+            // Versuche pitchId aus der Buchung zu finden
+            // Da wir bookingsMap nicht im Scope haben, müssen wir die Logik oben anpassen oder hier neu laden.
+            // Optimierung: Wir laden die Pitches oben im 'results' Block.
+          }
+        });
+      }
+
+      // KORREKTUR: Die Logik oben war etwas verstreut. Wir machen es sauberer:
+      // Wir haben allFixtures fertig. Jetzt holen wir für ALLE Fixtures (auch Ergebnisse) die Pitch-Namen, falls noch nicht da.
+      // Dazu brauchen wir die pitchId. Bei Ergebnissen kommt die aus der verknüpften Buchung.
+
+      // Wir müssen sicherstellen, dass wir für Ergebnisse auch die pitchId haben.
+      // Das passiert oben im Mapping: 
+      // if (result.bookingId && bookingsMap[result.bookingId]) { ... }
+      // Dort sollten wir auch die pitchId ins Result-Objekt übernehmen.
 
       setFixtures(allFixtures);
     } catch (error) {
@@ -599,6 +657,34 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     );
   }
 
+  // NEU: Empty State Handling
+  if (fixtures.length === 0) {
+    return (
+      <Container maxWidth={details ? "xl" : "md"} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
+        <Typography
+          variant={isMobile ? 'h6' : 'h4'}
+          sx={{
+            mb: isMobile ? 1.5 : 3,
+            mt: 2,
+            color: theme.palette.primary.main,
+            fontWeight: 700,
+            fontFamily: 'Comfortaa',
+            textAlign: 'center',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+          }}
+        >
+          {title}
+        </Typography>
+        <Box sx={{ textAlign: 'center', py: 4, backgroundColor: theme.palette.background.paper, borderRadius: theme.shape.borderRadius, border: `1px solid ${theme.palette.divider}` }}>
+          <Typography color="text.secondary" sx={{ fontFamily: 'Comfortaa' }}>
+            {showType === 'results' ? 'Noch keine Ergebnisse vorhanden.' : 'Keine geplanten Spiele.'}
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth={details ? "xl" : "md"} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
       <Typography
@@ -691,16 +777,22 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                   <StyledTableCell>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
                       <Avatar
+                        variant="rounded"
                         alt={`${teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'} Logo`}
                         src={teams[fixture.homeTeamId]?.logoUrl ? (teams[fixture.homeTeamId].logoUrl.startsWith('http') ? teams[fixture.homeTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.homeTeamId].logoUrl}`) : null}
                         sx={{
-                          width: isMobile ? 22 : 20,
-                          height: isMobile ? 22 : 20,
+                          width: isMobile ? 28 : 32, // Etwas größer für bessere Sichtbarkeit
+                          height: isMobile ? 28 : 32,
                           mb: 0.5,
                           fontSize: isMobile ? '0.7rem' : '0.7rem',
                           color: theme.palette.getContrastText(teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700],
-                          border: teams[fixture.homeTeamId]?.logoUrl ? `1px solid ${teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
+                          backgroundColor: 'transparent', // Kein Hintergrund für freigestellte Logos
+                          // border: teams[fixture.homeTeamId]?.logoUrl ? `1px solid ${teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none',
+                          '& img': {
+                            objectFit: 'contain',
+                            width: '100%',
+                            height: '100%',
+                          }
                         }}
                       >
                         {!teams[fixture.homeTeamId]?.logoUrl && (teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'U').substring(0, 1).toUpperCase()}
@@ -733,16 +825,22 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                   <StyledTableCell>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
                       <Avatar
+                        variant="rounded"
                         alt={`${teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'} Logo`}
                         src={teams[fixture.awayTeamId]?.logoUrl ? (teams[fixture.awayTeamId].logoUrl.startsWith('http') ? teams[fixture.awayTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.awayTeamId].logoUrl}`) : null}
                         sx={{
-                          width: isMobile ? 22 : 20,
-                          height: isMobile ? 22 : 20,
+                          width: isMobile ? 28 : 32,
+                          height: isMobile ? 28 : 32,
                           mb: 0.5,
                           fontSize: isMobile ? '0.7rem' : '0.7rem',
                           color: theme.palette.getContrastText(teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700],
-                          border: teams[fixture.awayTeamId]?.logoUrl ? `1px solid ${teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
+                          backgroundColor: 'transparent',
+                          // border: teams[fixture.awayTeamId]?.logoUrl ? `1px solid ${teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none',
+                          '& img': {
+                            objectFit: 'contain',
+                            width: '100%',
+                            height: '100%',
+                          }
                         }}
                       >
                         {!teams[fixture.awayTeamId]?.logoUrl && (teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'U').substring(0, 1).toUpperCase()}

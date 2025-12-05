@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthProvider';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import TeamSettings from '../components/TeamSettings';
+import CreateGameModal from '../components/Modals/CreateGameModal';
 import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, FormControl, InputLabel, Select, MenuItem, List, ListItem, ListItemIcon, ListItemText, Card, Divider, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { API_BASE_URL } from '../services/apiClient';
 import { ReusableModal } from '../components/Helpers/modalUtils';
@@ -38,6 +39,7 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [currentSeason, setCurrentSeason] = useState(null);
   const [showTeamSettings, setShowTeamSettings] = useState(false);
+  const [isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
 
   // State for Edit Modal
   const [selectedResult, setSelectedResult] = useState(null);
@@ -172,6 +174,15 @@ const DashboardPage = () => {
 
     fetchData();
   }, [currentUser, isAdmin, teamId, navigate, fetchData]);
+
+  // Check for action query param
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'createGame') {
+      setIsCreateGameModalOpen(true);
+    }
+  }, [location]);
 
   const handleAcceptBookingRequest = async (bookingId) => {
     try {
@@ -378,7 +389,7 @@ const DashboardPage = () => {
   }
 
   const renderIconButton = (title, icon, link, onClick) => (
-    <Grid xs={isAdmin && teamId ? 3 : 4} sm>
+    <Grid xs={teamId ? 3 : 4} sm>
       <Tooltip title={title} placement="bottom">
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <IconButton
@@ -449,7 +460,8 @@ const DashboardPage = () => {
             }}
           >
             <Grid container spacing={1} justifyContent="space-around" alignItems="center">
-              {renderIconButton('Platz buchen', <AddCircleOutlineIcon />, '/platzreservierung')}
+              {renderIconButton('Platz buchen', <EventIcon />, '/platzreservierung', null)}
+              {renderIconButton('Neues Spiel', <AddCircleOutlineIcon />, null, () => setIsCreateGameModalOpen(true))}
               {renderIconButton('Ergebnis melden', <PostAddIcon />, null, handleOpenReportModal)}
               {teamId && renderIconButton('Team-Einstellungen', <SettingsIcon />, null, () => setShowTeamSettings(true))}
             </Grid>
@@ -779,6 +791,12 @@ const DashboardPage = () => {
       </Grid>
 
       {showTeamSettings && <TeamSettings onClose={() => setShowTeamSettings(false)} />}
+
+      <CreateGameModal
+        open={isCreateGameModalOpen}
+        onClose={() => setIsCreateGameModalOpen(false)}
+        onGameCreated={fetchData}
+      />
 
       <ReusableModal open={isReportModalOpen} onClose={handleCloseReportModal} title="Ergebnis melden">
         <Box component="form" onSubmit={handleReportSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

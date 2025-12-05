@@ -14,6 +14,8 @@ class Booking {
     homeTeamId = null,
     awayTeamId = null,
     friendly = false, // NEU
+    status = 'available', // NEU
+    isCustom = false, // NEU
   }) {
     // 1. Validierung
     if (!date || !duration || !pitchId || !seasonId || !createdBy) {
@@ -29,9 +31,10 @@ class Booking {
     this.homeTeamId = homeTeamId;
     this.awayTeamId = awayTeamId;
 
-    this.status = 'available';
+    this.status = status;
     this.isAvailable = !homeTeamId && !awayTeamId;
     this.friendly = friendly; // NEU
+    this.isCustom = isCustom; // NEU: Flag für individuelle Buchungen
 
     // 3. Felder für den Ablehnungs- & Stornierungsprozess
     this.deniedByTeamId = null;
@@ -65,6 +68,7 @@ class Booking {
       status: this.status,
       isAvailable: this.isAvailable,
       friendly: this.friendly, // NEU
+      isCustom: this.isCustom, // NEU
 
       deniedByTeamId: this.deniedByTeamId,
       deniedAt: this.deniedAt,

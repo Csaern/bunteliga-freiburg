@@ -10,12 +10,12 @@ const pitchUploadDir = 'uploads/pitches';
 fs.mkdirSync(pitchUploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, pitchUploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${req.params.pitchId}-${Date.now()}${path.extname(file.originalname)}`);
-  }
+    destination: (req, file, cb) => {
+        cb(null, pitchUploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${req.params.pitchId}-${Date.now()}${path.extname(file.originalname)}`);
+    }
 });
 
 const upload = multer({ storage: storage });
@@ -34,11 +34,13 @@ router.get('/public', async (req, res) => {
 });
 
 // --- AUTHENTIFIZIERTE ROUTEN ---
-// Verifizierte Plätze für eingeloggte Nutzer
+// Verifizierte Plätze für eingeloggte Nutzer (inkl. eigene Plätze)
 router.get('/verified', checkAuth, async (req, res) => {
     try {
         const pitches = await pitchService.getAllPitches();
-        const verified = pitches.filter(p => p.isVerified && !p.isArchived);
+        const verified = pitches.filter(p =>
+            (p.isVerified || (req.user.teamId && p.teamId === req.user.teamId)) && !p.isArchived
+        );
         res.status(200).json(verified);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -55,18 +57,44 @@ router.get('/all-admin', checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
-router.post('/', checkAuth, checkAdmin, async (req, res) => {
+router.post('/', checkAuth, async (req, res) => {
     try {
-        const newPitch = await pitchService.createPitch(req.body, req.user);
+        const pitchData = { ...req.body };
+
+        // Wenn kein Admin, erzwinge bestimmte Felder
+        if (!req.user.admin) {
+            pitchData.isVerified = false; // Immer inoffiziell
+            pitchData.teamId = req.user.teamId; // Immer dem eigenen Team zugeordnet
+
+            if (!req.user.teamId) {
+                return res.status(400).json({ message: 'Du musst einem Team angehören, um einen Platz zu erstellen.' });
+            }
+        }
+
+        const newPitch = await pitchService.createPitch(pitchData, req.user);
         res.status(201).json(newPitch);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
 });
 
-router.put('/:pitchId', checkAuth, checkAdmin, async (req, res) => {
+router.put('/:pitchId', checkAuth, async (req, res) => {
     try {
         const { pitchId } = req.params;
+
+        // Wenn kein Admin, prüfe Besitzrechte
+        if (!req.user.admin) {
+            const pitch = await pitchService.getPitchById(pitchId);
+            if (!pitch) return res.status(404).json({ message: 'Platz nicht gefunden.' });
+
+            if (pitch.teamId !== req.user.teamId) {
+                return res.status(403).json({ message: 'Du kannst nur Plätze deines eigenen Teams bearbeiten.' });
+            }
+
+            // Verhindere, dass Nicht-Admins den Verifiziert-Status ändern
+            delete req.body.isVerified;
+        }
+
         const updatedPitch = await pitchService.updatePitch(pitchId, req.body);
         res.status(200).json(updatedPitch);
     } catch (error) {
@@ -86,24 +114,24 @@ router.put('/:pitchId/archive', checkAuth, checkAdmin, async (req, res) => {
 });
 
 router.post(
-  '/:pitchId/image',
-  checkAuth,
-  checkAdmin,
-  upload.single('pitchImage'),
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: 'Keine Datei hochgeladen.' });
-      }
-      const { pitchId } = req.params;
-      const relativePath = `/${req.file.path.replace(/\\/g, '/')}`;
-      const result = await pitchService.updatePitchImage(pitchId, relativePath);
-      res.status(200).json(result);
-      
-    } catch (error) {
-      res.status(400).json({ message: error.message });
+    '/:pitchId/image',
+    checkAuth,
+    checkAdmin,
+    upload.single('pitchImage'),
+    async (req, res) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ message: 'Keine Datei hochgeladen.' });
+            }
+            const { pitchId } = req.params;
+            const relativePath = `/${req.file.path.replace(/\\/g, '/')}`;
+            const result = await pitchService.updatePitchImage(pitchId, relativePath);
+            res.status(200).json(result);
+
+        } catch (error) {
+            res.status(400).json({ message: error.message });
+        }
     }
-  }
 );
 
 module.exports = router;

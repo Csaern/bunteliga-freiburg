@@ -24,10 +24,10 @@ const defaultSeasonData = {
     endDate: '',
     playMode: 'double_round_robin',
     maxDenials: 3,
-    cancellationDeadlineDays: 3,
-    forfeitWinScore: 3,
+    cancellationDeadlineDays: 2,
+    forfeitWinScore: 2,
     forfeitLossScore: 0,
-    pointsForWin: 3,
+    pointsForWin: 2,
     pointsForDraw: 1,
     pointsForLoss: 0,
     teams: []

@@ -15,6 +15,16 @@ export const getPublicPitches = () => {
     return publicApiClient('/api/pitches/public', 'GET');
 };
 
+// Alias for public access to all pitches (filtered by backend)
+export const getAllPitchesPublic = getPublicPitches;
+
+/**
+ * Holt verifizierte Plätze (inkl. eigene Plätze für eingeloggte User).
+ */
+export const getVerifiedPitches = () => {
+    return apiClient('/api/pitches/verified', 'GET');
+};
+
 /**
  * Erstellt einen neuen Platz.
  * @param {object} pitchData - Die Daten des neuen Platzes.

@@ -377,16 +377,22 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.3, width: '100%' }}>
                         <Avatar
+                          variant="rounded"
                           alt={`${row.name} Logo`}
                           src={row.logoUrl ? (row.logoUrl.startsWith('http') ? row.logoUrl : `${API_BASE_URL}${row.logoUrl}`) : null}
                           sx={{
-                            width: 20,
-                            height: 20,
+                            width: 24, // Etwas größer
+                            height: 24,
                             mr: 0.75,
                             fontSize: '0.55rem',
                             color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
-                            backgroundColor: row.logoColor || theme.palette.grey[700],
-                            border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none'
+                            backgroundColor: 'transparent',
+                            // border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none',
+                            '& img': {
+                              objectFit: 'contain',
+                              width: '100%',
+                              height: '100%',
+                            }
                           }}
                         >
                           {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}
@@ -400,16 +406,22 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
                   ) : (
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Avatar
+                        variant="rounded"
                         alt={`${row.name} Logo`}
                         src={row.logoUrl ? (row.logoUrl.startsWith('http') ? row.logoUrl : `${API_BASE_URL}${row.logoUrl}`) : null}
                         sx={{
-                          width: 20,
-                          height: 20,
+                          width: 28, // Etwas größer für Desktop
+                          height: 28,
                           mr: 1,
                           fontSize: '0.7rem',
                           color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
-                          backgroundColor: row.logoColor || theme.palette.grey[700],
-                          border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none'
+                          backgroundColor: 'transparent',
+                          // border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none',
+                          '& img': {
+                            objectFit: 'contain',
+                            width: '100%',
+                            height: '100%',
+                          }
                         }}
                       >
                         {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}

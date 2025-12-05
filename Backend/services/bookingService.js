@@ -155,6 +155,8 @@ class BookingService {
     static async checkSingleSlot(slotData) {
         const { pitchId, date, duration, bookingIdToIgnore = null } = slotData;
 
+        console.log(`[checkSingleSlot] Checking collision for Pitch: ${pitchId}, Date: ${date}, Duration: ${duration}, Ignore: ${bookingIdToIgnore}`);
+
         const newBookingStart = new Date(date);
         const newBookingEnd = new Date(newBookingStart.getTime() + duration * 60000);
 
@@ -163,6 +165,7 @@ class BookingService {
         const querySnapshot = await bookingsCollection.where('pitchId', '==', pitchId).get();
 
         if (querySnapshot.empty) {
+            console.log('[checkSingleSlot] No bookings on this pitch.');
             return { isAvailable: true };
         }
 
@@ -171,6 +174,7 @@ class BookingService {
         for (const doc of querySnapshot.docs) {
             // Beim Bearbeiten einer Buchung darf sie nicht mit sich selbst kollidieren
             if (bookingIdToIgnore && doc.id === bookingIdToIgnore) {
+                console.log(`[checkSingleSlot] Ignoring self: ${doc.id}`);
                 continue;
             }
 
@@ -183,6 +187,7 @@ class BookingService {
 
             // Die Kernlogik der Überlappungsprüfung: (StartA < EndeB) UND (EndeA > StartB)
             if (newBookingStart < existingBookingEnd && newBookingEnd > existingBookingStart) {
+                console.log(`[checkSingleSlot] Collision found with: ${doc.id} (${existingBookingStart.toISOString()} - ${existingBookingEnd.toISOString()}) vs New (${newBookingStart.toISOString()} - ${newBookingEnd.toISOString()})`);
                 collidingBookingInfo = {
                     homeTeamId: existingBooking.homeTeamId || null,
                     awayTeamId: existingBooking.awayTeamId || null,
@@ -263,14 +268,39 @@ class BookingService {
 
         // KORREKTUR: Status wird auch beim Update automatisch angepasst.
         const hasBothTeams = updateData.homeTeamId && updateData.awayTeamId;
-        const status = hasBothTeams ? 'confirmed' : 'available';
+        // FIX: Allow admin to override status
+        let status = updateData.status || (hasBothTeams ? 'confirmed' : 'available');
+
+        // NEU: Wenn Status "cancelled" (Abgesagt) oder "blocked" (Gesperrt) ist, wird die Buchung zurückgesetzt.
+        let finalHomeTeamId = updateData.homeTeamId;
+        let finalAwayTeamId = updateData.awayTeamId;
+        let finalFriendly = isFriendly;
+
+        if (status === 'cancelled' || status === 'blocked') {
+            // NEU: Wenn es eine individuelle Buchung ist, wird sie komplett gelöscht.
+            if (originalBooking.isCustom) {
+                await bookingRef.delete();
+                return { message: 'Individuelle Buchung wurde gelöscht.' };
+            }
+
+            if (status === 'cancelled') {
+                status = 'available';
+            }
+            // Bei 'blocked' bleibt status 'blocked'.
+
+            finalHomeTeamId = null;
+            finalAwayTeamId = null;
+            finalFriendly = false;
+        }
 
         const dataToUpdate = {
             ...updateData,
             date: admin.firestore.Timestamp.fromDate(new Date(updateData.date)),
-            status: status, // Automatischer Status
+            status: status, // Automatischer oder zurückgesetzter Status
+            homeTeamId: finalHomeTeamId,
+            awayTeamId: finalAwayTeamId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            friendly: isFriendly, // NEU
+            friendly: finalFriendly, // NEU
         };
 
         await bookingRef.update(dataToUpdate);
@@ -278,9 +308,6 @@ class BookingService {
         return { id: bookingId, ...updatedDoc.data() };
     }
 
-    /**
-     * KORRIGIERT: Ruft die nächsten 5 anstehenden, bestätigten Spiele ab, ohne einen Index zu benötigen.
-     */
     static async getUpcomingBookings() {
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Setzt die Zeit auf den Anfang des Tages
@@ -372,9 +399,6 @@ class BookingService {
         };
     }
 
-    /**
-     * KORRIGIERT: Erstellt Buchungen basierend auf dem neuen, korrekten Datenmodell.
-     */
     static async bulkCreateAvailableSlots(data, user) {
         const { seasonId, slotsToCreate } = data;
         const batch = db.batch();
@@ -466,6 +490,12 @@ class BookingService {
         }
 
         if (action === 'deny') {
+            // NEU: Wenn es eine individuelle Buchung ist, wird sie gelöscht.
+            if (bookingData.isCustom) {
+                await bookingRef.delete();
+                return { message: 'Anfrage abgelehnt. Die individuelle Buchung wurde gelöscht.' };
+            }
+
             await bookingRef.update({
                 status: 'available',
                 homeTeamId: null,
@@ -501,6 +531,12 @@ class BookingService {
         // Prüfe, ob das Team an der Buchung beteiligt ist
         if (bookingData.homeTeamId !== cancellingTeamId && bookingData.awayTeamId !== cancellingTeamId) {
             throw new Error('Du kannst nur Buchungen absagen, an denen dein Team beteiligt ist.');
+        }
+
+        // NEU: Wenn es eine individuelle Buchung ist, wird sie gelöscht.
+        if (bookingData.isCustom) {
+            await bookingRef.delete();
+            return { message: 'Spiel abgesagt. Die individuelle Buchung wurde gelöscht.' };
         }
 
         return await db.runTransaction(async (transaction) => {
@@ -597,6 +633,12 @@ class BookingService {
                 const bookingDocInTransaction = await transaction.get(bookingRef);
                 if (!bookingDocInTransaction.exists || bookingDocInTransaction.data().status !== 'cancellation_pending') {
                     throw new Error('Es liegt kein Stornierungs-Antrag für dieses Spiel vor.');
+                }
+
+                // NEU: Wenn es eine individuelle Buchung ist, wird sie gelöscht.
+                if (bookingData.isCustom) {
+                    transaction.delete(bookingRef);
+                    return; // Keine weitere Verarbeitung nötig
                 }
 
                 const pitchRef = pitchesCollection.doc(bookingData.pitchId);
@@ -703,8 +745,11 @@ class BookingService {
 
         const newBookingData = {
             ...bookingData,
+            date: new Date(date), // Convert string to Date object
             createdBy: user.uid,
             status: awayTeamId ? 'pending_away_confirm' : 'confirmed',
+            isCustom: true, // NEU: Explizit als individuelle Buchung markieren
+            duration: bookingData.duration || 90, // Fallback, falls nicht übergeben
         };
 
         const newBooking = new Booking(newBookingData);
@@ -720,6 +765,12 @@ class BookingService {
      */
     static async adminCancelBooking(bookingId, reason, adminUid) {
         const bookingRef = bookingsCollection.doc(bookingId);
+        const bookingDoc = await bookingRef.get();
+        if (bookingDoc.exists && bookingDoc.data().isCustom) {
+            await bookingRef.delete();
+            return { message: 'Individuelle Buchung wurde durch Admin gelöscht.' };
+        }
+
         await bookingRef.update({
             status: 'cancelled_admin',
             cancellationReason: reason,

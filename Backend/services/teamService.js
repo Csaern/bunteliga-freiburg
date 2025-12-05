@@ -233,54 +233,66 @@ async function getPotentialOpponents(teamId, isFriendly = false) {
     return allSeasonTeams.filter(t => t.id !== teamId);
   }
 
-  const [allSeasonTeams, seasonResults, futureBookings, allPitches, seasonBookingsSnapshot] = await Promise.all([
+  const [allSeasonTeams, seasonResults, allPitches, seasonBookingsSnapshot] = await Promise.all([
     getTeamsByIds(seasonTeamIds),
     resultsCollection.where('seasonId', '==', activeSeason.id).get(),
-    bookingService.getFutureBookingsForSeason(activeSeason.id),
     db.collection('pitches').get(),
     bookingsCollection.where('seasonId', '==', activeSeason.id).get(),
   ]);
 
   const pitchesData = allPitches.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  const getPitchName = (pitchId) => pitchesData.find(p => p.id === pitchId)?.name || 'Unbekannt';
   const resultsData = seasonResults.docs.map(doc => doc.data());
 
-  // Buchungen der Saison mappen, um Freundschaftsspiele erkennen zu können
+  // Alle Buchungen der Saison
   const seasonBookings = seasonBookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  const bookingById = new Map(seasonBookings.map(b => [b.id, b]));
+
+  // Set von Booking-IDs, für die bereits ein Ergebnis existiert
+  const bookingsWithResults = new Set(resultsData.map(r => r.bookingId).filter(id => id));
 
   // Nur Liga-Ergebnisse (keine Freundschaftsspiele) für die Wertung der Paarungen zählen
+  // Wir zählen hier nur Ergebnisse, die NICHT mit einer Buchung verknüpft sind (Legacy oder manuell),
+  // ODER Ergebnisse, deren Buchung wir kennen und die nicht friendly ist.
+  // Einfacher: Wir zählen alle Ergebnisse, die als Ligaspiel gewertet werden.
+  // Da wir 'gamesPlayed' unten berechnen, müssen wir aufpassen, nicht doppelt zu zählen.
+  // Strategie: 
+  // 1. Zähle alle Ergebnisse (League Results).
+  // 2. Zähle alle Buchungen (Confirmed/Pending, League), für die KEIN Ergebnis vorliegt.
+
   const leagueResults = resultsData.filter(result => {
-    if (!result.bookingId) {
-      // Ergebnisse ohne Booking-Bezug gelten standardmäßig als Ligaspiele
-      return true;
+    // Wenn wir die Buchung kennen, prüfen wir 'friendly'.
+    // Wenn nicht, gehen wir davon aus, dass es ein Ligaspiel ist (oder wir filtern es anderswo).
+    if (result.bookingId) {
+      const booking = seasonBookings.find(b => b.id === result.bookingId);
+      return !booking || !booking.friendly;
     }
-    const booking = bookingById.get(result.bookingId);
-    // Falls die zugehörige Buchung fehlt oder nicht als freundlich markiert ist → als Ligaspiel werten
-    return !booking || booking.friendly !== true;
+    return true; // Ergebnisse ohne Booking-ID zählen als Ligaspiel
   });
 
-  // Nur zukünftige Ligaspiele für die Blockierung weiterer Paarungen berücksichtigen
-  const futureLeagueBookings = futureBookings.filter(b => !b.friendly);
+  // Relevante Buchungen: Confirmed oder Pending, nicht Friendly, und noch kein Ergebnis
+  const relevantBookings = seasonBookings.filter(b =>
+    !b.friendly &&
+    ['confirmed', 'pending_home_confirm', 'pending_away_confirm'].includes(b.status) &&
+    !bookingsWithResults.has(b.id)
+  );
+
   const potentialOpponents = allSeasonTeams.filter(t => t.id !== teamId);
 
   const opponentList = potentialOpponents.map(opponent => {
-    // Anzahl gespielter Ligaspiele zwischen den Teams
+    // 1. Anzahl gespielter Ligaspiele (Ergebnisse)
     const gamesPlayed = leagueResults.filter(r =>
       (r.homeTeamId === teamId && r.awayTeamId === opponent.id) ||
       (r.homeTeamId === opponent.id && r.awayTeamId === teamId)
     ).length;
 
-    // Zukünftige Ligaspiele (keine Freundschaftsspiele) zwischen den Teams
-    const futureBookingsForOpponent = futureLeagueBookings.filter(b =>
+    // 2. Anzahl geplanter/ausstehender Ligaspiele (Buchungen ohne Ergebnis)
+    const gamesPlanned = relevantBookings.filter(b =>
       (b.homeTeamId === teamId && b.awayTeamId === opponent.id) ||
       (b.homeTeamId === opponent.id && b.awayTeamId === teamId)
-    );
+    ).length;
 
-    const totalEncounters = gamesPlayed + futureBookingsForOpponent.length;
+    const totalEncounters = gamesPlayed + gamesPlanned;
 
     let isEligible = true;
-    // KORREKTUR: Die Prüfung verwendet jetzt das korrekte Feld 'playMode' aus dem Season-Modell.
     if (activeSeason.playMode === 'single_round_robin' && totalEncounters >= 1) {
       isEligible = false;
     }

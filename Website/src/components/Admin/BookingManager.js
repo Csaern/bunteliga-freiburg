@@ -558,6 +558,14 @@ const BookingManager = ({ currentSeason }) => {
                             </Select>
                         </FormControl>
 
+                        {(formData.status === 'cancelled' || formData.status === 'blocked') && (
+                            <Alert severity="warning" sx={{ mt: 1, bgcolor: 'rgba(237, 108, 2, 0.1)', color: '#ffcc80' }}>
+                                {formData.status === 'cancelled'
+                                    ? 'Achtung: Wenn Sie speichern, wird die Buchung wieder freigegeben (Status: Verfügbar, Teams werden entfernt).'
+                                    : 'Achtung: Wenn Sie speichern, wird der Platz gesperrt und die Teams werden entfernt.'}
+                            </Alert>
+                        )}
+
                         <FormControlLabel
                             control={<Checkbox
                                 checked={formData.friendly}

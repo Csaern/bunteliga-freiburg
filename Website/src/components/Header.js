@@ -44,6 +44,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import ArticleIcon from '@mui/icons-material/Article';
 
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../img/logo.png';
@@ -75,6 +76,7 @@ const adminPages = [
 const teamboardPages = [
   { text: 'Übersicht', path: '/dashboard', iconName: 'DashboardIcon' },
   { text: 'Platz buchen', path: '/platzreservierung', iconName: 'EventIcon' },
+  { text: 'Neues Spiel', path: '/dashboard?action=createGame', iconName: 'AddCircleOutlineIcon' },
 ];
 
 const iconMap = {
@@ -96,6 +98,7 @@ const iconMap = {
   StyleIcon: StyleIcon,
   DashboardIcon: DashboardIcon,
   StadiumIcon: StadiumIcon,
+  AddCircleOutlineIcon: AddCircleOutlineIcon,
 };
 
 const drawerWidth = 240;

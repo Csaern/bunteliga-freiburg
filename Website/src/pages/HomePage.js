@@ -41,7 +41,7 @@ const HomePage = () => {
       <NewsCarousel />
       <DynamicFixtureList
         title="Neueste Ergebnisse"
-        details={false}
+        details={true}
         seasonId={currentSeason?.id}
         showType="results"
       />

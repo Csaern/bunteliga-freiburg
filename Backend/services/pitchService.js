@@ -13,6 +13,12 @@ class PitchService {
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
+    static async getPitchById(pitchId) {
+        const doc = await pitchesCollection.doc(pitchId).get();
+        if (!doc.exists) return null;
+        return { id: doc.id, ...doc.data() };
+    }
+
     static async createPitch(pitchData, user) {
         const newPitch = {
             name: pitchData.name || '',
