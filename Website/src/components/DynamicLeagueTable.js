@@ -92,7 +92,7 @@ const FormDisplay = ({ formArray }) => {
   );
 };
 
-const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
+const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:1020px)'); // Switch to mobile layout below 1020px
   const navigate = useNavigate();
@@ -293,7 +293,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
 
   if (loading) {
     return (
-      <Container maxWidth="xl" sx={{ my: 4, px: isMobile ? 1 : 2 }}>
+      <Container maxWidth={maxWidth || "xl"} sx={{ my: 4, px: isMobile ? 1 : 2 }}>
         <Typography
           variant={isMobile ? 'h5' : 'h4'}
           sx={{
@@ -317,7 +317,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId }) => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ my: 4, px: isMobile ? 1 : 2 }}>
+    <Container maxWidth={maxWidth || "xl"} sx={{ my: 4, px: isMobile ? 1 : 2 }}>
       <Typography
         variant={isMobile ? 'h5' : 'h4'}
         sx={{

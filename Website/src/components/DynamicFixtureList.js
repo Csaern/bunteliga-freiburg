@@ -59,7 +59,7 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   );
 };
 
-const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId }) => {
+const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId, maxWidth }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { teamId } = useAuth();
@@ -634,7 +634,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
   if (loading) {
     return (
-      <Container maxWidth={details ? "xl" : "md"} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
+      <Container maxWidth={maxWidth || (details ? "xl" : "md")} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
         <Typography
           variant={isMobile ? 'h6' : 'h4'}
           sx={{
@@ -660,7 +660,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   // NEU: Empty State Handling
   if (fixtures.length === 0) {
     return (
-      <Container maxWidth={details ? "xl" : "md"} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
+      <Container maxWidth={maxWidth || (details ? "xl" : "md")} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
         <Typography
           variant={isMobile ? 'h6' : 'h4'}
           sx={{
@@ -686,7 +686,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   }
 
   return (
-    <Container maxWidth={details ? "xl" : "md"} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
+    <Container maxWidth={maxWidth || (details ? "xl" : "md")} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
       <Typography
         variant={isMobile ? 'h6' : 'h4'}
         sx={{

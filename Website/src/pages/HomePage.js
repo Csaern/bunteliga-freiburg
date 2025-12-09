@@ -44,11 +44,13 @@ const HomePage = () => {
         details={true}
         seasonId={currentSeason?.id}
         showType="results"
+        maxWidth="md"
       />
       <DynamicLeagueTable
         title="Aktuelle Tabelle"
         form={false}
         seasonId={currentSeason?.id}
+        maxWidth="md"
       />
 
       <DynamicFixtureList
@@ -56,6 +58,7 @@ const HomePage = () => {
         details={true}
         seasonId={currentSeason?.id}
         showType="upcoming"
+        maxWidth="md"
       />
     </Box>
   );
