@@ -77,7 +77,7 @@ const InfoSection = ({ title, icon, children, sx }) => {
         <Paper
             elevation={3}
             sx={{
-                p: { xs: 2, sm: 3 },
+                p: { xs: 1.5, sm: 3 },
                 backgroundColor: theme.palette.background.paper,
                 backgroundImage: 'none',
                 borderRadius: theme.shape.borderRadius,

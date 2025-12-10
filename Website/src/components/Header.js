@@ -184,7 +184,7 @@ function Header() {
   const drawerContent = (
     <Box
       sx={{
-        width: drawerWidth,
+        width: '100%',
         backgroundColor: appBarBackgroundColor,
         backdropFilter: appBarBlur,
         color: theme.palette.common.white,
@@ -358,7 +358,7 @@ function Header() {
           </Box>
 
 
-          <Drawer variant="temporary" anchor="left" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, backgroundColor: '#111', backdropFilter: appBarBlur, color: theme.palette.common.white, borderRight: `1px solid ${theme.palette.grey[800]}` } }}>
+          <Drawer variant="temporary" anchor="left" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, backgroundColor: '#111', backdropFilter: appBarBlur, color: theme.palette.common.white, borderRight: `1px solid ${theme.palette.grey[800]}`, overflowX: 'hidden' } }}>
             {drawerContent}
           </Drawer>
 

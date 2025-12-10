@@ -59,7 +59,7 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   );
 };
 
-const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId, maxWidth }) => {
+const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId, maxWidth, disableContainer = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { teamId } = useAuth();
@@ -632,9 +632,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
   const rowHeight = isMobile ? 55 : 60;
 
+  const Wrapper = disableContainer ? Box : Container;
+  const wrapperProps = disableContainer ? { sx: { my: 4 } } : { maxWidth: maxWidth || (details ? "xl" : "md"), sx: { my: 4, px: isMobile ? 0.25 : 2 } };
+
   if (loading) {
     return (
-      <Container maxWidth={maxWidth || (details ? "xl" : "md")} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
+      <Wrapper {...wrapperProps}>
         <Typography
           variant={isMobile ? 'h6' : 'h4'}
           sx={{
@@ -653,14 +656,14 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <Typography color="text.secondary">Lade Spiele...</Typography>
         </Box>
-      </Container>
+      </Wrapper>
     );
   }
 
   // NEU: Empty State Handling
   if (fixtures.length === 0) {
     return (
-      <Container maxWidth={maxWidth || (details ? "xl" : "md")} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
+      <Wrapper {...wrapperProps}>
         <Typography
           variant={isMobile ? 'h6' : 'h4'}
           sx={{
@@ -681,12 +684,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             {showType === 'results' ? 'Noch keine Ergebnisse vorhanden.' : 'Keine geplanten Spiele.'}
           </Typography>
         </Box>
-      </Container>
+      </Wrapper>
     );
   }
 
   return (
-    <Container maxWidth={maxWidth || (details ? "xl" : "md")} sx={{ my: 4, px: isMobile ? 0.25 : 2 }}>
+    <Wrapper {...wrapperProps}>
       <Typography
         variant={isMobile ? 'h6' : 'h4'}
         sx={{
@@ -1046,7 +1049,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           {notification.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Wrapper>
   );
 };
 

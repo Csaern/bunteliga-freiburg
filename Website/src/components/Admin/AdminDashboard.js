@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthProvider';
 import DynamicLeagueTable from '../DynamicLeagueTable';
 import DynamicFixtureList from '../DynamicFixtureList';
-import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, Alert } from '@mui/material';
+import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, Alert, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import * as seasonApi from '../../services/seasonApiService';
 import * as teamApi from '../../services/teamApiService';
 import * as bookingApi from '../../services/bookingApiService';
@@ -22,12 +22,15 @@ import StyleIcon from '@mui/icons-material/Style';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import WarningIcon from '@mui/icons-material/Warning';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 const AdminDashboard = () => {
   const { currentUser, isAdmin } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const [anchorEl, setAnchorEl] = useState(null);
+  const menuOpen = Boolean(anchorEl);
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -113,17 +116,43 @@ const AdminDashboard = () => {
     }
   }, [currentUser, isAdmin, navigate, fetchData]);
 
+  const handleMenuClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
   }
 
-  const renderIconButton = (title, icon, link) => (
-    <Grid xs={6} sm={3}>
+  const adminActions = [
+    { title: 'Buchungen', icon: <EventIcon />, link: '/admin/bookings' },
+    { title: 'Benutzer', icon: <GroupIcon />, link: '/admin/users' },
+    { title: 'Ergebnisse', icon: <InsightsIcon />, link: '/admin/results' },
+    { title: 'Saisons', icon: <EmojiEventsIcon />, link: '/admin/season' },
+    { title: 'Teams', icon: <StyleIcon />, link: '/admin/teams' },
+    { title: 'Plätze', icon: <StadiumIcon />, link: '/admin/pitches' },
+  ];
+
+  const visibleActions = isDesktop
+    ? adminActions
+    : adminActions.filter(a => !['Saisons', 'Teams', 'Plätze'].includes(a.title));
+
+  const menuActions = isDesktop
+    ? []
+    : adminActions.filter(a => ['Saisons', 'Teams', 'Plätze'].includes(a.title));
+
+  const renderIconButton = (title, icon, link, onClick = null) => (
+    <Grid item xs={3} sm={3} key={title}>
       <Tooltip title={title} placement="bottom">
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <IconButton
-            component={Link}
+            component={link ? Link : 'button'}
             to={link}
+            onClick={onClick}
             sx={{
               border: '1px solid',
               borderColor: 'grey.700',
@@ -150,10 +179,10 @@ const AdminDashboard = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
-      <Grid container spacing={3} direction="column">
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
 
         {/* Header */}
-        <Grid sx={{ textAlign: 'center' }}>
+        <Box sx={{ textAlign: 'center' }}>
           <Typography variant="h4" component="h1" sx={{ color: '#00A99D', fontFamily: 'comfortaa', fontWeight: 700, mb: 2, textTransform: 'uppercase' }}>
             Admin Dashboard
           </Typography>
@@ -167,14 +196,24 @@ const AdminDashboard = () => {
             >
               <AdminPanelSettingsIcon />
             </Avatar>
-            <Typography variant="h6" component="h2" sx={{ fontFamily: 'comfortaa', color: 'common.white' }}>
+            <Typography
+              variant="h6"
+              component="h2"
+              sx={{
+                fontFamily: 'comfortaa',
+                color: 'common.white',
+                fontSize: { xs: '1rem', sm: '1.25rem' },
+                wordBreak: 'break-word',
+                textAlign: 'left'
+              }}
+            >
               {currentUser?.email || 'Administrator'}
             </Typography>
           </Box>
-        </Grid>
+        </Box>
 
         {/* Action Icon Bar */}
-        <Grid>
+        <Box>
           <Paper
             elevation={0}
             sx={{
@@ -185,25 +224,54 @@ const AdminDashboard = () => {
               backgroundColor: 'transparent',
             }}
           >
-            <Grid container spacing={1} justifyContent="space-around" alignItems="center">
-              {renderIconButton('Buchungen', <EventIcon />, '/admin/bookings')}
-              {renderIconButton('Benutzer', <GroupIcon />, '/admin/users')}
-              {renderIconButton('Saisons', <EmojiEventsIcon />, '/admin/season')}
-              {renderIconButton('Ergebnisse', <InsightsIcon />, '/admin/results')}
-              {renderIconButton('Teams', <StyleIcon />, '/admin/teams')}
-              {renderIconButton('Plätze', <StadiumIcon />, '/admin/pitches')}
-            </Grid>
+            <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              {visibleActions.map(action => renderIconButton(action.title, action.icon, action.link))}
+
+              {!isDesktop && (
+                <>
+                  {renderIconButton('Mehr', <MoreVertIcon />, null, handleMenuClick)}
+                  <Menu
+                    anchorEl={anchorEl}
+                    open={menuOpen}
+                    onClose={handleMenuClose}
+                    PaperProps={{
+                      sx: {
+                        bgcolor: '#1e1e1e',
+                        color: 'grey.300',
+                        border: '1px solid',
+                        borderColor: 'grey.800',
+                      }
+                    }}
+                  >
+                    {menuActions.map((action) => (
+                      <MenuItem
+                        key={action.title}
+                        component={Link}
+                        to={action.link}
+                        onClick={handleMenuClose}
+                        sx={{ '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.08)' } }}
+                      >
+                        <ListItemIcon sx={{ color: 'inherit' }}>
+                          {action.icon}
+                        </ListItemIcon>
+                        <ListItemText primary={action.title} primaryTypographyProps={{ fontFamily: 'comfortaa' }} />
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                </>
+              )}
+            </Box>
           </Paper>
-        </Grid>
+        </Box>
 
         {/* News Management Section */}
-        <Grid>
+        <Box>
           <NewsManagement onDataChange={fetchData} />
-        </Grid>
+        </Box>
 
         {/* Statistics Cards */}
-        <Grid>
-          <Grid container spacing={2} sx={{ width: '100%', display: 'flex' }}>
+        <Box>
+          <Grid container spacing={2} sx={{ display: 'flex' }}>
             <Grid xs={12} sm={6} md={3} sx={{ display: 'flex', flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' }, minWidth: 0 }}>
               <Paper sx={{ ...sectionCardSx, width: '100%', flex: 1 }}>
                 <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: 'grey.400', mb: 1 }}>
@@ -245,43 +313,46 @@ const AdminDashboard = () => {
               </Paper>
             </Grid>
           </Grid>
-        </Grid>
+        </Box>
 
         {/* League Table */}
         {currentSeason && (
-          <Grid>
+          <Box>
             <DynamicLeagueTable
               title="AKTUELLE TABELLE"
               form={true}
               seasonId={currentSeason.id}
+              disableContainer={true}
             />
-          </Grid>
+          </Box>
         )}
 
         {/* Upcoming Games */}
         {currentSeason && (
-          <Grid>
+          <Box>
             <DynamicFixtureList
               title="BEVORSTEHENDE SPIELE"
               details={true}
               seasonId={currentSeason.id}
               showType="upcoming"
+              disableContainer={true}
             />
-          </Grid>
+          </Box>
         )}
 
         {/* Recent Results */}
         {currentSeason && (
-          <Grid>
+          <Box>
             <DynamicFixtureList
               title="NEUESTE ERGEBNISSE"
               details={true}
               seasonId={currentSeason.id}
               showType="results"
+              disableContainer={true}
             />
-          </Grid>
+          </Box>
         )}
-      </Grid>
+      </Box>
     </Container>
   );
 };

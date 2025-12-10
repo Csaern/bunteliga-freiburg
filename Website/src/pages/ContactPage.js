@@ -7,15 +7,15 @@ const ContactPage = () => {
 
   return (
     <Container
-      maxWidth="md"
+      maxWidth="lg"
       sx={{
-        py: { xs: 3, sm: 4 },
-        px: { xs: 2, sm: 3 },
+        my: 4,
+        px: { xs: 1, sm: 3 },
         color: theme.palette.text.primary,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: { xs: 3, sm: 4 },
+        gap: 4,
       }}
     >
       <ContactContent />

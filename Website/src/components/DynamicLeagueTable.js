@@ -92,7 +92,7 @@ const FormDisplay = ({ formArray }) => {
   );
 };
 
-const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth }) => {
+const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disableContainer = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:1020px)'); // Switch to mobile layout below 1020px
   const navigate = useNavigate();
@@ -291,9 +291,12 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth }) => 
     loadTableData();
   }, [loadTableData]);
 
+  const Wrapper = disableContainer ? Box : Container;
+  const wrapperProps = disableContainer ? { sx: { my: 4 } } : { maxWidth: maxWidth || "xl", sx: { my: 4, px: isMobile ? 1 : 2 } };
+
   if (loading) {
     return (
-      <Container maxWidth={maxWidth || "xl"} sx={{ my: 4, px: isMobile ? 1 : 2 }}>
+      <Wrapper {...wrapperProps}>
         <Typography
           variant={isMobile ? 'h5' : 'h4'}
           sx={{
@@ -312,12 +315,12 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth }) => 
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <Typography color="text.secondary">Lade Tabelle...</Typography>
         </Box>
-      </Container>
+      </Wrapper>
     );
   }
 
   return (
-    <Container maxWidth={maxWidth || "xl"} sx={{ my: 4, px: isMobile ? 1 : 2 }}>
+    <Wrapper {...wrapperProps}>
       <Typography
         variant={isMobile ? 'h5' : 'h4'}
         sx={{
@@ -451,7 +454,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth }) => 
           </TableBody>
         </Table>
       </TableContainer>
-    </Container>
+    </Wrapper>
   );
 };
 

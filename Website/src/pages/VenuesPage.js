@@ -129,115 +129,109 @@ const VenuesPage = () => {
   }, []);
 
   return (
-    <Container maxWidth="lg" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
-      <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
-        <Typography
-          variant={isMobile ? 'h4' : 'h3'}
-          component="h1"
-          sx={{
-            mb: 3,
-            mt: 2,
-            color: theme.palette.primary.main,
-            fontWeight: 700,
-            fontFamily: 'Comfortaa',
-            textAlign: 'center',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-          }}
-        >
-          Über uns
-        </Typography>
+    <Container maxWidth="lg" sx={{ my: 4, px: { xs: 1, sm: 3 } }}>
+      <Typography
+        variant={isMobile ? 'h4' : 'h3'}
+        component="h1"
+        sx={{
+          mb: 3,
+          mt: 2,
+          color: theme.palette.primary.main,
+          fontWeight: 700,
+          fontFamily: 'Comfortaa',
+          textAlign: 'center',
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+        }}
+      >
+        Über uns
+      </Typography>
 
-        {/* Beschreibung über die Bunte Liga */}
-        <Paper
-          sx={{
-            backgroundColor: theme.palette.background.paper,
-            borderRadius: theme.shape.borderRadius,
-            border: `1px solid ${theme.palette.divider}`,
-            p: { xs: 2, sm: 3 },
-            mb: 4,
-          }}
-        >
-          <Typography
-            variant="h5"
-            sx={{
-              color: theme.palette.primary.main,
-              fontFamily: 'Comfortaa',
-              fontWeight: 700,
-              mb: 2,
-              textAlign: 'center',
-            }}
-          >
-            Die Bunte Liga Freiburg
-          </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              color: theme.palette.text.secondary,
-              fontFamily: 'Comfortaa',
-              lineHeight: 1.8,
-              textAlign: 'justify',
-            }}
-          >
-            Die Bunte Liga Freiburg ist eine inklusive Hans Fußballliga, die Menschen aller Hintergründe zusammenbringt.
-            Wir fördern Fairplay, Gemeinschaft und den Spaß am Fußball. Unsere Liga steht für Vielfalt, Respekt und
-            sportliche Begeisterung. Egal ob Anfänger oder erfahrener Spieler – bei uns ist jeder willkommen, der
-            die Leidenschaft für den Fußball teilt.
-
-            Dumm wer nicht mitmacht!
-          </Typography>
-        </Paper>
-
-        {/* Plätze in Grid (max 2 nebeneinander) */}
+      {/* Beschreibung über die Bunte Liga */}
+      <Paper
+        sx={{
+          backgroundColor: theme.palette.background.paper,
+          borderRadius: theme.shape.borderRadius,
+          border: `1px solid ${theme.palette.divider}`,
+          p: { xs: 2, sm: 3 },
+          mb: 4,
+        }}
+      >
         <Typography
           variant="h5"
           sx={{
-            mb: 3,
-            mt: 2,
             color: theme.palette.primary.main,
-            mt: 4,
-            color: '#00A99D',
-            fontWeight: 700,
             fontFamily: 'Comfortaa',
+            fontWeight: 700,
+            mb: 2,
             textAlign: 'center',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
           }}
         >
-          Unsere Plätze
+          Die Bunte Liga Freiburg
         </Typography>
+        <Typography
+          variant="body1"
+          sx={{
+            color: theme.palette.text.secondary,
+            fontFamily: 'Comfortaa',
+            lineHeight: 1.8,
+            textAlign: 'justify',
+          }}
+        >
+          Die Bunte Liga Freiburg ist eine inklusive Hans Fußballliga, die Menschen aller Hintergründe zusammenbringt.
+          Wir fördern Fairplay, Gemeinschaft und den Spaß am Fußball. Unsere Liga steht für Vielfalt, Respekt und
+          sportliche Begeisterung. Egal ob Anfänger oder erfahrener Spieler – bei uns ist jeder willkommen, der
+          die Leidenschaft für den Fußball teilt.
 
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-            <CircularProgress color="secondary" />
-          </Box>
-        ) : error ? (
-          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-        ) : venues.length === 0 ? (
-          <Alert severity="info" sx={{ mb: 2 }}>Keine Plätze gefunden.</Alert>
-        ) : (
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: 3,
-            }}
-          >
-            {venues.map((venue) => (
-              <Box key={venue.id} sx={{ display: 'flex', width: { xs: '100%', md: '350px' } }}>
-                <VenueCard venue={venue} />
-              </Box>
-            ))}
-          </Box>
-        )}
+          Dumm wer nicht mitmacht!
+        </Typography>
+      </Paper>
 
-        <Box sx={{ mt: 8 }}>
-          <ContactContent />
+      {/* Plätze in Grid (max 2 nebeneinander) */}
+      <Typography
+        variant="h5"
+        sx={{
+          mb: 3,
+          mt: 4,
+          color: theme.palette.primary.main,
+          fontWeight: 700,
+          fontFamily: 'Comfortaa',
+          textAlign: 'center',
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+        }}
+      >
+        Unsere Plätze
+      </Typography>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress color="secondary" />
         </Box>
+      ) : error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+      ) : venues.length === 0 ? (
+        <Alert severity="info" sx={{ mb: 2 }}>Keine Plätze gefunden.</Alert>
+      ) : (
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: 3,
+          }}
+        >
+          {venues.map((venue) => (
+            <Box key={venue.id} sx={{ display: 'flex', width: { xs: '100%', md: '350px' } }}>
+              <VenueCard venue={venue} />
+            </Box>
+          ))}
+        </Box>
+      )}
 
-
-      </Container>
+      <Box sx={{ mt: 8 }}>
+        <ContactContent />
+      </Box>
     </Container>
   );
 };

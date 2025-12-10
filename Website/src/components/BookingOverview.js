@@ -278,7 +278,7 @@ const BookingOverview = () => {
   }
 
   return (
-    <Box sx={{ p: { sm: 3 } }}>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
       <Snackbar open={notification.open} autoHideDuration={6000} onClose={() => setNotification({ ...notification, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={() => setNotification({ ...notification, open: false })} severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>
       </Snackbar>
