@@ -36,19 +36,36 @@ const TeamDetailPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:850px)'); // Changed to 850px as requested
   const [team, setTeam] = useState(null);
-  const [currentSeason, setCurrentSeason] = useState(null);
+  const [logoError, setLogoError] = useState(false);
+
   const [allSeasons, setAllSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper zum Generieren einer "zufälligen" aber consistenten Farbe basierend auf dem Namen
+  const getFallbackColor = (name) => {
+    const colors = [
+      '#E91E63', // Pink
+      '#FFC107', // Amber
+      '#9C27B0', // Purple
+      '#00BCD4', // Cyan
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
   useEffect(() => {
     loadTeamData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId]);
 
   const loadTeamData = async () => {
     try {
       setLoading(true);
-      const [teamData, seasonData] = await Promise.all([
+      const [teamData] = await Promise.all([
         teamApi.getTeamByIdPublic(teamId).catch(() => null),
         seasonApi.getActiveSeasonPublic().catch(() => null)
       ]);
@@ -86,7 +103,6 @@ const TeamDetailPage = () => {
         }
 
         if (seasonToSelect) {
-          setCurrentSeason(seasonToSelect);
           setSelectedSeasonId(seasonToSelect.id);
         }
       } catch (error) {
@@ -102,8 +118,6 @@ const TeamDetailPage = () => {
   const handleSeasonChange = (event) => {
     const newSeasonId = event.target.value;
     setSelectedSeasonId(newSeasonId);
-    const selectedSeason = allSeasons.find(s => s.id === newSeasonId);
-    setCurrentSeason(selectedSeason || null);
   };
 
   const sectionCardSx = {
@@ -147,6 +161,7 @@ const TeamDetailPage = () => {
     );
   }
 
+
   const logoUrl = team.logoUrl ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`) : null;
 
   return (
@@ -171,26 +186,66 @@ const TeamDetailPage = () => {
         <Grid>
           <Paper sx={sectionCardSx}>
             <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: 3, textAlign: isMobile ? 'center' : 'left' }}>
-              <Avatar
-                src={logoUrl}
-                sx={{
-                  width: isMobile ? 100 : 120,
-                  height: isMobile ? 100 : 120,
-                  fontSize: isMobile ? '3rem' : '4rem',
-                  color: theme.palette.getContrastText(team.logoColor || theme.palette.grey[700]),
-                  backgroundColor: team.logoColor || theme.palette.primary.main,
-                  border: logoUrl ? `3px solid ${team.logoColor || theme.palette.primary.main}` : 'none',
-                  boxShadow: theme.shadows[3]
-                }}
-              >
-                {!logoUrl && team.name.charAt(0).toUpperCase()}
-              </Avatar>
+              {(logoError || !logoUrl) ? (
+                <Box
+                  sx={{
+                    width: isMobile ? 80 : 100,
+                    height: isMobile ? 96 : 120, // Höher für Schild-Optik
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: theme.palette.grey[200],
+                    borderRadius: '0 0 50% 50%', // Schild-Form
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxShadow: theme.shadows[3],
+                    flexShrink: 0,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: getFallbackColor(team.name),
+                      opacity: 1,
+                    }}
+                  />
+                  <Typography
+                    variant="h2" // Sehr groß
+                    sx={{
+                      fontFamily: 'Comfortaa',
+                      fontWeight: 'bold',
+                      color: '#fff',
+                      zIndex: 1,
+                      textShadow: '2px 2px 4px rgba(0,0,0,0.4)',
+                      fontSize: isMobile ? '2.5rem' : '3.5rem',
+                    }}
+                  >
+                    {team.name.charAt(0).toUpperCase()}
+                  </Typography>
+                </Box>
+              ) : (
+                <Box
+                  component="img"
+                  src={logoUrl}
+                  alt={`${team.name} Logo`}
+                  onError={() => setLogoError(true)}
+                  sx={{
+                    width: isMobile ? 100 : 150, // Größer und natürlich
+                    height: 'auto',
+                    maxHeight: 150,
+                    objectFit: 'contain',
+                    // Keine Border, kein Schatten für echte Logos
+                  }}
+                />
+              )}
               <Box sx={{ flex: 1 }}>
                 <Typography
                   variant={isMobile ? 'h4' : 'h3'}
                   component="h1"
                   sx={{
-                    color: theme.palette.primary.main,
+                    color: theme.palette.text.primary, // Schwarz/Weiß
                     fontFamily: 'Comfortaa',
                     fontWeight: 700,
                     mb: 1,
@@ -199,73 +254,22 @@ const TeamDetailPage = () => {
                 >
                   {team.name}
                 </Typography>
-                {team.foundedYear && (
-                  <Chip
-                    label={`Gegründet ${team.foundedYear}`}
-                    sx={{
-                      backgroundColor: theme.palette.action.selected,
-                      color: theme.palette.primary.main,
-                      fontFamily: 'Comfortaa',
-                      fontWeight: 600,
-                      mb: 1
-                    }}
-                  />
-                )}
-                {/* Season Selector - direkt unter dem Team-Namen */}
-                {allSeasons.length > 0 && (
-                  <FormControl size="small" sx={{ minWidth: 200, mt: 1 }}>
-                    <InputLabel sx={{ color: theme.palette.text.secondary, fontSize: '0.875rem' }}>Saison</InputLabel>
-                    <Select
-                      value={selectedSeasonId || ''}
-                      onChange={handleSeasonChange}
-                      label="Saison"
-                      sx={{
-                        color: theme.palette.text.primary,
-                        fontSize: '0.875rem',
-                        height: '36px',
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: theme.palette.divider,
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: theme.palette.text.secondary,
-                        },
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: theme.palette.primary.main,
-                        },
-                        '& .MuiSelect-icon': {
-                          color: theme.palette.text.secondary,
-                        },
-                      }}
-                      MenuProps={{
-                        PaperProps: {
-                          sx: {
-                            bgcolor: theme.palette.background.paper,
-                            color: theme.palette.text.primary,
-                          },
-                        },
-                      }}
-                    >
-                      {allSeasons.map((season) => (
-                        <MenuItem key={season.id} value={season.id}>
-                          {season.name} {season.status === 'active' ? '(Aktiv)' : ''}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
+
+                {/* Season Selector und Gegründet entfernt aus Top-Header */}
               </Box>
             </Box>
+
           </Paper>
         </Grid>
 
         {/* Team Information */}
-        {(team.description || team.contactPerson || team.contactEmail || team.contactPhone || team.website || team.socialMedia) && (
+        {(team.description || team.contactPerson || team.contactEmail || team.contactPhone || team.website || team.socialMedia || team.foundedYear) && (
           <Grid>
             <Paper sx={sectionCardSx}>
               <Typography
                 variant="h5"
                 sx={{
-                  color: theme.palette.primary.main,
+                  color: theme.palette.text.primary, // Schwarz/Weiß
                   fontFamily: 'Comfortaa',
                   fontWeight: 700,
                   mb: 3,
@@ -411,6 +415,16 @@ const TeamDetailPage = () => {
                     </Box>
                   </Grid>
                 )}
+                {team.foundedYear && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, mb: 1, fontFamily: 'Comfortaa' }}>
+                      Gegründet
+                    </Typography>
+                    <Typography variant="body1" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>
+                      {team.foundedYear}
+                    </Typography>
+                  </Grid>
+                )}
               </Grid>
             </Paper>
           </Grid>
@@ -419,6 +433,50 @@ const TeamDetailPage = () => {
 
         {selectedSeasonId && (
           <Grid item>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+              {/* Season Selector - jetzt hier platziert */}
+              {allSeasons.length > 0 && (
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel sx={{ color: theme.palette.text.secondary, fontSize: '0.875rem' }}>Saison</InputLabel>
+                  <Select
+                    value={selectedSeasonId || ''}
+                    onChange={handleSeasonChange}
+                    label="Saison"
+                    sx={{
+                      color: theme.palette.text.primary,
+                      fontSize: '0.875rem',
+                      height: '40px', // Etwas höher
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: theme.palette.divider,
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: theme.palette.text.secondary,
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: theme.palette.primary.main,
+                      },
+                      '& .MuiSelect-icon': {
+                        color: theme.palette.text.secondary,
+                      },
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: theme.palette.background.paper,
+                          color: theme.palette.text.primary,
+                        },
+                      },
+                    }}
+                  >
+                    {allSeasons.map((season) => (
+                      <MenuItem key={season.id} value={season.id}>
+                        {season.name} {season.status === 'active' ? '(Aktiv)' : ''}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+            </Box>
             <DynamicFixtureList
               title="ERGEBNISSE"
               details={false}
@@ -444,7 +502,7 @@ const TeamDetailPage = () => {
         {/* Recent Results */}
 
       </Grid>
-    </Container>
+    </Container >
   );
 };
 

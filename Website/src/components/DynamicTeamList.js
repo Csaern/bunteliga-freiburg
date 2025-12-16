@@ -17,6 +17,87 @@ import { db } from '../firebase';
 import { API_BASE_URL } from '../services/apiClient';
 import * as seasonApiService from '../services/seasonApiService';
 
+// Helper für Farbe
+const getFallbackColor = (name) => {
+  const colors = [
+    '#E91E63', // Pink
+    '#FFC107', // Amber
+    '#9C27B0', // Purple
+    '#00BCD4', // Cyan
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
+// Interne Komponente für Logo Handling
+const TeamLogoItem = ({ team, isMobile }) => {
+  const [imgError, setImgError] = useState(false);
+  const logoSrc = team.logoUrl
+    ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`)
+    : null;
+
+  if (imgError || !logoSrc) {
+    return (
+      <Box
+        sx={{
+          width: isMobile ? 26 : 40, // Größer als in Tabelle
+          height: isMobile ? 32 : 46, // Schild-Format
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '0 0 50% 50%',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            backgroundColor: getFallbackColor(team.name),
+          }}
+        />
+        <Typography
+          variant="h6"
+          sx={{
+            fontFamily: 'Comfortaa',
+            fontWeight: 'bold',
+            color: '#fff',
+            zIndex: 1,
+            textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+            fontSize: isMobile ? '0.7rem' : '1.0rem',
+          }}
+        >
+          {team.name.substring(0, 1).toUpperCase()}
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Avatar
+      variant="rounded"
+      alt={`${team.name} Logo`}
+      src={logoSrc}
+      imgProps={{
+        onError: () => setImgError(true)
+      }}
+      sx={{
+        width: isMobile ? 30 : 45,
+        height: isMobile ? 30 : 45,
+        backgroundColor: 'transparent',
+        '& img': { objectFit: 'contain' }
+      }}
+    />
+  );
+};
+
 const DynamicTeamList = ({ title }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:850px)'); // Changed to 850px as requested // Changed to 1250px
@@ -85,7 +166,7 @@ const DynamicTeamList = ({ title }) => {
     return (
       <Container maxWidth="md" sx={{ my: 4, px: isMobile ? 1 : 2 }}>
         <Typography
-          variant={isMobile ? 'h5' : 'h4'}
+          variant={isMobile ? 'h4' : 'h3'}
           sx={{
             mb: 2,
             mt: 2,
@@ -118,7 +199,7 @@ const DynamicTeamList = ({ title }) => {
   return (
     <Container maxWidth="md" sx={{ my: 4, px: isMobile ? 1 : 2 }}>
       <Typography
-        variant={isMobile ? 'h5' : 'h4'}
+        variant={isMobile ? 'h4' : 'h3'}
         sx={{
           mb: 2,
           mt: 2,
@@ -150,8 +231,7 @@ const DynamicTeamList = ({ title }) => {
           minHeight: '48px', // Mindesthöhe für Konsistenz
         }}>
           <Typography sx={{
-            color: theme.palette.secondary.main, // Gelb (Secondary)
-            fontFamily: 'Comfortaa',
+            color: theme.palette.text.primary, // Schwarz/Weiß
             fontWeight: 'bold',
             fontSize: isMobile ? '0.9rem' : '1.1rem', // Schriftgröße verkleinert
             textAlign: isMobile ? 'left' : 'center', // Links auf Mobile
@@ -189,10 +269,6 @@ const DynamicTeamList = ({ title }) => {
         ) : (
           <List disablePadding>
             {displayedTeams.map((team, index) => {
-              const logoSrc = team.logoUrl
-                ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`)
-                : null;
-
               return (
                 <ListItem
                   key={team.id}
@@ -220,56 +296,7 @@ const DynamicTeamList = ({ title }) => {
                     justifyContent: 'center',
                     alignItems: 'center'
                   }}>
-                    {logoSrc ? (
-                      <Avatar
-                        variant="rounded"
-                        alt={`${team.name} Logo`}
-                        src={logoSrc}
-                        sx={{
-                          width: isMobile ? 30 : 45, // Noch kleiner
-                          height: isMobile ? 30 : 45,
-                          backgroundColor: 'transparent',
-                          '& img': { objectFit: 'contain' }
-                        }}
-                      />
-                    ) : (
-                      <Box
-                        sx={{
-                          width: isMobile ? 28 : 40, // Noch kleiner
-                          height: isMobile ? 32 : 46,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: theme.palette.grey[200],
-                          borderRadius: '0 0 50% 50%',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            width: '100%',
-                            height: '100%',
-                            background: `linear-gradient(180deg, ${team.logoColor || theme.palette.primary.main} 0%, ${theme.palette.grey[500]} 100%)`,
-                          }}
-                        />
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontFamily: 'Comfortaa',
-                            fontWeight: 'bold',
-                            color: '#fff',
-                            zIndex: 1,
-                            textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-                            fontSize: isMobile ? '0.8rem' : '1.1rem',
-                          }}
-                        >
-                          {team.name.substring(0, 1).toUpperCase()}
-                        </Typography>
-                      </Box>
-                    )}
+                    <TeamLogoItem team={team} isMobile={isMobile} />
                   </ListItemAvatar>
 
                   <Box sx={{ flexGrow: 1 }}>
@@ -280,7 +307,7 @@ const DynamicTeamList = ({ title }) => {
                       sx={{
                         fontFamily: 'Comfortaa',
                         color: theme.palette.text.primary,
-                        fontWeight: 'bold',
+                        fontWeight: 500, // Reduziert von bold
                         fontSize: isMobile ? '0.8rem' : '1.1rem',
                         lineHeight: 1.3,
                         transition: 'color 0.2s ease',
@@ -305,22 +332,7 @@ const DynamicTeamList = ({ title }) => {
                     )}
                   </Box>
 
-                  {
-                    team.foundedYear && (
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontFamily: 'Comfortaa',
-                            color: theme.palette.text.secondary,
-                            fontSize: isMobile ? '0.6rem' : '0.8rem',
-                          }}
-                        >
-                          Gegründet {team.foundedYear}
-                        </Typography>
-                      </Box>
-                    )
-                  }
+                  {/* Gegründet entfernt */}
                 </ListItem >
               );
             })}

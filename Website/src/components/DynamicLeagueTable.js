@@ -23,6 +23,84 @@ import { API_BASE_URL } from '../services/apiClient';
 import * as seasonApiService from '../services/seasonApiService';
 import * as bookingApiService from '../services/bookingApiService';
 
+const TeamLogo = ({ team, isMobile }) => {
+  const theme = useTheme();
+  const [error, setError] = useState(false);
+  const logoUrl = team.logoUrl ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`) : null;
+
+  const getFallbackColor = (name) => {
+    const colors = [
+      '#E91E63', // Pink
+      '#FFC107', // Amber
+      '#9C27B0', // Purple
+      '#00BCD4', // Cyan
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  if (error || !logoUrl) {
+    return (
+      <Box
+        sx={{
+          width: isMobile ? 20 : 28, // Klein für Tabelle
+          height: isMobile ? 24 : 34, // Höher für Schild
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.palette.grey[200],
+          borderRadius: '0 0 50% 50%',
+          position: 'relative',
+          overflow: 'hidden',
+          mr: 1,
+          flexShrink: 0,
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            backgroundColor: getFallbackColor(team.name),
+          }}
+        />
+        <Typography
+          variant="caption"
+          sx={{
+            fontFamily: 'Comfortaa',
+            fontWeight: 'bold',
+            color: '#fff',
+            zIndex: 1,
+            fontSize: isMobile ? '0.55rem' : '0.75rem',
+            lineHeight: 1,
+          }}
+        >
+          {team.name.charAt(0).toUpperCase()}
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+      <Box
+        component="img"
+        src={logoUrl}
+        alt={`${team.name} Logo`}
+        onError={() => setError(true)}
+        sx={{
+          width: isMobile ? 24 : 32,
+          height: isMobile ? 24 : 32,
+          objectFit: 'contain'
+        }}
+      />
+    </Box>
+  );
+};
+
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:1020px)'); // Switch to mobile layout below 1020px
@@ -40,8 +118,8 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
         fontFamily: 'Comfortaa',
         borderBottom: `1px solid ${theme.palette.divider}`,
         py: isMobile ? 0.6 : 1,
-        px: isMobile ? 0.5 : 1,
-        fontSize: isMobile ? '0.7rem' : '0.8rem',
+        px: isMobile ? 0.3 : 1, // Reduced padding for mobile
+        fontSize: isMobile ? '0.75rem' : '0.9rem', // Larger font
         ...sx,
       }}
       {...props}
@@ -322,7 +400,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
   return (
     <Wrapper {...wrapperProps}>
       <Typography
-        variant={isMobile ? 'h5' : 'h4'}
+        variant={isMobile ? 'h4' : 'h3'}
         sx={{
           mb: 2,
           mt: 2,
@@ -376,31 +454,14 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
               >
                 <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{row.rank}</StyledTableCell>
                 <StyledTableCell>
+
+
+
                   {isMobile ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.3, width: '100%' }}>
-                        <Avatar
-                          variant="rounded"
-                          alt={`${row.name} Logo`}
-                          src={row.logoUrl ? (row.logoUrl.startsWith('http') ? row.logoUrl : `${API_BASE_URL}${row.logoUrl}`) : null}
-                          sx={{
-                            width: 24, // Etwas größer
-                            height: 24,
-                            mr: 0.75,
-                            fontSize: '0.55rem',
-                            color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
-                            backgroundColor: 'transparent',
-                            // border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none',
-                            '& img': {
-                              objectFit: 'contain',
-                              width: '100%',
-                              height: '100%',
-                            }
-                          }}
-                        >
-                          {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}
-                        </Avatar>
-                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: '0.65rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                        <TeamLogo team={row} isMobile={isMobile} />
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: '0.75rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
                           {row.name}
                         </Typography>
                       </Box>
@@ -408,28 +469,8 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
                     </Box>
                   ) : (
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar
-                        variant="rounded"
-                        alt={`${row.name} Logo`}
-                        src={row.logoUrl ? (row.logoUrl.startsWith('http') ? row.logoUrl : `${API_BASE_URL}${row.logoUrl}`) : null}
-                        sx={{
-                          width: 28, // Etwas größer für Desktop
-                          height: 28,
-                          mr: 1,
-                          fontSize: '0.7rem',
-                          color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
-                          backgroundColor: 'transparent',
-                          // border: row.logoUrl ? `1px solid ${row.logoColor || theme.palette.grey[700]}` : 'none',
-                          '& img': {
-                            objectFit: 'contain',
-                            width: '100%',
-                            height: '100%',
-                          }
-                        }}
-                      >
-                        {!row.logoUrl && row.name.substring(0, 1).toUpperCase()}
-                      </Avatar>
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <TeamLogo team={row} isMobile={isMobile} />
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {row.name}
                       </Typography>
                     </Box>

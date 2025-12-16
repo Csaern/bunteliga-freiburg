@@ -41,14 +41,14 @@ const HomePage = () => {
       <NewsCarousel />
       <Container maxWidth="md" sx={{ px: { xs: 2, sm: 3 } }}>
         <DynamicFixtureList
-          title="Neueste Ergebnisse"
+          title="Ergebnisse"
           details={true}
           seasonId={currentSeason?.id}
           showType="results"
           disableContainer={true}
         />
         <DynamicLeagueTable
-          title="Aktuelle Tabelle"
+          title="Tabelle"
           form={false}
           seasonId={currentSeason?.id}
           disableContainer={true}

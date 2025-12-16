@@ -47,8 +47,8 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
         fontFamily: 'Comfortaa',
         borderBottom: `1px solid ${theme.palette.divider}`,
         py: isMobile ? 0.5 : 1,
-        px: isMobile ? 0.3 : 1,
-        fontSize: isMobile ? '0.6rem' : '0.85rem',
+        px: isMobile ? 0.2 : 1, // Minimize padding on mobile
+        fontSize: isMobile ? '0.7rem' : '0.95rem', // Larger fonts
         verticalAlign: 'middle',
         ...sx,
       }}
@@ -491,26 +491,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       }
 
       // NEU: Lade Pitch-Namen auch für Ergebnisse, wenn sie angezeigt werden sollen
-      if (showType === 'results' || showType === 'all') {
-        const resultPitchIds = [...new Set(allFixtures.filter(f => f.isPast && !f.location && f.bookingId).map(f => {
-          // Wir müssen die bookingId in der bookingsMap finden, um die pitchId zu bekommen
-          // Aber wir haben bookingsMap nur im Scope oben.
-          // Besser: Wir sammeln alle bookingIds der Ergebnisse
-          return null; // Platzhalter, Logik muss angepasst werden
-        }))];
 
-        // Korrektur: Wir machen das direkter. Wir haben oben schon bookingsMap gefüllt.
-        // Wir iterieren über allFixtures und holen die Pitch-Namen.
 
-        const pitchIdsToFetch = new Set();
-        allFixtures.forEach(fixture => {
-          if (fixture.isPast && fixture.id.startsWith('result-')) {
-            // Versuche pitchId aus der Buchung zu finden
-            // Da wir bookingsMap nicht im Scope haben, müssen wir die Logik oben anpassen oder hier neu laden.
-            // Optimierung: Wir laden die Pitches oben im 'results' Block.
-          }
-        });
-      }
+      // Korrektur: Wir machen das direkter. Wir haben oben schon bookingsMap gefüllt.
+      // Wir iterieren über allFixtures und holen die Pitch-Namen.
+
+
 
       // KORREKTUR: Die Logik oben war etwas verstreut. Wir machen es sauberer:
       // Wir haben allFixtures fertig. Jetzt holen wir für ALLE Fixtures (auch Ergebnisse) die Pitch-Namen, falls noch nicht da.
@@ -639,7 +625,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     return (
       <Wrapper {...wrapperProps}>
         <Typography
-          variant={isMobile ? 'h6' : 'h4'}
+          variant={isMobile ? 'h4' : 'h3'}
           sx={{
             mb: isMobile ? 1.5 : 3,
             mt: 2,
@@ -691,7 +677,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   return (
     <Wrapper {...wrapperProps}>
       <Typography
-        variant={isMobile ? 'h6' : 'h4'}
+        variant={isMobile ? 'h4' : 'h3'}
         sx={{
           mb: isMobile ? 1.5 : 3,
           mt: 2,
@@ -749,7 +735,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                   onClick={isMyGame ? () => handleFixtureClick(fixture) : undefined}
                   sx={{
                     '&:hover': { backgroundColor: theme.palette.action.hover },
-                    opacity: fixture.isPast ? 0.7 : 1,
+                    opacity: 1, // Full opacity for readability
                     height: rowHeight,
                     cursor: isMyGame ? 'pointer' : 'default',
                   }}
@@ -800,7 +786,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                       >
                         {!teams[fixture.homeTeamId]?.logoUrl && (teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'U').substring(0, 1).toUpperCase()}
                       </Avatar>
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.75rem' : '0.95rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
                         {teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'}
                       </Typography>
                     </Box>
@@ -848,7 +834,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                       >
                         {!teams[fixture.awayTeamId]?.logoUrl && (teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'U').substring(0, 1).toUpperCase()}
                       </Avatar>
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.75rem' : '0.95rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
                         {teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'}
                       </Typography>
                     </Box>

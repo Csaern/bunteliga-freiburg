@@ -126,7 +126,7 @@ const TeamPage = () => {
     <div>
       <Container maxWidth="sm" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
         <Typography
-          variant={isMobile ? 'h5' : 'h4'}
+          variant={isMobile ? 'h4' : 'h3'}
           component="h1"
           sx={{
             mb: 4,

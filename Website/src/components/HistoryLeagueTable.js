@@ -40,7 +40,7 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
         ...sx,
       }}
       {...props}
-    >{children}</TableCell> 
+    >{children}</TableCell>
   );
 };
 
@@ -51,21 +51,21 @@ const LeagueTable = ({ title }) => {
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTeamIds, setActiveTeamIds] = useState(new Set());
+
 
   useEffect(() => {
     const loadAllTimeTable = async () => {
       try {
         setError('');
         setLoading(true);
-        
+
         // Lade aktive Saison parallel
         let activeTeamIdsSet = new Set();
         try {
           const activeSeason = await seasonApi.getActiveSeasonPublic();
           if (activeSeason && activeSeason.teams && Array.isArray(activeSeason.teams)) {
-            activeTeamIdsSet = new Set(activeSeason.teams.map(team => team.id).filter(id => id));
-            setActiveTeamIds(activeTeamIdsSet);
+            // activeTeamIdsSet = new Set(activeSeason.teams.map(team => team.id).filter(id => id));
+            // setActiveTeamIds(activeTeamIdsSet);
           }
         } catch (seasonErr) {
           console.warn('Aktive Saison konnte nicht geladen werden:', seasonErr);
@@ -118,13 +118,13 @@ const LeagueTable = ({ title }) => {
   return (
     <Container maxWidth="xl" sx={{ my: 4, px: isMobile ? 1 : 2 }}>
       <Typography
-        variant={isMobile ? 'h5' : 'h4'}
+        variant={isMobile ? 'h4' : 'h3'}
         sx={{
           mb: 2,
           mt: 2,
-          color: '#00A99D',
+          color: theme.palette.primary.main, // Changed to primary
           fontWeight: 700,
-          fontFamily: 'comfortaa',
+          fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
@@ -141,16 +141,16 @@ const LeagueTable = ({ title }) => {
           <Typography color="error.main">{error}</Typography>
         </Box>
       ) : (
-      <TableContainer
-        component={Paper}
-        sx={{
-          backgroundColor: '#111',
-          borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.grey[800]}`,
-        }}
-      >
-        <Table aria-label="Fußballtabelle" size="small">
-          <TableHead><TableRow sx={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+        <TableContainer
+          component={Paper}
+          sx={{
+            backgroundColor: '#111',
+            borderRadius: theme.shape.borderRadius,
+            border: `1px solid ${theme.palette.grey[800]}`,
+          }}
+        >
+          <Table aria-label="Fußballtabelle" size="small">
+            <TableHead><TableRow sx={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
               <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '7%' : '3%' }}>#</StyledTableCell>
               <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '60%' : '25%' }}>Team</StyledTableCell>
               <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '8%' }}>Jahre</StyledTableCell>
@@ -160,33 +160,70 @@ const LeagueTable = ({ title }) => {
               <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '11%' }}>Diff.</StyledTableCell>
               <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '11%' }}>Pkt.</StyledTableCell>
             </TableRow>
-          </TableHead>
-          <TableBody>
-            {tableData.map((row) => (
-              <TableRow
-                key={row.name}
-                sx={{
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
-                  ...(row.rank === 1 && { backgroundColor: 'rgba(71, 163, 163, 0.27)' }),
-                }}
-              >
-                <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }}>{row.rank}</StyledTableCell>
-                <StyledTableCell>
-                  {isMobile ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.3, width: '100%' }}>
+            </TableHead>
+            <TableBody>
+              {tableData.map((row) => (
+                <TableRow
+                  key={row.name}
+                  sx={{
+                    '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
+                    ...(row.rank === 1 && { backgroundColor: 'rgba(71, 163, 163, 0.27)' }),
+                  }}
+                >
+                  <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }}>{row.rank}</StyledTableCell>
+                  <StyledTableCell>
+                    {isMobile ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.3, width: '100%' }}>
+                          <Avatar
+                            alt={`${row.name} Logo`}
+                            sx={{
+                              width: 20,
+                              height: 20,
+                              mr: 0.75,
+                              fontSize: '0.55rem',
+                              color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
+                              backgroundColor: row.logoColor || theme.palette.grey[700]
+                            }}
+                          >{row.name.substring(0, 1).toUpperCase()}</Avatar>
+                          <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.65rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 /* Erlaubt dem Namen, den verfügbaren Platz zu nehmen */ }}>
+                            {row.name}
+                          </Typography>
+                          {row.isActive && (
+                            <Chip
+                              label="A"
+                              size="small"
+                              sx={{
+                                ml: 0.5,
+                                height: 16,
+                                minWidth: 16,
+                                fontSize: '0.6rem',
+                                fontWeight: 'bold',
+                                backgroundColor: '#4caf50',
+                                color: '#000',
+                                '& .MuiChip-label': {
+                                  px: 0.5,
+                                },
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Avatar
                           alt={`${row.name} Logo`}
+                          src={row.logoUrl || undefined}
                           sx={{
                             width: 20,
                             height: 20,
-                            mr: 0.75,
-                            fontSize: '0.55rem', 
+                            mr: 1,
+                            fontSize: '0.7rem',
                             color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
                             backgroundColor: row.logoColor || theme.palette.grey[700]
                           }}
                         >{row.name.substring(0, 1).toUpperCase()}</Avatar>
-                        <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.65rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 /* Erlaubt dem Namen, den verfügbaren Platz zu nehmen */ }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {row.name}
                         </Typography>
                         {row.isActive && (
@@ -194,10 +231,10 @@ const LeagueTable = ({ title }) => {
                             label="A"
                             size="small"
                             sx={{
-                              ml: 0.5,
-                              height: 16,
-                              minWidth: 16,
-                              fontSize: '0.6rem',
+                              ml: 1,
+                              height: 20,
+                              minWidth: 20,
+                              fontSize: '0.7rem',
                               fontWeight: 'bold',
                               backgroundColor: '#4caf50',
                               color: '#000',
@@ -208,65 +245,28 @@ const LeagueTable = ({ title }) => {
                           />
                         )}
                       </Box>
-                    </Box>
-                  ) : (
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar
-                        alt={`${row.name} Logo`}
-                        src={row.logoUrl || undefined}
-                        sx={{
-                          width: 20,
-                          height: 20,
-                          mr: 1,
-                          fontSize: '0.7rem',
-                          color: theme.palette.getContrastText(row.logoColor || theme.palette.grey[700]),
-                          backgroundColor: row.logoColor || theme.palette.grey[700]
-                        }}
-                      >{row.name.substring(0, 1).toUpperCase()}</Avatar>
-                      <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {row.name}
-                      </Typography>
-                      {row.isActive && (
-                        <Chip
-                          label="A"
-                          size="small"
-                          sx={{
-                            ml: 1,
-                            height: 20,
-                            minWidth: 20,
-                            fontSize: '0.7rem',
-                            fontWeight: 'bold',
-                            backgroundColor: '#4caf50',
-                            color: '#000',
-                            '& .MuiChip-label': {
-                              px: 0.5,
-                            },
-                          }}
-                        />
-                      )}
-                    </Box>
-                  )}
-                </StyledTableCell>
-                <StyledTableCell align="center">{row.years}</StyledTableCell>
-                <StyledTableCell align="center">{row.games}</StyledTableCell>
-                <StyledTableCell align="center" hideOnMobile>{row.goals}</StyledTableCell>
-                <StyledTableCell align="center" hideOnMobile>{row.conceded}</StyledTableCell>
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: row.diff > 0 ? theme.palette.success.light : (row.diff < 0 ? theme.palette.error.light : theme.palette.grey[300]) }}>
-                  {row.diff > 0 ? `+${row.diff}` : row.diff}
-                </StyledTableCell>
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }}>{row.points}</StyledTableCell>
-              </TableRow>
-            ))}
-            {tableData.length === 0 && (
-              <TableRow>
-                <StyledTableCell colSpan={7} align="center" sx={{ color: 'grey.400' }}>
-                  Noch keine Daten für die Ewige Tabelle vorhanden.
-                </StyledTableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                    )}
+                  </StyledTableCell>
+                  <StyledTableCell align="center">{row.years}</StyledTableCell>
+                  <StyledTableCell align="center">{row.games}</StyledTableCell>
+                  <StyledTableCell align="center" hideOnMobile>{row.goals}</StyledTableCell>
+                  <StyledTableCell align="center" hideOnMobile>{row.conceded}</StyledTableCell>
+                  <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: row.diff > 0 ? theme.palette.success.light : (row.diff < 0 ? theme.palette.error.light : theme.palette.grey[300]) }}>
+                    {row.diff > 0 ? `+${row.diff}` : row.diff}
+                  </StyledTableCell>
+                  <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100] }}>{row.points}</StyledTableCell>
+                </TableRow>
+              ))}
+              {tableData.length === 0 && (
+                <TableRow>
+                  <StyledTableCell colSpan={7} align="center" sx={{ color: 'grey.400' }}>
+                    Noch keine Daten für die Ewige Tabelle vorhanden.
+                  </StyledTableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
     </Container>
   );

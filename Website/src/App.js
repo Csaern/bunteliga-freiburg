@@ -1,8 +1,7 @@
 import React from 'react';
 import { Routes, Route, useParams } from 'react-router-dom'; // useParams importieren
-import { ThemeProvider } from '@mui/material/styles';
+import { ColorModeProvider } from './context/ColorModeContext';
 import CssBaseline from '@mui/material/CssBaseline';
-import theme from './theme';
 import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -30,7 +29,6 @@ import AdminDashboard from './components/Admin/AdminDashboard';
 import DashboardPage from './pages/DashboardPage';
 import TeamPage from './pages/TeamPage';
 import TeamDetailPage from './pages/TeamDetailPage';
-import GameManagementPage from './pages/GameManagementPage';
 
 // Eine kleine Helfer-Komponente, um den URL-Parameter an das AdminBoard zu übergeben
 function AdminBoardWrapper() {
@@ -43,7 +41,7 @@ function AdminBoardWrapper() {
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
+    <ColorModeProvider>
       <CssBaseline />
       <AuthProvider>
         <div className="app-container">
@@ -70,9 +68,6 @@ function App() {
               <Route path="/regeln" element={<RulesPage />} />
               <Route path="/team" element={<TeamPage />} />
               <Route path="/team/:teamId" element={<TeamDetailPage />} />
-              {/* <Route path="/ergebnis-bestaetigen" element={<ResultConfirmationPage />} /> */}
-              <Route path="/spiel-verwaltung" element={<GameManagementPage />} />
-
               {/* Die Catch-all Route muss immer am Ende stehen */}
               <Route path="*" element={<HomePage />} />
             </Routes>
@@ -80,7 +75,7 @@ function App() {
           <Footer />
         </div>
       </AuthProvider>
-    </ThemeProvider>
+    </ColorModeProvider>
   );
 }
 

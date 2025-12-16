@@ -65,7 +65,7 @@ const LegalNoticePage = () => {
   return (
     <Container maxWidth="md" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
       <Typography
-        variant={isMobile ? 'h5' : 'h3'} // Kleinere Hauptüberschrift für Mobile
+        variant={isMobile ? 'h4' : 'h3'} // Kleinere Hauptüberschrift für Mobile
         component="h1"
         sx={{
           mb: 4,

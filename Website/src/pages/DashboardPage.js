@@ -5,7 +5,7 @@ import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import TeamSettings from '../components/TeamSettings';
 import CreateGameModal from '../components/Modals/CreateGameModal';
-import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, FormControl, InputLabel, Select, MenuItem, List, ListItem, ListItemIcon, ListItemText, Card, Divider, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, Snackbar, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Alert } from '@mui/material';
 import { API_BASE_URL } from '../services/apiClient';
 import { ReusableModal } from '../components/Helpers/modalUtils';
 import * as seasonApi from '../services/seasonApiService';
@@ -19,9 +19,6 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 import SettingsIcon from '@mui/icons-material/Settings';
-import PersonIcon from '@mui/icons-material/Person';
-import EmailIcon from '@mui/icons-material/Email';
-import GroupIcon from '@mui/icons-material/Group';
 import EventIcon from '@mui/icons-material/Event';
 
 const DashboardPage = () => {
@@ -41,8 +38,7 @@ const DashboardPage = () => {
   const [showTeamSettings, setShowTeamSettings] = useState(false);
   const [isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
 
-  // State for Edit Modal
-  const [selectedResult, setSelectedResult] = useState(null);
+
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportForm, setReportForm] = useState({ bookingId: '', homeScore: '', awayScore: '' });
   const [reportOptions, setReportOptions] = useState([]);
@@ -91,16 +87,7 @@ const DashboardPage = () => {
     gap: 1.5,
   };
 
-  const darkInputStyle = {
-    '& label.Mui-focused': { color: theme.palette.primary.main },
-    '& .MuiOutlinedInput-root': {
-      '& fieldset': { borderColor: theme.palette.grey[700] },
-      '&:hover fieldset': { borderColor: theme.palette.grey[500] },
-      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
-    },
-    '& .MuiInputBase-input': { color: theme.palette.text.primary },
-    '& label': { color: theme.palette.text.secondary },
-  };
+
 
   const fetchData = useCallback(async () => {
     if (!currentUser) return;
@@ -426,7 +413,7 @@ const DashboardPage = () => {
 
         {/* Header */}
         <Grid sx={{ textAlign: 'center' }}>
-          <Typography variant="h4" component="h1" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontWeight: 700, mb: 2, textTransform: 'uppercase' }}>
+          <Typography variant={isDesktop ? 'h3' : 'h4'} component="h1" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontWeight: 700, mb: 2, textTransform: 'uppercase' }}>
             Teamboard
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>

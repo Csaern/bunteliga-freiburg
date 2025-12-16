@@ -67,7 +67,7 @@ const PrivacyPage = () => {
   return (
     <Container maxWidth="md" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
       <Typography
-        variant={isMobile ? 'h5' : 'h4'}
+        variant={isMobile ? 'h4' : 'h3'}
         component="h1"
         sx={{
           mb: 4,
@@ -77,7 +77,7 @@ const PrivacyPage = () => {
           fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
-          letterSpacing: { xs: '0.05em', sm: '0.1em' }, // Angepasst für mobil
+          letterSpacing: '0.1em', // Standardized letter spacing
           wordBreak: 'break-word', // Erzwingt den Umbruch, um Überlaufen zu verhindern
         }}
       >

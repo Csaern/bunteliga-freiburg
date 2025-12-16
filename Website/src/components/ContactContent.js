@@ -184,7 +184,7 @@ const ContactContent = () => {
             }}
         >
             <Typography
-                variant="h3"
+                variant={isMobile ? 'h4' : 'h3'}
                 component="h1"
                 textAlign="center"
                 sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.primary.main, mb: 1 }}

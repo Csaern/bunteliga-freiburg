@@ -102,13 +102,14 @@ const LoginPage = () => {
       >
         <Typography
           component="h1"
-          variant="h5"
+          variant="h3"
           sx={{
             fontFamily: 'Comfortaa',
             fontWeight: 700,
             color: theme.palette.primary.main,
             textTransform: 'uppercase',
             mb: 3,
+            fontSize: { xs: '1.5rem', sm: '3rem' } // Manual override to match h4/h3 roughly if needed, or just use variant
           }}
         >
           Anmeldung

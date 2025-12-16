@@ -21,8 +21,8 @@ import List from '@mui/material/List';
 import Collapse from '@mui/material/Collapse';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import { styled, useTheme } from '@mui/material/styles';
-import useMediaQuery from '@mui/material/useMediaQuery'; // Added import
+import { styled, useTheme, alpha } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { Link } from 'react-router-dom';
 
 import HomeIcon from '@mui/icons-material/Home';
@@ -43,8 +43,9 @@ import StyleIcon from '@mui/icons-material/Style';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import ArticleIcon from '@mui/icons-material/Article';
-
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../img/logo.png';
@@ -52,6 +53,7 @@ import logo from '../img/logo.png';
 import { useAuth } from '../context/AuthProvider';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
+import { ColorModeContext } from '../context/ColorModeContext';
 
 
 const pages = [
@@ -106,20 +108,30 @@ const initialLogoHeight = 65;
 const shrunkLogoHeight = 40;
 const mobileInitialLogoHeight = 60;
 const mobileShrunkLogoHeight = 30;
-const appBarBackgroundColor = 'rgba(10, 10, 10, 0.77)';
+// const appBarBackgroundColor = 'rgba(10, 10, 10, 0.77)'; 
 const appBarBlur = 'blur(8px)';
-const colorfulTextPalette = [
-  '#00A99D', // theme.palette.primary.main
-  '#FFBF00', // theme.palette.secondary.main
-  '#3366CC',
-  '#4CAF50',
+const lightPalette = [
+  '#E91E63', // Pink
+  '#FFC107', // Amber/Yellow
+  '#9C27B0', // Purple
+  '#00BCD4', // Cyan
+];
+
+const darkPalette = [
+  '#00A99D', // Original Teal
+  '#FFBF00', // Original Amber
+  '#3366CC', // Original Blue
+  '#4CAF50', // Original Green
 ];
 
 const ColorfulText = ({ text }) => {
+  const theme = useTheme();
+  const palette = theme.palette.mode === 'light' ? lightPalette : darkPalette;
+
   return (
     <Box component="span" sx={{ display: 'inline-flex' }}>
       {text.split('').map((char, index) => (
-        <Box component="span" key={index} sx={{ color: colorfulTextPalette[index % colorfulTextPalette.length] }}>
+        <Box component="span" key={index} sx={{ color: palette[index % palette.length] }}>
           {char}
         </Box>
       ))}
@@ -139,6 +151,7 @@ const CustomDrawerHeader = styled('div')(({ theme }) => ({
 function Header() {
   const navigate = useNavigate();
   const theme = useTheme();
+  const colorMode = React.useContext(ColorModeContext);
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isShrunk, setIsShrunk] = React.useState(false);
@@ -146,6 +159,11 @@ function Header() {
   const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = React.useState(false);
   const [teamboardMenuAnchorEl, setTeamboardMenuAnchorEl] = React.useState(null);
   const [mobileTeamboardMenuOpen, setMobileTeamboardMenuOpen] = React.useState(false);
+
+  // Determine dynamic background color for AppBar based on theme mode
+  const appBarBackgroundColor = theme.palette.mode === 'dark'
+    ? 'rgba(10, 10, 10, 0.77)'
+    : 'rgba(255, 255, 255, 0.85)';
 
   // Custom breakpoint for mobile menu activation at 850px
   const isMobile = useMediaQuery('(max-width:850px)');
@@ -185,9 +203,9 @@ function Header() {
     <Box
       sx={{
         width: '100%',
-        backgroundColor: appBarBackgroundColor,
+        backgroundColor: theme.palette.background.paper, // Dynamic background
         backdropFilter: appBarBlur,
-        color: theme.palette.common.white,
+        color: theme.palette.text.primary, // Dynamic text color
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -198,21 +216,24 @@ function Header() {
         scrollbarWidth: 'none',
       }}
     >
-      <CustomDrawerHeader sx={{ justifyContent: 'flex-end' }}>
-        <IconButton onClick={handleDrawerToggle} sx={{ color: theme.palette.common.white }}>
+      <CustomDrawerHeader sx={{ justifyContent: 'space-between' }}>
+        <IconButton sx={{ ml: 1 }} onClick={colorMode.toggleColorMode} color="inherit">
+          {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+        </IconButton>
+        <IconButton onClick={handleDrawerToggle} sx={{ color: theme.palette.text.primary }}>
           {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </IconButton>
       </CustomDrawerHeader>
-      <Divider sx={{ borderColor: theme.palette.grey[850] }} />
+      <Divider sx={{ borderColor: theme.palette.divider }} />
 
       <List>
         {currentUser && teamId && (
           <>
             <ListItem disablePadding>
               <ListItemButton onClick={handleMobileTeamboardMenuToggle} sx={{ margin: theme.spacing(0.5, 1) }}>
-                <ListItemIcon sx={{ color: theme.palette.common.white, minWidth: 'auto', mr: 1.5 }}><DashboardIcon fontSize="small" /></ListItemIcon>
-                <ListItemText primary="Teamboard" primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.common.white }} />
-                {mobileTeamboardMenuOpen ? <ExpandLess sx={{ color: 'white' }} /> : <ExpandMore sx={{ color: 'white' }} />}
+                <ListItemIcon sx={{ color: theme.palette.text.primary, minWidth: 'auto', mr: 1.5 }}><DashboardIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primary="Teamboard" primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.text.primary }} />
+                {mobileTeamboardMenuOpen ? <ExpandLess sx={{ color: theme.palette.text.primary }} /> : <ExpandMore sx={{ color: theme.palette.text.primary }} />}
               </ListItemButton>
             </ListItem>
             <Collapse in={mobileTeamboardMenuOpen} timeout="auto" unmountOnExit>
@@ -223,11 +244,11 @@ function Header() {
                     <ListItem key={page.text} disablePadding sx={{ pl: 4 }}>
                       <ListItemButton component={Link} to={page.path} onClick={handleDrawerToggle}
                         sx={{
-                          backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent',
+                          backgroundColor: isActive ? alpha(theme.palette.secondary.main, 0.2) : 'transparent',
                           borderRadius: theme.shape.borderRadius, margin: theme.spacing(0.5, 1),
                         }}
                       >
-                        <ListItemText primary={page.text} primaryTypographyProps={{ fontSize: '0.9rem', color: isActive ? theme.palette.secondary.main : 'inherit' }} />
+                        <ListItemText primary={page.text} primaryTypographyProps={{ fontSize: '0.9rem', color: isActive ? theme.palette.secondary.main : theme.palette.text.primary }} />
                       </ListItemButton>
                     </ListItem>
                   );
@@ -241,9 +262,9 @@ function Header() {
           <>
             <ListItem disablePadding>
               <ListItemButton onClick={handleMobileAdminMenuToggle} sx={{ margin: theme.spacing(0.5, 1) }}>
-                <ListItemIcon sx={{ color: theme.palette.common.white, minWidth: 'auto', mr: 1.5 }}><AdminPanelSettingsIcon fontSize="small" /></ListItemIcon>
-                <ListItemText primary="Admin" primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.common.white }} />
-                {mobileAdminMenuOpen ? <ExpandLess sx={{ color: 'white' }} /> : <ExpandMore sx={{ color: 'white' }} />}
+                <ListItemIcon sx={{ color: theme.palette.text.primary, minWidth: 'auto', mr: 1.5 }}><AdminPanelSettingsIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primary="Admin" primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.text.primary }} />
+                {mobileAdminMenuOpen ? <ExpandLess sx={{ color: theme.palette.text.primary }} /> : <ExpandMore sx={{ color: theme.palette.text.primary }} />}
               </ListItemButton>
             </ListItem>
             <Collapse in={mobileAdminMenuOpen} timeout="auto" unmountOnExit>
@@ -254,11 +275,11 @@ function Header() {
                     <ListItem key={page.text} disablePadding sx={{ pl: 4 }}>
                       <ListItemButton component={Link} to={page.path} onClick={handleDrawerToggle}
                         sx={{
-                          backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent',
+                          backgroundColor: isActive ? alpha(theme.palette.secondary.main, 0.2) : 'transparent',
                           borderRadius: theme.shape.borderRadius, margin: theme.spacing(0.5, 1),
                         }}
                       >
-                        <ListItemText primary={page.text} primaryTypographyProps={{ fontSize: '0.9rem', color: isActive ? theme.palette.secondary.main : 'inherit' }} />
+                        <ListItemText primary={page.text} primaryTypographyProps={{ fontSize: '0.9rem', color: isActive ? theme.palette.secondary.main : theme.palette.text.primary }} />
                       </ListItemButton>
                     </ListItem>
                   );
@@ -275,15 +296,15 @@ function Header() {
             <ListItem key={pageItem.text} disablePadding>
               <ListItemButton component={Link} to={pageItem.path} onClick={handleDrawerToggle}
                 sx={{
-                  backgroundColor: isActive ? 'rgba(255, 191, 0, 0.2)' : 'transparent',
-                  '&:hover': { backgroundColor: theme.palette.grey[800] },
+                  backgroundColor: isActive ? alpha(theme.palette.secondary.main, 0.2) : 'transparent',
+                  '&:hover': { backgroundColor: theme.palette.action.hover },
                   borderRadius: theme.shape.borderRadius, margin: theme.spacing(0.5, 1),
                 }}
               >
-                <ListItemIcon sx={{ color: isActive ? theme.palette.secondary.main : theme.palette.grey[400], minWidth: 'auto', mr: 1.5 }}>
+                <ListItemIcon sx={{ color: isActive ? theme.palette.secondary.main : theme.palette.text.secondary, minWidth: 'auto', mr: 1.5 }}>
                   {IconComponent ? <IconComponent fontSize="small" /> : null}
                 </ListItemIcon>
-                <ListItemText primary={pageItem.text} primaryTypographyProps={{ fontWeight: isActive ? 'bold' : 'normal', color: isActive ? theme.palette.secondary.main : theme.palette.grey[300] }} />
+                <ListItemText primary={pageItem.text} primaryTypographyProps={{ fontWeight: isActive ? 'bold' : 'normal', color: isActive ? theme.palette.secondary.main : theme.palette.text.primary }} />
               </ListItemButton>
             </ListItem>
           );
@@ -291,14 +312,14 @@ function Header() {
       </List>
 
       <Box sx={{ marginTop: 'auto' }}>
-        <Divider sx={{ borderColor: theme.palette.grey[850], mt: 1, mb: 0 }} />
+        <Divider sx={{ borderColor: theme.palette.divider, mt: 1, mb: 0 }} />
         <ListItem disablePadding>
           {currentUser ? (
             <ListItemButton onClick={() => { handleLogout(); handleDrawerToggle(); }} sx={{ margin: 0, width: '100%', borderRadius: 0, bgcolor: theme.palette.error.main, '&:hover': { bgcolor: theme.palette.error.dark } }}>
               <ListItemIcon sx={{ color: theme.palette.common.white, minWidth: 'auto', mr: 1.5 }}><LogoutIcon fontSize="small" /></ListItemIcon>
               <ListItemText primary={`Abmelden`} secondary={currentUser.email} primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.common.white }} secondaryTypographyProps={{
                 fontSize: '0.7rem',
-                color: theme.palette.grey[300],
+                color: 'rgba(255,255,255,0.7)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
@@ -316,7 +337,17 @@ function Header() {
   );
 
   return (
-    <AppBar position="sticky" sx={{ backgroundColor: appBarBackgroundColor, backdropFilter: appBarBlur, boxShadow: isShrunk ? theme.shadows[4] : theme.shadows[1], borderBottom: `1px solid ${theme.palette.grey[900]}` }}>
+    <AppBar position="sticky" sx={{
+      backgroundColor: appBarBackgroundColor,
+      backdropFilter: appBarBlur,
+      boxShadow: theme.palette.mode === 'light'
+        ? (isShrunk ? '0 2px 4px rgba(0,0,0,0.02)' : 'none')
+        : (isShrunk ? theme.shadows[4] : theme.shadows[1]),
+      borderBottom: theme.palette.mode === 'light'
+        ? '1px solid rgba(0, 0, 0, 0.03)'
+        : '1px solid #444',
+      color: theme.palette.text.primary
+    }}>
       <Container maxWidth="xl">
         <Toolbar disableGutters sx={{ position: 'relative', minHeight: { xs: isShrunk ? 48 : 70, md: isShrunk ? 50 : 90 }, transition: theme.transitions.create(['min-height'], { duration: theme.transitions.duration.short }), py: { xs: isShrunk ? 0.25 : 0.5, md: isShrunk ? 0.25 : 0.5 } }}>
           <Box sx={{ display: isMobile ? 'none' : 'flex', alignItems: 'center', flexGrow: 1 }}>
@@ -358,7 +389,7 @@ function Header() {
           </Box>
 
 
-          <Drawer variant="temporary" anchor="left" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, backgroundColor: '#111', backdropFilter: appBarBlur, color: theme.palette.common.white, borderRight: `1px solid ${theme.palette.grey[800]}`, overflowX: 'hidden' } }}>
+          <Drawer variant="temporary" anchor="left" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRight: `1px solid ${theme.palette.divider}`, overflowX: 'hidden' } }}>
             {drawerContent}
           </Drawer>
 
@@ -367,7 +398,7 @@ function Header() {
               const isActive = location.pathname === pageItem.path;
               return (
                 <Button key={pageItem.text} onClick={() => navigate(pageItem.path)}
-                  sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: isActive ? theme.palette.secondary.main : 'rgba(255, 255, 255, 0.75)', display: 'block', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: isActive ? 'bold' : 400, borderBottom: isActive ? `3px solid ${theme.palette.secondary.main}` : '3px solid transparent', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: theme.palette.common.white, borderBottom: `3px solid rgba(255, 255, 255, 0.15)` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
+                  sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: isActive ? theme.palette.secondary.main : theme.palette.text.primary, display: 'block', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: isActive ? 'bold' : 400, borderBottom: isActive ? `3px solid ${theme.palette.secondary.main}` : '3px solid transparent', '&:hover': { backgroundColor: theme.palette.action.hover, color: theme.palette.text.primary, borderBottom: `3px solid ${theme.palette.action.hover}` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
                 >
                   {pageItem.text}
                 </Button>
@@ -377,13 +408,13 @@ function Header() {
             {currentUser && teamId && (
               <>
                 <Button id="teamboard-menu-button" onClick={handleTeamboardMenuOpen}
-                  sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: isTeamboardActive ? theme.palette.secondary.main : 'rgba(255, 255, 255, 0.75)', display: 'block', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: isTeamboardActive ? 'bold' : 400, borderBottom: isTeamboardActive ? `3px solid ${theme.palette.secondary.main}` : '3px solid transparent', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: theme.palette.common.white, borderBottom: `3px solid rgba(255, 255, 255, 0.15)` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
+                  sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: isTeamboardActive ? theme.palette.secondary.main : theme.palette.text.primary, display: 'block', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: isTeamboardActive ? 'bold' : 400, borderBottom: isTeamboardActive ? `3px solid ${theme.palette.secondary.main}` : '3px solid transparent', '&:hover': { backgroundColor: theme.palette.action.hover, color: theme.palette.text.primary, borderBottom: `3px solid ${theme.palette.action.hover}` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
                 >
                   Teamboard
                 </Button>
-                <Menu id="teamboard-menu" anchorEl={teamboardMenuAnchorEl} open={Boolean(teamboardMenuAnchorEl)} onClose={handleTeamboardMenuClose} MenuListProps={{ 'aria-labelledby': 'teamboard-menu-button' }} PaperProps={{ sx: { backgroundColor: '#333', color: 'white' } }}>
+                <Menu id="teamboard-menu" anchorEl={teamboardMenuAnchorEl} open={Boolean(teamboardMenuAnchorEl)} onClose={handleTeamboardMenuClose} MenuListProps={{ 'aria-labelledby': 'teamboard-menu-button' }} PaperProps={{ sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary } }}>
                   {teamboardPages.map((page) => (
-                    <MenuItem key={page.text} onClick={() => { handleTeamboardMenuClose(); navigate(page.path); }} sx={{ '&:hover': { backgroundColor: 'rgba(255, 191, 0, 0.2)' } }}>
+                    <MenuItem key={page.text} onClick={() => { handleTeamboardMenuClose(); navigate(page.path); }} sx={{ '&:hover': { backgroundColor: alpha(theme.palette.secondary.main, 0.2) } }}>
                       {page.text}
                     </MenuItem>
                   ))}
@@ -394,19 +425,23 @@ function Header() {
             {isAdmin && (
               <>
                 <Button id="admin-menu-button" aria-controls={Boolean(adminMenuAnchorEl) ? 'admin-menu' : undefined} aria-haspopup="true" aria-expanded={Boolean(adminMenuAnchorEl) ? 'true' : undefined} onClick={handleAdminMenuOpen}
-                  sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: location.pathname.startsWith('/admin') ? theme.palette.secondary.main : 'rgba(255, 255, 255, 0.75)', display: 'block', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: location.pathname.startsWith('/admin') ? 'bold' : 400, borderBottom: location.pathname.startsWith('/admin') ? `3px solid ${theme.palette.secondary.main}` : '3px solid transparent', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: theme.palette.common.white, borderBottom: `3px solid rgba(255, 255, 255, 0.15)` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
+                  sx={{ my: isShrunk ? 0.1 : 0.5, mx: isShrunk ? 0.3 : 0.5, color: location.pathname.startsWith('/admin') ? theme.palette.secondary.main : theme.palette.text.primary, display: 'block', fontSize: isShrunk ? '0.78rem' : '0.9rem', fontWeight: location.pathname.startsWith('/admin') ? 'bold' : 400, borderBottom: location.pathname.startsWith('/admin') ? `3px solid ${theme.palette.secondary.main}` : '3px solid transparent', '&:hover': { backgroundColor: theme.palette.action.hover, color: theme.palette.text.primary, borderBottom: `3px solid ${theme.palette.action.hover}` }, transition: theme.transitions.create(['margin', 'font-size', 'color', 'border-bottom', 'padding', 'background-color'], { duration: theme.transitions.duration.short }), padding: isShrunk ? '4px 10px' : '6px 14px', minWidth: 'auto', textTransform: 'none' }}
                 >
                   Admin
                 </Button>
-                <Menu id="admin-menu" anchorEl={adminMenuAnchorEl} open={Boolean(adminMenuAnchorEl)} onClose={handleAdminMenuClose} MenuListProps={{ 'aria-labelledby': 'admin-menu-button' }} PaperProps={{ sx: { backgroundColor: '#333', color: 'white' } }}>
+                <Menu id="admin-menu" anchorEl={adminMenuAnchorEl} open={Boolean(adminMenuAnchorEl)} onClose={handleAdminMenuClose} MenuListProps={{ 'aria-labelledby': 'admin-menu-button' }} PaperProps={{ sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary } }}>
                   {adminPages.map((page) => (
-                    <MenuItem key={page.text} onClick={() => { handleAdminMenuClose(); navigate(page.path); }} sx={{ '&:hover': { backgroundColor: 'rgba(255, 191, 0, 0.2)' } }}>
+                    <MenuItem key={page.text} onClick={() => { handleAdminMenuClose(); navigate(page.path); }} sx={{ '&:hover': { backgroundColor: alpha(theme.palette.secondary.main, 0.2) } }}>
                       {page.text}
                     </MenuItem>
                   ))}
                 </Menu>
               </>
             )}
+
+            <IconButton sx={{ ml: 1 }} onClick={colorMode.toggleColorMode} color="inherit">
+              {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+            </IconButton>
 
             <Box sx={{ ml: 1 }}>
               {currentUser ? (
