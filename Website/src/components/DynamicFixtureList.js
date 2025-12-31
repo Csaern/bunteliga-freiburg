@@ -30,6 +30,7 @@ import { API_BASE_URL } from '../services/apiClient';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import * as seasonApiService from '../services/seasonApiService';
+import GameDetailsModal from './Modals/GameDetailsModal';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
@@ -69,6 +70,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   const [selectedFixture, setSelectedFixture] = useState(null);
   const [pitchName, setPitchName] = useState('');
   const [pitchesMap, setPitchesMap] = useState({});
+  const [pitches, setPitches] = useState([]);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportForm, setReportForm] = useState({ homeScore: '', awayScore: '' });
@@ -179,6 +181,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           name: t.name,
           logoColor: t.logoColor || '#666666',
           logoUrl: t.logoUrl,
+          logoUrlLight: t.logoUrlLight,
           description: t.description,
           foundedYear: t.foundedYear,
         };
@@ -307,6 +310,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                     name: teamData.name || 'Unbekannt',
                     logoColor: teamData.logoColor || '#666666',
                     logoUrl: teamData.logoUrl,
+                    logoUrlLight: teamData.logoUrlLight,
                     description: teamData.description,
                     foundedYear: teamData.foundedYear,
                   };
@@ -327,6 +331,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                   name: (result?.homeTeamId === teamId ? result.homeTeamName : result?.awayTeamName) || 'Unbekannt',
                   logoColor: '#666666',
                   logoUrl: null,
+                  logoUrlLight: null,
                 };
               }
             });
@@ -347,6 +352,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                   name: result.awayTeamName,
                   logoColor: '#666666',
                   logoUrl: null,
+                  logoUrlLight: null,
                 };
               }
             });
@@ -381,22 +387,41 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         }
 
         allFixtures.push(...results.map(result => {
-          // Versuche das Datum aus der zugehörigen Buchung zu bekommen, sonst verwende reportedAt
+          // Priorität 1: Datum/Ort direkt aus dem Ergebnis (neue Logik)
           let resultDate = null;
           let resultTime = '';
-          let resultPitchId = null; // NEU
+          let resultLocation = null;
+          let resultPitchId = null;
 
-          if (result.bookingId && bookingsMap[result.bookingId]) {
-            const booking = bookingsMap[result.bookingId];
-            const bookingDate = normalizeToDate(booking.date);
-            if (bookingDate) {
-              resultDate = bookingDate.toISOString().split('T')[0];
-              resultTime = bookingDate.toTimeString().slice(0, 5);
+          if (result.date) {
+            const d = normalizeToDate(result.date);
+            if (d) {
+              resultDate = d.toISOString().split('T')[0];
+              resultTime = d.toTimeString().slice(0, 5);
             }
-            resultPitchId = booking.pitchId; // NEU
           }
 
-          // Fallback: Verwende reportedAt
+          if (result.location) {
+            resultLocation = result.location;
+          }
+
+          // Priorität 2: Fallback auf Buchung (alte Logik)
+          if (result.bookingId && bookingsMap[result.bookingId]) {
+            const booking = bookingsMap[result.bookingId];
+
+            if (!resultDate) {
+              const bookingDate = normalizeToDate(booking.date);
+              if (bookingDate) {
+                resultDate = bookingDate.toISOString().split('T')[0];
+                resultTime = bookingDate.toTimeString().slice(0, 5);
+              }
+            }
+
+            // Nur PitchId setzen, Location kommt idealerweise aus Result
+            if (!resultPitchId) resultPitchId = booking.pitchId;
+          }
+
+          // Priorität 3: Fallback auf reportedAt (ganz alt)
           if (!resultDate) {
             const reportedDate = normalizeToDate(result.reportedAt);
             if (reportedDate) {
@@ -407,6 +432,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
           return {
             id: `result-${result.id}`,
+            bookingId: result.bookingId, // WICHTIG: bookingId hinzufügen
             date: resultDate || '',
             time: resultTime,
             homeTeamId: result.homeTeamId,
@@ -414,8 +440,8 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             homeScore: result.homeScore,
             awayScore: result.awayScore,
             isPast: true,
-            location: " ", // Wird später gefüllt
-            pitchId: resultPitchId, // NEU
+            location: resultLocation, // Wird unten ggf. durch Pitch-Namen überschrieben wenn leer
+            pitchId: resultPitchId,
             homeTeamName: result.homeTeamName,
             awayTeamName: result.awayTeamName,
           };
@@ -442,8 +468,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       if (pitchIds.size > 0) {
         try {
           // Optimierung: Wir könnten hier cachen oder nur fehlende laden, aber getPublicPitches lädt eh alle (meistens wenige)
-          const pitches = await pitchApi.getPublicPitches();
-          pitches.forEach(pitch => {
+          const pitchesDataList = await pitchApi.getPublicPitches();
+          setPitches(pitchesDataList);
+          pitchesDataList.forEach(pitch => {
             if (pitchIds.has(pitch.id)) {
               pitchesData[pitch.id] = pitch.name;
             }
@@ -454,11 +481,11 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         }
       }
 
-      // Update Locations für Ergebnisse
+      // Update Locations für Ergebnisse (nur wenn noch nicht gesetzt)
       allFixtures.forEach(f => {
-        if (f.pitchId && pitchesData[f.pitchId]) {
+        if (!f.location && f.pitchId && pitchesData[f.pitchId]) {
           f.location = pitchesData[f.pitchId];
-        } else {
+        } else if (!f.location) {
           f.location = 'Unbekannt';
         }
       });
@@ -616,6 +643,13 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     }
   };
 
+  const getLogoUrl = (team) => {
+    if (!team) return null;
+    const isLightMode = theme.palette.mode === 'light';
+    const logoUrlToUse = (isLightMode && team.logoUrlLight) ? team.logoUrlLight : team.logoUrl;
+    return logoUrlToUse ? (logoUrlToUse.startsWith('http') ? logoUrlToUse : `${API_BASE_URL}${logoUrlToUse}`) : null;
+  };
+
   const rowHeight = isMobile ? 55 : 60;
 
   const Wrapper = disableContainer ? Box : Container;
@@ -732,12 +766,12 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
               return (
                 <TableRow
                   key={fixture.id}
-                  onClick={isMyGame ? () => handleFixtureClick(fixture) : undefined}
+                  onClick={() => handleFixtureClick(fixture)}
                   sx={{
                     '&:hover': { backgroundColor: theme.palette.action.hover },
                     opacity: 1, // Full opacity for readability
                     height: rowHeight,
-                    cursor: isMyGame ? 'pointer' : 'default',
+                    cursor: 'pointer',
                   }}
                 >
                   {details && (
@@ -768,7 +802,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                       <Avatar
                         variant="rounded"
                         alt={`${teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'} Logo`}
-                        src={teams[fixture.homeTeamId]?.logoUrl ? (teams[fixture.homeTeamId].logoUrl.startsWith('http') ? teams[fixture.homeTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.homeTeamId].logoUrl}`) : null}
+                        src={getLogoUrl(teams[fixture.homeTeamId])}
                         sx={{
                           width: isMobile ? 28 : 32, // Etwas größer für bessere Sichtbarkeit
                           height: isMobile ? 28 : 32,
@@ -816,7 +850,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                       <Avatar
                         variant="rounded"
                         alt={`${teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'} Logo`}
-                        src={teams[fixture.awayTeamId]?.logoUrl ? (teams[fixture.awayTeamId].logoUrl.startsWith('http') ? teams[fixture.awayTeamId].logoUrl : `${API_BASE_URL}${teams[fixture.awayTeamId].logoUrl}`) : null}
+                        src={getLogoUrl(teams[fixture.awayTeamId])}
                         sx={{
                           width: isMobile ? 28 : 32,
                           height: isMobile ? 28 : 32,
@@ -853,98 +887,15 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       </TableContainer>
 
       {/* Modal für Spiel-Details */}
-      {selectedFixture && !showReportModal && (
-        <ReusableModal
-          open={!!selectedFixture}
-          onClose={() => setSelectedFixture(null)}
-          title="Spiel-Details"
-        >
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box>
-              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Datum</Typography>
-              <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>
-                {formatDate(selectedFixture.date)} ({getWeekday(selectedFixture.date)})
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Uhrzeit</Typography>
-              <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>{selectedFixture.time} Uhr</Typography>
-            </Box>
-            {pitchName && (
-              <Box>
-                <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Ort</Typography>
-                <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>{pitchName}</Typography>
-              </Box>
-            )}
-            <Box>
-              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Heim</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar
-                  src={teams[selectedFixture.homeTeamId]?.logoUrl ? (teams[selectedFixture.homeTeamId].logoUrl.startsWith('http') ? teams[selectedFixture.homeTeamId].logoUrl : `${API_BASE_URL}${teams[selectedFixture.homeTeamId].logoUrl}`) : null}
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    bgcolor: teams[selectedFixture.homeTeamId]?.logoColor || theme.palette.grey[700],
-                    fontSize: '0.8rem'
-                  }}
-                >
-                  {!teams[selectedFixture.homeTeamId]?.logoUrl && (teams[selectedFixture.homeTeamId]?.name || selectedFixture.homeTeamName || 'H').charAt(0).toUpperCase()}
-                </Avatar>
-                <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>
-                  {teams[selectedFixture.homeTeamId]?.name || selectedFixture.homeTeamName || 'Unbekannt'}
-                </Typography>
-              </Box>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 0.5 }}>Auswärts</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar
-                  src={teams[selectedFixture.awayTeamId]?.logoUrl ? (teams[selectedFixture.awayTeamId].logoUrl.startsWith('http') ? teams[selectedFixture.awayTeamId].logoUrl : `${API_BASE_URL}${teams[selectedFixture.awayTeamId].logoUrl}`) : null}
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    bgcolor: teams[selectedFixture.awayTeamId]?.logoColor || theme.palette.grey[700],
-                    fontSize: '0.8rem'
-                  }}
-                >
-                  {!teams[selectedFixture.awayTeamId]?.logoUrl && (teams[selectedFixture.awayTeamId]?.name || selectedFixture.awayTeamName || 'A').charAt(0).toUpperCase()}
-                </Avatar>
-                <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa' }}>
-                  {teams[selectedFixture.awayTeamId]?.name || selectedFixture.awayTeamName || 'Unbekannt'}
-                </Typography>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 2, pt: 2, borderTop: '1px solid', borderColor: theme.palette.divider }}>
-              <Button
-                variant="outlined"
-                onClick={() => setSelectedFixture(null)}
-                sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}
-              >
-                Schließen
-              </Button>
-              {selectedFixture.bookingId && (
-                <>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleReportResult}
-                    sx={{ bgcolor: theme.palette.primary.main }}
-                  >
-                    Ergebnis melden
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={handleCancelBooking}
-                  >
-                    Spiel absagen
-                  </Button>
-                </>
-              )}
-            </Box>
-          </Box>
-        </ReusableModal>
-      )}
+      <GameDetailsModal
+        open={!!selectedFixture && !showReportModal}
+        onClose={() => setSelectedFixture(null)}
+        fixture={selectedFixture}
+        teams={teams}
+        pitches={pitches}
+        handleReportResult={handleReportResult}
+        handleCancelBooking={handleCancelBooking}
+      />
 
       {/* Modal für Ergebnis melden */}
       {showReportModal && selectedFixture && (

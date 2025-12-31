@@ -8,10 +8,8 @@ class Season {
    * @param {string} data.createdBy - Die UID des Admins, der die Saison erstellt hat.
    * @param {Array<{id: string, name: string}>} [data.teams=[]] - Optional: Eine Liste der teilnehmenden Teams.
    * @param {string} [data.status='planning'] - Optional: Der Status der Saison (z.B. 'planning', 'active', 'finished').
-   * @param {number} [data.maxDenials=3] - Optional: Maximale Anzahl an Ablehnungen.
-   * @param {number} [data.cancellationDeadlineDays=3] - Optional: Tage vor dem Spiel für eine fristgerechte Stornierung.
-   * @param {number} [data.forfeitWinScore=3] - Optional: Tore für das gewinnende Team.
-   * @param {number} [data.forfeitLossScore=0] - Optional: Tore für das verlierende Team.
+   * @param {number} [data.requestExpiryDays=3] - Optional: Tage bis eine Spielanfrage abläuft.
+   * @param {number} [data.friendlyGamesReleaseHours=48] - Optional: Stunden vor einem Termin, an denen er für Freundschaftsspiele freigegeben wird.
    * @param {string} [data.playMode='double_round_robin'] - Optional: Der Spielmodus (z.B. 'double_round_robin').
    * @param {number} [data.minGamesPlayed=0] - Optional: Minimale Anzahl an gespielten Spielen.
    * @param {number} [data.pointsForWin=3] - Optional: Punkte für einen Sieg.
@@ -21,16 +19,13 @@ class Season {
    * @param {string} [data.tieBreakingMode='playoff_game'] - Optional: Modus zur Entscheidung bei Punktgleichheit.
    * @param {Array<number>} [data.tieBreakerForPositions=[1]] - Optional: Positionen, für die ein Tie-Breaker gespielt wird.
    */
-  constructor({ name, startDate, endDate, teams = [], status = 'planning', createdBy, maxDenials = 3, cancellationDeadlineDays = 3, forfeitWinScore = 3, forfeitLossScore = 0, playMode = 'double_round_robin', minGamesPlayed = 0, pointsForWin = 3, pointsForDraw = 1, pointsForLoss = 0, rankingCriteria = ['points', 'goalDifference', 'goalsScored', 'headToHead'], tieBreakingMode = 'playoff_game', tieBreakerForPositions = [1] }) {
+  constructor({ name, startDate, endDate, teams = [], status = 'planning', createdBy, requestExpiryDays = 3, friendlyGamesReleaseHours = 48, playMode = 'double_round_robin', minGamesPlayed = 0, pointsForWin = 3, pointsForDraw = 1, pointsForLoss = 0, rankingCriteria = ['points', 'goalDifference', 'goalsScored', 'headToHead'], tieBreakingMode = 'playoff_game', tieBreakerForPositions = [1] }) {
     // 1. Validierung
     if (!name || !startDate || !endDate || !createdBy) {
       throw new Error('Name, Start-/Enddatum und Ersteller sind erforderlich.');
     }
-    if (typeof maxDenials !== 'number' || maxDenials < 0) {
-        throw new Error('Maximale Anzahl an Ablehnungen muss eine positive Zahl sein.');
-    }
     if (!Array.isArray(teams)) {
-        throw new Error('Teams muss ein Array sein.');
+      throw new Error('Teams muss ein Array sein.');
     }
 
     // 2. Eigenschaften zuweisen
@@ -40,10 +35,8 @@ class Season {
     this.teams = teams;
     this.status = status;
     this.createdBy = createdBy;
-    this.maxDenials = maxDenials;
-    this.cancellationDeadlineDays = cancellationDeadlineDays; 
-    this.forfeitWinScore = forfeitWinScore; // NEU
-    this.forfeitLossScore = forfeitLossScore; // NEU
+    this.requestExpiryDays = requestExpiryDays;
+    this.friendlyGamesReleaseHours = friendlyGamesReleaseHours;
     this.playMode = playMode;
     this.minGamesPlayed = minGamesPlayed;
     this.pointsForWin = pointsForWin;
@@ -58,14 +51,14 @@ class Season {
      * Jedes Team bekommt bei der Erstellung automatisch den Status 'active'.
      */
     this.teams = teams.map(team => {
-        if (!team.id || !team.name) {
-            throw new Error('Jedes Team im Array muss eine ID und einen Namen haben.');
-        }
-        return {
-            id: team.id,
-            name: team.name,
-            status: 'active'
-        };
+      if (!team.id || !team.name) {
+        throw new Error('Jedes Team im Array muss eine ID und einen Namen haben.');
+      }
+      return {
+        id: team.id,
+        name: team.name,
+        status: 'active'
+      };
     });
 
     // 3. Erweiterte Eigenschaften mit Standardwerten
@@ -92,10 +85,8 @@ class Season {
       teams: this.teams,
       status: this.status,
       createdBy: this.createdBy,
-      maxDenials: this.maxDenials,
-      cancellationDeadlineDays: this.cancellationDeadlineDays, 
-      forfeitWinScore: this.forfeitWinScore, // NEU
-      forfeitLossScore: this.forfeitLossScore, // NEU
+      requestExpiryDays: this.requestExpiryDays,
+      friendlyGamesReleaseHours: this.friendlyGamesReleaseHours,
       playMode: this.playMode,
       minGamesPlayed: this.minGamesPlayed,
       pointsForWin: this.pointsForWin,

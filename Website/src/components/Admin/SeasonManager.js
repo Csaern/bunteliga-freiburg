@@ -23,10 +23,8 @@ const defaultSeasonData = {
     startDate: '',
     endDate: '',
     playMode: 'double_round_robin',
-    maxDenials: 3,
-    cancellationDeadlineDays: 2,
-    forfeitWinScore: 2,
-    forfeitLossScore: 0,
+    requestExpiryDays: 3,
+    friendlyGamesReleaseHours: 48,
     pointsForWin: 2,
     pointsForDraw: 1,
     pointsForLoss: 0,
@@ -59,20 +57,19 @@ const SeasonManager = () => {
     const autocompleteInputRef = useRef(null);
 
     const darkInputStyle = {
-        '& label.Mui-focused': { color: '#00A99D' },
+        '& label.Mui-focused': { color: theme.palette.primary.main },
         '& .MuiOutlinedInput-root': {
-            '& fieldset': { borderColor: 'grey.700' },
-            '&:hover fieldset': { borderColor: 'grey.500' },
-            '&.Mui-focused fieldset': { borderColor: '#00A99D' },
-            '&.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.800' },
+            '& fieldset': { borderColor: theme.palette.divider },
+            '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+            '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
+            '&.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.action.disabledBackground },
         },
-        '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark' },
-        '& .MuiInputBase-input.Mui-disabled': { WebkitTextFillColor: theme.palette.grey[500] },
-        '& label': { color: 'grey.400' },
-        '& label.Mui-disabled': { color: 'grey.600' },
-        '& .MuiSelect-icon': { color: 'grey.400' },
-        // KORREKTUR: Icon-Farbe für Autocomplete hinzugefügt
-        '& .MuiAutocomplete-popupIndicator': { color: 'grey.400' },
+        '& .MuiInputBase-input': { color: theme.palette.text.primary },
+        '& .MuiInputBase-input.Mui-disabled': { WebkitTextFillColor: theme.palette.text.disabled },
+        '& label': { color: theme.palette.text.secondary },
+        '& label.Mui-disabled': { color: theme.palette.text.disabled },
+        '& .MuiSelect-icon': { color: theme.palette.text.secondary },
+        '& .MuiAutocomplete-popupIndicator': { color: theme.palette.text.secondary },
     };
 
     const [seasons, setSeasons] = useState([]);
@@ -298,15 +295,15 @@ const SeasonManager = () => {
 
     return (
         <Box sx={{ p: { sm: 3 } }}>
-            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
+            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
                 Saisonverwaltung
             </Typography>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }}>
+                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
                     Neue Saison erstellen
                 </Button>
             </Box>
-            {error && <Alert severity="error" sx={{ mb: 2, bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>{error}</Alert>}
+            {error && <Alert severity="error" sx={{ mb: 2, bgcolor: theme.palette.background.default, color: theme.palette.error.main }}>{error}</Alert>}
 
             <ReusableModal
                 open={isConfirmModalOpen}
@@ -342,45 +339,45 @@ const SeasonManager = () => {
                                         </List>
                                     </>
                                 ) : (
-                                    <Typography sx={{ color: 'grey.300', mb: 3 }}>
+                                    <Typography sx={{ color: theme.palette.text.secondary, mb: 3 }}>
                                         Alle Teams haben mindestens die Hälfte der Spiele absolviert.
                                     </Typography>
                                 )}
                             </>
                         ) : actionToConfirm.action === 'delete' ? (
                             <>
-                                <Typography sx={{ color: 'error.light', mb: 2, fontWeight: 'bold' }}>
+                                <Typography sx={{ color: theme.palette.error.main, mb: 2, fontWeight: 'bold' }}>
                                     WARNUNG: Diese Aktion kann nicht rückgängig gemacht werden!
                                 </Typography>
-                                <Typography sx={{ color: 'grey.300', mb: 2 }}>
+                                <Typography sx={{ color: theme.palette.text.primary, mb: 2 }}>
                                     Möchtest du die Saison "{actionToConfirm.seasonName}" und alle zugehörigen Daten wirklich löschen?
                                 </Typography>
-                                <Typography sx={{ color: 'grey.400', mb: 3, fontSize: '0.9rem' }}>
+                                <Typography sx={{ color: theme.palette.text.secondary, mb: 3, fontSize: '0.9rem' }}>
                                     Folgende Daten werden gelöscht:
                                 </Typography>
-                                <List sx={{ bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1, mb: 3 }}>
+                                <List sx={{ bgcolor: theme.palette.action.hover, borderRadius: 1, mb: 3 }}>
                                     <ListItem>
                                         <ListItemText
                                             primary="Die Saison selbst"
-                                            primaryTypographyProps={{ sx: { color: 'grey.200' } }}
+                                            primaryTypographyProps={{ sx: { color: theme.palette.text.primary } }}
                                         />
                                     </ListItem>
                                     <ListItem>
                                         <ListItemText
                                             primary="Alle Ergebnisse dieser Saison"
-                                            primaryTypographyProps={{ sx: { color: 'grey.200' } }}
+                                            primaryTypographyProps={{ sx: { color: theme.palette.text.primary } }}
                                         />
                                     </ListItem>
                                     <ListItem>
                                         <ListItemText
                                             primary="Alle Spielbuchungen dieser Saison"
-                                            primaryTypographyProps={{ sx: { color: 'grey.200' } }}
+                                            primaryTypographyProps={{ sx: { color: theme.palette.text.primary } }}
                                         />
                                     </ListItem>
                                 </List>
                             </>
                         ) : (
-                            <Typography sx={{ color: 'grey.300', mb: 3 }}>
+                            <Typography sx={{ color: theme.palette.text.primary, mb: 3 }}>
                                 {`Möchtest du die Aktion "${{ activate: 'Aktivieren', archive: 'Archivieren' }[actionToConfirm.action]
                                     }" für die Saison "${actionToConfirm.seasonName}" wirklich durchführen?`}
                             </Typography>
@@ -389,16 +386,16 @@ const SeasonManager = () => {
                             <Button variant="outlined" onClick={() => {
                                 setIsConfirmModalOpen(false);
                                 setTeamsBelowMinimum([]);
-                            }} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
+                            }} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>
                                 Abbrechen
                             </Button>
                             <Button
                                 variant="contained"
                                 onClick={handleConfirmAction}
                                 sx={{
-                                    backgroundColor: actionToConfirm.action === 'delete' ? 'error.main' : '#00A99D',
+                                    backgroundColor: actionToConfirm.action === 'delete' ? theme.palette.error.main : theme.palette.primary.main,
                                     '&:hover': {
-                                        backgroundColor: actionToConfirm.action === 'delete' ? 'error.dark' : '#00897B'
+                                        backgroundColor: actionToConfirm.action === 'delete' ? theme.palette.error.dark : theme.palette.primary.dark
                                     }
                                 }}
                             >
@@ -411,9 +408,9 @@ const SeasonManager = () => {
 
             <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neue Saison erstellen' : 'Saison Details'}>
                 <form onSubmit={handleSubmit}>
-                    <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ borderBottom: 1, borderColor: 'divider', '& .MuiTabs-indicator': { backgroundColor: '#00A99D' }, '& .MuiTab-root.Mui-selected': { color: '#00A99D' } }}>
-                        <Tab label="Allgemein & Regeln" sx={{ color: 'grey.400', textTransform: 'none' }} />
-                        <Tab label={`Teams (${formData.teams.length})`} sx={{ color: 'grey.400', textTransform: 'none' }} />
+                    <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ borderBottom: 1, borderColor: theme.palette.divider, '& .MuiTabs-indicator': { backgroundColor: theme.palette.primary.main }, '& .MuiTab-root.Mui-selected': { color: theme.palette.primary.main } }}>
+                        <Tab label="Allgemein & Regeln" sx={{ color: theme.palette.text.secondary, textTransform: 'none' }} />
+                        <Tab label={`Teams (${formData.teams.length})`} sx={{ color: theme.palette.text.secondary, textTransform: 'none' }} />
                     </Tabs>
                     <Box sx={{ height: '55vh', overflowY: 'auto' }}>
                         <TabPanel value={activeTab} index={0}>
@@ -422,17 +419,15 @@ const SeasonManager = () => {
                             <TextField size="small" label="Enddatum" name="endDate" type="date" value={formData.endDate} onChange={handleFormChange} disabled={isReadOnly} fullWidth InputLabelProps={{ shrink: true }} sx={darkInputStyle} />
                             <FormControl size="small" fullWidth sx={darkInputStyle} disabled={isReadOnly}>
                                 <InputLabel>Spielmodus</InputLabel>
-                                <Select name="playMode" value={formData.playMode} label="Spielmodus" onChange={handleFormChange} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
+                                <Select name="playMode" value={formData.playMode} label="Spielmodus" onChange={handleFormChange} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
                                     <MenuItem value="single_round_robin">Nur Hinrunde</MenuItem>
                                     <MenuItem value="double_round_robin">Hin- und Rückrunde</MenuItem>
                                 </Select>
                             </FormControl>
                             <TextField size="small" label="Punkte für Sieg" name="pointsForWin" type="number" value={formData.pointsForWin} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
                             <TextField size="small" label="Punkte für Unentschieden" name="pointsForDraw" type="number" value={formData.pointsForDraw} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
-                            <TextField size="small" label="Max. Spielabsagen" name="maxDenials" type="number" value={formData.maxDenials} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
-                            <TextField size="small" label="Stornierungsfrist (Tage)" name="cancellationDeadlineDays" type="number" value={formData.cancellationDeadlineDays} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
-                            <TextField size="small" label="Tore für Sieger (Strafw.)" name="forfeitWinScore" type="number" value={formData.forfeitWinScore} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
-                            <TextField size="small" label="Tore für Verlierer (Strafw.)" name="forfeitLossScore" type="number" value={formData.forfeitLossScore} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
+                            <TextField size="small" label="Ablauf von Anfragen (Tage)" name="requestExpiryDays" type="number" value={formData.requestExpiryDays} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
+                            <TextField size="small" label="Freigabe für Freundschaftsspiele (Stunden)" name="friendlyGamesReleaseHours" type="number" value={formData.friendlyGamesReleaseHours} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
                         </TabPanel>
                         <TabPanel value={activeTab} index={1}>
                             {!isReadOnly && (
@@ -457,13 +452,13 @@ const SeasonManager = () => {
                                         />
                                     )}
                                     sx={{ mb: 2 }}
-                                    PaperComponent={(props) => <Paper {...props} sx={{ bgcolor: '#333', color: 'grey.200' }} />}
+                                    PaperComponent={(props) => <Paper {...props} sx={{ bgcolor: theme.palette.background.paper, color: theme.palette.text.primary }} />}
                                 />
                             )}
-                            <TableContainer component={Paper} sx={{ backgroundColor: '#1e1e1e', flexGrow: 1 }}>
+                            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, flexGrow: 1 }}>
                                 <Table stickyHeader>
                                     <TableHead>
-                                        <TableRow sx={{ '& .MuiTableCell-root': { backgroundColor: '#1e1e1e' } }}>
+                                        <TableRow sx={{ '& .MuiTableCell-root': { backgroundColor: theme.palette.background.paper } }}>
                                             <StyledTableCell>Teamname</StyledTableCell>
                                             {!isReadOnly && <StyledTableCell align="right"></StyledTableCell>}
                                         </TableRow>
@@ -484,18 +479,18 @@ const SeasonManager = () => {
                             </TableContainer>
                         </TabPanel>
                     </Box>
-                    <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        {modalMode === 'create' && (<><Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }}>Erstellen</Button></>)}
-                        {modalMode === 'view' && (<><Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Schließen</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: '#00A99D' }}>Bearbeiten</Button></>)}
-                        {modalMode === 'edit' && (<><Button variant="outlined" onClick={() => setModalMode('view')} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }}>Speichern</Button></>)}
+                    <Box sx={{ p: 2, borderTop: 1, borderColor: theme.palette.divider, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        {modalMode === 'create' && (<><Button variant="outlined" onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Erstellen</Button></>)}
+                        {modalMode === 'view' && (<><Button variant="outlined" onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Schließen</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main }}>Bearbeiten</Button></>)}
+                        {modalMode === 'edit' && (<><Button variant="outlined" onClick={() => setModalMode('view')} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Speichern</Button></>)}
                     </Box>
                 </form>
             </ReusableModal>
 
-            <TableContainer component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
+            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
                 <Table>
                     <TableHead>
-                        <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
+                        <TableRow sx={{ borderBottom: `2px solid ${theme.palette.divider}` }}>
                             <StyledTableCell align="center" sx={{ width: '5%' }}>Status</StyledTableCell>
                             <StyledTableCell>Name</StyledTableCell>
                             {!isMobile && <StyledTableCell>Modus</StyledTableCell>}
@@ -505,7 +500,7 @@ const SeasonManager = () => {
                     </TableHead>
                     <TableBody>
                         {seasons.filter(s => s.status !== 'archived').sort((a, b) => (b.name > a.name ? 1 : -1)).map(season => (
-                            <TableRow key={season.id} onClick={() => handleRowClick(season)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' }, height: '53px' }}>
+                            <TableRow key={season.id} onClick={() => handleRowClick(season)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover }, height: '53px' }}>
                                 <StyledTableCell align="center"><StatusIndicator status={season.status} /></StyledTableCell>
                                 <StyledTableCell>{season.name}</StyledTableCell>
                                 {!isMobile && <StyledTableCell>{season.playMode === 'double_round_robin' ? 'Hin- & Rückrunde' : 'Nur Hinrunde'}</StyledTableCell>}
@@ -522,14 +517,14 @@ const SeasonManager = () => {
                                         <Tooltip title={season.status === 'planning' || season.status === 'inactive' ? "Saison aktivieren" : "Nur Saisons in Planung oder inaktive Saisons können aktiviert werden"}>
                                             <span>
                                                 <IconButton onClick={() => handleActionRequest('activate', season.id)} disabled={season.status !== 'planning' && season.status !== 'inactive'}>
-                                                    <PlayCircleOutlineIcon sx={{ color: season.status === 'planning' || season.status === 'inactive' ? 'success.light' : 'grey.800' }} />
+                                                    <PlayCircleOutlineIcon sx={{ color: season.status === 'planning' || season.status === 'inactive' ? theme.palette.success.light : theme.palette.text.disabled }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
                                         <Tooltip title="Saison archivieren">
                                             <span>
                                                 <IconButton onClick={() => handleActionRequest('archive', season.id)} disabled={season.status !== 'finished' && season.status !== 'planning' && season.status !== 'inactive'}>
-                                                    <ArchiveOutlinedIcon sx={{ color: season.status === 'finished' || season.status === 'planning' || season.status === 'inactive' ? 'error.light' : 'grey.800' }} />
+                                                    <ArchiveOutlinedIcon sx={{ color: season.status === 'finished' || season.status === 'planning' || season.status === 'inactive' ? theme.palette.error.light : theme.palette.text.disabled }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>

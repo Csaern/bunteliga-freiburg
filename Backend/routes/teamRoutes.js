@@ -52,6 +52,18 @@ router.get('/:teamId/potential-opponents', async (req, res) => {
     }
 });
 
+// GET /api/teams/:teamId/stats/:seasonId
+router.get('/:teamId/stats/:seasonId', async (req, res) => {
+    try {
+        const { teamId, seasonId } = req.params;
+        const stats = await teamService.getTeamStats(teamId, seasonId);
+        res.status(200).json(stats);
+    } catch (error) {
+        console.error('Fehler beim Abrufen der Team-Statistiken:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // GET /api/teams/:id
 router.get('/:id', async (req, res) => {
     try {
@@ -111,7 +123,8 @@ router.post(
             }
 
             const { teamId } = req.params;
-            const outputFilename = `${teamId}-${Date.now()}.webp`;
+            const logoType = req.query.type || 'dark'; // NEU: 'light' oder 'dark' (default)
+            const outputFilename = `${teamId}-${logoType}-${Date.now()}.webp`; // NEU: Typ im Dateinamen
             const outputPath = path.join(__dirname, '..', 'uploads', 'team-logos', outputFilename);
 
             await sharp(req.file.buffer)
@@ -121,7 +134,7 @@ router.post(
 
             const relativePath = `/uploads/team-logos/${outputFilename}`;
 
-            const updatedTeam = await teamService.updateTeamLogo(teamId, relativePath);
+            const updatedTeam = await teamService.updateTeamLogo(teamId, relativePath, logoType); // NEU: Typ übergeben
             res.status(200).json(updatedTeam);
 
         } catch (error) {

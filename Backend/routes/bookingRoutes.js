@@ -10,11 +10,8 @@ const { checkAuth, checkAdmin, checkCaptainOfActingTeam } = require('../middlewa
 router.get('/public/available/:seasonId', async (req, res) => {
     try {
         const bookings = await BookingService.getBookingsForSeason(req.params.seasonId);
-        // Filtere nur verfügbare Buchungen: status === 'available' ODER (isAvailable === true UND keine Teams)
-        const availableBookings = bookings.filter(booking => {
-            return booking.status === 'available' ||
-                (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
-        });
+        // Filtere nur wirklich verfügbare Buchungen
+        const availableBookings = bookings.filter(booking => booking.status === 'available');
         res.status(200).json(availableBookings);
     } catch (error) {
         res.status(500).json({ message: error.message });

@@ -32,14 +32,14 @@ const BookingOverview = () => {
   const [isFriendlyGame, setIsFriendlyGame] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const darkInputStyle = {
+  const inputStyle = {
     '& label.Mui-focused': { color: theme.palette.primary.main },
     '& .MuiOutlinedInput-root': {
       '& fieldset': { borderColor: theme.palette.divider },
       '&:hover fieldset': { borderColor: theme.palette.text.secondary },
       '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
     },
-    '& .MuiInputBase-input': { color: theme.palette.text.primary, colorScheme: 'dark', accentColor: theme.palette.primary.main },
+    '& .MuiInputBase-input': { color: theme.palette.text.primary, accentColor: theme.palette.primary.main },
     '& label': { color: theme.palette.text.secondary },
     '& .MuiSelect-icon': { color: theme.palette.text.secondary },
     '& .Mui-disabled': { WebkitTextFillColor: `${theme.palette.text.disabled} !important`, color: `${theme.palette.text.disabled} !important` },
@@ -296,7 +296,7 @@ const BookingOverview = () => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           sx={{
-            ...darkInputStyle,
+            ...inputStyle,
             maxWidth: '600px'
           }}
           InputProps={{
@@ -322,26 +322,26 @@ const BookingOverview = () => {
             const pitchName = getPitchName(pitchId);
 
             return (
-              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800', maxWidth: '1200px', margin: '0 auto' }}>
-                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
-                  <Typography variant="h6" sx={{ color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
+              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider, maxWidth: '1200px', margin: '0 auto' }}>
+                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                  <Typography variant="h6" sx={{ color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
                     {pitchName}
                   </Typography>
                 </Box>
                 <Table size="small">
                   <TableHead>
                     {isMobile ? (
-                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.divider}` }}>
-                        <TableCell align="center" colSpan={7} sx={{ color: theme.palette.text.primary }}>Verfügbare Termine</TableCell>
+                      <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+                        <TableCell align="center" colSpan={7} sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Verfügbare Termine</TableCell>
                       </TableRow>
                     ) : (
-                      <TableRow sx={{ borderBottom: `2px solid ${theme.palette.divider}` }}>
-                        <TableCell align="center" sx={{ width: '40px', color: theme.palette.text.primary }}>Status</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary }}>Datum</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary }}>Zeitraum</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary }}>Heim</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary }}>Auswärts</TableCell>
-                        <TableCell align="center" sx={{ color: theme.palette.text.primary }}>Aktion</TableCell>
+                      <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+                        <TableCell align="center" sx={{ width: '40px', color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Status</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Datum</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Zeitraum</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Heim</TableCell>
+                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Auswärts</TableCell>
+                        <TableCell align="center" sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Aktion</TableCell>
                       </TableRow>
                     )}
                   </TableHead>
@@ -374,9 +374,9 @@ const BookingOverview = () => {
                               <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                   <Box sx={{ textAlign: 'center', pr: 2 }}>
-                                    <Typography sx={{ fontSize: '0.7rem', color: 'grey.300' }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
+                                    <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
+                                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
                                       {booking.friendly && <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.8rem' }}>F</Typography>}
                                     </Box>
                                   </Box>
@@ -408,7 +408,7 @@ const BookingOverview = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
                           <StyledTableCell align="center">
                             <Box sx={{ width: '10px', height: '10px', bgcolor: statusConfig.color, borderRadius: '50%', boxShadow: `0 0 8px ${statusConfig.color}` }} title={statusConfig.label} />
                           </StyledTableCell>
@@ -446,11 +446,11 @@ const BookingOverview = () => {
         <ReusableModal open={!!selectedSlot} onClose={() => setSelectedSlot(null)} title="Platz buchen">
           <Box component="form" onSubmit={submitBooking} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField size="small" label="Datum" type="date" fullWidth value={new Date(selectedSlot.date).toISOString().split('T')[0]} InputLabelProps={{ shrink: true }} sx={darkInputStyle} disabled />
-              <TextField size="small" label="Uhrzeit" type="time" fullWidth value={selectedSlot.time} InputLabelProps={{ shrink: true }} sx={darkInputStyle} disabled />
+              <TextField size="small" label="Datum" type="date" fullWidth value={new Date(selectedSlot.date).toISOString().split('T')[0]} InputLabelProps={{ shrink: true }} sx={inputStyle} disabled />
+              <TextField size="small" label="Uhrzeit" type="time" fullWidth value={selectedSlot.time} InputLabelProps={{ shrink: true }} sx={inputStyle} disabled />
             </Box>
-            <TextField size="small" label="Dauer (Minuten)" type="number" fullWidth value={(data.bookings || []).find(b => b.id === selectedSlot.id)?.duration || 90} sx={darkInputStyle} disabled />
-            <FormControl size="small" fullWidth sx={darkInputStyle} disabled>
+            <TextField size="small" label="Dauer (Minuten)" type="number" fullWidth value={(data.bookings || []).find(b => b.id === selectedSlot.id)?.duration || 90} sx={inputStyle} disabled />
+            <FormControl size="small" fullWidth sx={inputStyle} disabled>
               <InputLabel>Platz</InputLabel>
               <Select value={selectedSlot.pitchId} label="Platz" MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }} sx={{ color: theme.palette.text.primary }}>
                 {data.pitches.map(p => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}

@@ -14,9 +14,9 @@ export const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props })
         <TableCell
             align={align}
             sx={{
-                color: theme.palette.grey[300],
+                color: theme.palette.text.primary,
                 fontFamily: 'comfortaa',
-                borderBottom: `1px solid ${theme.palette.grey[800]}`,
+                borderBottom: `1px solid ${theme.palette.divider}`,
                 py: isMobile ? 0.8 : 1.2,
                 px: isMobile ? 0.5 : 1.5,
                 fontSize: isMobile ? '0.7rem' : '0.85rem',

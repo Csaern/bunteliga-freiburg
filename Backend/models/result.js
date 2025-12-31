@@ -12,6 +12,8 @@ class Result {
    * @param {string} data.reportedByTeamId - Die ID des Teams, das das Ergebnis meldet.
    * @param {string} data.reportedByUserId - Die UID des Benutzers, der das Ergebnis meldet.
    * @param {string|null} [data.bookingId=null] - Optionale ID der zugehörigen Spielbuchung.
+   * @param {string|null} [data.date=null] - Datum des Spiels (ISO String oder Timestamp).
+   * @param {string|null} [data.location=null] - Ort des Spiels.
    */
   constructor({
     homeTeamId,
@@ -24,13 +26,19 @@ class Result {
     reportedByTeamId,
     reportedByUserId,
     bookingId = null,
+    date = null,
+    location = null,
   }) {
     // 1. Validierung
     if (!homeTeamId || !homeTeamName || !awayTeamId || !awayTeamName || !seasonId || !reportedByTeamId || !reportedByUserId) {
       throw new Error('Team-IDs, Team-Namen, Saison-ID und meldendes Team/Benutzer sind erforderlich.');
     }
     if (homeScore === undefined || homeScore === null || awayScore === undefined || awayScore === null) {
-        throw new Error('Ein Ergebnis (Tore) ist für beide Teams erforderlich.');
+      throw new Error('Ein Ergebnis (Tore) ist für beide Teams erforderlich.');
+    }
+
+    if (!bookingId && (!date || !location)) {
+      throw new Error('Wenn keine Buchung verknüpft ist, sind Datum und Ort erforderlich.');
     }
 
     // 2. Zuweisung der Eigenschaften
@@ -44,6 +52,8 @@ class Result {
     this.reportedByTeamId = reportedByTeamId;
     this.reportedByUserId = reportedByUserId;
     this.bookingId = bookingId;
+    this.date = date; // NEU
+    this.location = location; // NEU
 
     /**
      * @type {string}
@@ -82,6 +92,8 @@ class Result {
       reportedByTeamId: this.reportedByTeamId,
       reportedByUserId: this.reportedByUserId,
       bookingId: this.bookingId,
+      date: this.date, // NEU
+      location: this.location, // NEU
       status: this.status,
       confirmedByTeamId: this.confirmedByTeamId,
       confirmedByUserId: this.confirmedByUserId,

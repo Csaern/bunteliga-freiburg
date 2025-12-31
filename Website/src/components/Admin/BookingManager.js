@@ -7,6 +7,7 @@ import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import * as bookingApiService from '../../services/bookingApiService';
 import * as pitchApiService from '../../services/pitchApiService';
 import * as teamApiService from '../../services/teamApiService';
+import AdminBookingForm from './Forms/AdminBookingForm';
 
 const StatusIndicator = ({ status }) => {
     const theme = useTheme();
@@ -30,29 +31,34 @@ const StatusIndicator = ({ status }) => {
     return <Box sx={{ width: '10px', height: '10px', bgcolor: config.color, borderRadius: '50%', boxShadow: `0 0 8px ${config.color}` }} />;
 };
 
+// ... imports
+
+
+// ... StatusIndicator code ...
+
 const BookingManager = ({ currentSeason }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    const darkInputStyle = {
-        '& label.Mui-focused': { color: '#00A99D' },
+    const inputStyle = {
+        '& label.Mui-focused': { color: theme.palette.primary.main },
         '& .MuiOutlinedInput-root': {
-            '& fieldset': { borderColor: 'grey.700' },
-            '&:hover fieldset': { borderColor: 'grey.500' },
-            '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+            '& fieldset': { borderColor: theme.palette.divider },
+            '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+            '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
         },
-        '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark', accentColor: '#00A99D' },
-        '& label': { color: 'grey.400' },
-        '& .MuiSelect-icon': { color: 'grey.400' },
-        '& .Mui-disabled': { WebkitTextFillColor: `${theme.palette.grey[400]} !important`, color: `${theme.palette.grey[400]} !important` },
-        '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: 'grey.800' },
+        '& .MuiInputBase-input': { color: theme.palette.text.primary, accentColor: theme.palette.primary.main },
+        '& label': { color: theme.palette.text.secondary },
+        '& .MuiSelect-icon': { color: theme.palette.text.secondary },
+        '& .Mui-disabled': { WebkitTextFillColor: `${theme.palette.text.disabled} !important`, color: `${theme.palette.text.disabled} !important` },
+        '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.action.disabledBackground },
     };
 
     const scrollbarStyle = {
         '&::-webkit-scrollbar': { width: '8px' },
-        '&::-webkit-scrollbar-track': { background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px' },
-        '&::-webkit-scrollbar-thumb': { background: '#00A99D', borderRadius: '4px' },
-        '&::-webkit-scrollbar-thumb:hover': { background: '#00897B' }
+        '&::-webkit-scrollbar-track': { background: theme.palette.action.hover, borderRadius: '4px' },
+        '&::-webkit-scrollbar-thumb': { background: theme.palette.primary.main, borderRadius: '4px' },
+        '&::-webkit-scrollbar-thumb:hover': { background: theme.palette.primary.dark }
     };
 
     const [localBookings, setLocalBookings] = useState([]);
@@ -66,9 +72,11 @@ const BookingManager = ({ currentSeason }) => {
     const [modalMode, setModalMode] = useState('view');
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [formData, setFormData] = useState({ date: '', time: '', pitchId: '', homeTeamId: '', awayTeamId: '', isAvailable: true, duration: 90, friendly: false, status: 'available' });
+    // Removed specific formData state for single booking as it is now handled by AdminBookingForm
     const [searchTerm, setSearchTerm] = useState('');
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+
+    // Bulk Form Data remains here
     const [bulkFormData, setBulkFormData] = useState({
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
@@ -81,9 +89,8 @@ const BookingManager = ({ currentSeason }) => {
     const [bulkModalStep, setBulkModalStep] = useState('form');
     const [bulkCheckResult, setBulkCheckResult] = useState(null);
     const [isChecking, setIsChecking] = useState(false);
-    const [collisionCheck, setCollisionCheck] = useState({ status: 'idle', message: '' });
-    const [potentialOpponents, setPotentialOpponents] = useState([]);
-    const [isOpponentLoading, setIsOpponentLoading] = useState(false);
+
+    // Removed collisionCheck, potentialOpponents, isOpponentLoading as they are now in AdminBookingForm
 
     const parseDate = (dateObj) => {
         if (!dateObj) return new Date();
@@ -118,106 +125,7 @@ const BookingManager = ({ currentSeason }) => {
         fetchData();
     }, [currentSeason]);
 
-    useEffect(() => {
-        const checkCollision = async () => {
-            if (modalMode !== 'create' && modalMode !== 'edit') return;
-
-            const { date, time, pitchId, duration } = formData;
-            if (!date || !time || !pitchId || !duration) {
-                setCollisionCheck({ status: 'idle', message: '' });
-                return;
-            }
-
-            const selectedPitch = allPitches.find(p => p.id === pitchId);
-            if (!selectedPitch || !selectedPitch.isVerified) {
-                setCollisionCheck({ status: 'idle', message: '' });
-                return;
-            }
-
-            if (modalMode === 'edit' && selectedBooking) {
-                const originalDate = new Date(selectedBooking.date);
-                const originalDateStr = originalDate.toISOString().split('T')[0];
-                const originalTimeStr = originalDate.toTimeString().slice(0, 5);
-
-                if (date === originalDateStr && time === originalTimeStr && pitchId === selectedBooking.pitchId) {
-                    setCollisionCheck({ status: 'success', message: 'Keine Änderung an Termin/Platz.' });
-                    return;
-                }
-            }
-
-            setCollisionCheck({ status: 'checking', message: 'Prüfe Verfügbarkeit...' });
-
-            try {
-                const combinedDate = new Date(`${date}T${time}`);
-                const dataToSend = {
-                    pitchId,
-                    date: combinedDate.toISOString(),
-                    duration,
-                    bookingIdToIgnore: modalMode === 'edit' ? selectedBooking.id : null
-                };
-
-                const result = await bookingApiService.checkSingleSlot(dataToSend);
-
-                if (result.isAvailable) {
-                    setCollisionCheck({ status: 'success', message: 'Dieser Termin ist verfügbar.' });
-                } else {
-                    setCollisionCheck({ status: 'error', message: `Der Platz ist belegt` });
-                }
-            } catch (error) {
-                setCollisionCheck({ status: 'idle', message: 'Prüfung fehlgeschlagen.' });
-            }
-        };
-
-        const handler = setTimeout(() => {
-            checkCollision();
-        }, 500);
-
-        return () => clearTimeout(handler);
-    }, [formData.date, formData.time, formData.pitchId, formData.duration, modalMode, allPitches, selectedBooking]);
-
-
-    useEffect(() => {
-        if (selectedBooking) {
-            const bookingDate = new Date(selectedBooking.date);
-            setFormData({
-                date: bookingDate.toISOString().split('T')[0],
-                time: bookingDate.toTimeString().slice(0, 5),
-                pitchId: selectedBooking.pitchId || '',
-                homeTeamId: selectedBooking.homeTeamId || '', awayTeamId: selectedBooking.awayTeamId || '',
-                duration: selectedBooking.duration || 90,
-                isAvailable: selectedBooking.status === 'available',
-                friendly: selectedBooking.friendly || false,
-                status: selectedBooking.status || 'available'
-            });
-        }
-    }, [selectedBooking]);
-
-    useEffect(() => {
-        const fetchOpponents = async () => {
-            if (!formData.homeTeamId) {
-                setPotentialOpponents([]);
-                setFormData(prev => ({ ...prev, awayTeamId: '' }));
-                return;
-            }
-
-            setIsOpponentLoading(true);
-            try {
-                const opponents = await teamApiService.getPotentialOpponents(formData.homeTeamId);
-                setPotentialOpponents(opponents);
-            } catch (error) {
-                setNotification({ open: true, message: 'Fehler beim Laden der Gegner.', severity: 'error' });
-                setPotentialOpponents([]);
-            } finally {
-                setIsOpponentLoading(false);
-            }
-        };
-
-        fetchOpponents();
-    }, [formData.homeTeamId]);
-
-    const isTeamInPotentialOpponents = (teamId) => {
-        return potentialOpponents.some(t => t.id === teamId);
-    };
+    // Removed Effects for collision check and opponent fetch
 
     const getPitchName = (pitchId) => {
         const pitch = allPitches.find(p => p.id === pitchId);
@@ -232,17 +140,6 @@ const BookingManager = ({ currentSeason }) => {
 
     const handleOpenCreateModal = () => {
         setSelectedBooking(null);
-        setFormData({
-            date: new Date().toISOString().split('T')[0],
-            time: '10:00',
-            pitchId: '',
-            homeTeamId: '',
-            awayTeamId: '',
-            isAvailable: true,
-            duration: 120,
-            friendly: false,
-            status: 'available'
-        });
         setModalMode('create');
         setIsModalOpen(true);
     };
@@ -257,26 +154,24 @@ const BookingManager = ({ currentSeason }) => {
         setIsModalOpen(false);
         setShowDeleteConfirm(false);
         setSelectedBooking(null);
-        setCollisionCheck({ status: 'idle', message: '' });
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (data) => {
         if (!currentSeason?.id) {
             setNotification({ open: true, message: 'Keine aktive Saison gefunden. Bitte erstellen Sie zuerst eine aktive Saison.', severity: 'error' });
             return;
         }
         try {
-            const combinedDate = new Date(`${formData.date}T${formData.time}`);
+            const combinedDate = new Date(`${data.date}T${data.time}`);
             const bookingData = {
                 seasonId: currentSeason.id,
-                pitchId: formData.pitchId,
-                homeTeamId: formData.homeTeamId || null,
-                awayTeamId: formData.awayTeamId || null,
+                pitchId: data.pitchId,
+                homeTeamId: data.homeTeamId || null,
+                awayTeamId: data.awayTeamId || null,
                 date: combinedDate.toISOString(),
-                duration: formData.duration,
-                friendly: formData.friendly,
-                status: formData.status
+                duration: data.duration,
+                friendly: data.friendly,
+                status: data.status
             };
 
             if (modalMode === 'create') {
@@ -345,8 +240,13 @@ const BookingManager = ({ currentSeason }) => {
 
     const handleBulkCheck = async (e) => {
         e.preventDefault();
+        // ... bulk check code ... (This seemed huge in the view_file, did I truncate it?)
+        // To be safe, I'm assuming the replacer extracts 'handleBulkCheck' logic. 
+        // Wait, I should not delete the bulk logic. The replacement block replaces 
+        // lines 32-587, which includes `handleBulkCheck`. 
+        // I MUST RE-INCLUDE IT.
         if (!currentSeason?.id) {
-            setNotification({ open: true, message: 'Keine aktive Saison gefunden. Bitte erstellen Sie zuerst eine aktive Saison.', severity: 'error' });
+            setNotification({ open: true, message: 'Keine aktive Saison gefunden.', severity: 'error' });
             return;
         }
         const today = new Date();
@@ -396,7 +296,7 @@ const BookingManager = ({ currentSeason }) => {
     const handleBulkCreate = async () => {
         if (!bulkCheckResult || bulkCheckResult.validSlots.length === 0) return;
         if (!currentSeason?.id) {
-            setNotification({ open: true, message: 'Keine aktive Saison gefunden. Bitte erstellen Sie zuerst eine aktive Saison.', severity: 'error' });
+            setNotification({ open: true, message: 'Keine aktive Saison gefunden.', severity: 'error' });
             return;
         }
         try {
@@ -435,14 +335,14 @@ const BookingManager = ({ currentSeason }) => {
             <Snackbar open={notification.open} autoHideDuration={6000} onClose={() => setNotification({ ...notification, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <Alert onClose={() => setNotification({ ...notification, open: false })} severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>
             </Snackbar>
-            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
+            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
                 Buchungsverwaltung
             </Typography>
             <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }} size={isMobile ? 'small' : 'medium'}>
+                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }} size={isMobile ? 'small' : 'medium'}>
                     Neue Buchung
                 </Button>
-                <Button variant="outlined" onClick={() => setIsBulkModalOpen(true)} sx={{ color: '#00A99D', borderColor: '#00A99D', '&:hover': { borderColor: '#00897B', backgroundColor: 'rgba(0, 169, 157, 0.1)' } }} size={isMobile ? 'small' : 'medium'}>
+                <Button variant="outlined" onClick={() => setIsBulkModalOpen(true)} sx={{ color: theme.palette.primary.main, borderColor: theme.palette.primary.main, '&:hover': { borderColor: theme.palette.primary.dark, backgroundColor: 'rgba(0, 169, 157, 0.1)' } }} size={isMobile ? 'small' : 'medium'}>
                     Zeitslots erstellen
                 </Button>
             </Box>
@@ -456,7 +356,7 @@ const BookingManager = ({ currentSeason }) => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     sx={{
-                        ...darkInputStyle,
+                        ...inputStyle,
                         maxWidth: '600px'
                     }}
                     InputProps={{
@@ -470,120 +370,33 @@ const BookingManager = ({ currentSeason }) => {
             </Box>
 
             <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neue Buchung erstellen' : 'Buchungsdetails'}>
-                <form onSubmit={handleSubmit}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                            <TextField size="small" label="Datum" type="date" fullWidth value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} InputLabelProps={{ shrink: true }} required sx={darkInputStyle} disabled={isReadOnly} />
-                            <TextField size="small" label="Uhrzeit" type="time" fullWidth value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} InputLabelProps={{ shrink: true }} required sx={darkInputStyle} disabled={isReadOnly} />
-                        </Box>
-
-                        <FormControl size="small" fullWidth required sx={darkInputStyle} disabled={isReadOnly}>
-                            <InputLabel>Dauer (Minuten)</InputLabel>
-                            <Select
-                                value={formData.duration}
-                                label="Dauer (Minuten)"
-                                onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                                MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}
-                            >
-                                <MenuItem value={90}>90 Minuten</MenuItem>
-                                <MenuItem value={120}>120 Minuten</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <FormControl size="small" fullWidth required sx={darkInputStyle} disabled={isReadOnly}>
-                            <InputLabel>Platz</InputLabel>
-                            <Select value={formData.pitchId} label="Platz" onChange={(e) => setFormData({ ...formData, pitchId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
-                                {allPitches.map(p => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-                            </Select>
-                        </FormControl>
-
-                        {collisionCheck.status !== 'idle' && (
-                            <Alert
-                                severity={collisionCheck.status === 'success' ? 'success' : collisionCheck.status === 'error' ? 'error' : 'info'}
-                                icon={collisionCheck.status === 'checking' ? <CircularProgress size={20} /> : null}
-                                sx={{
-                                    mt: 1,
-                                    bgcolor: collisionCheck.status === 'error' ? 'rgba(211, 47, 47, 0.1)' : 'rgba(46, 125, 50, 0.1)',
-                                    color: collisionCheck.status === 'error' ? '#ffcdd2' : '#a5d6a7'
-                                }}
-                            >
-                                {collisionCheck.message}
-                            </Alert>
-                        )}
-
-                        <Divider sx={{ my: 1, borderColor: 'grey.800' }} />
-                        <FormControl size="small" fullWidth sx={darkInputStyle} disabled={isReadOnly}>
-                            <InputLabel>Heim</InputLabel>
-                            <Select value={formData.homeTeamId} label="Heim" onChange={(e) => setFormData({ ...formData, homeTeamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
-                                <MenuItem value=""><em>-</em></MenuItem>
-                                {allTeams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-                            </Select>
-                        </FormControl>
-                        <Typography sx={{ color: 'grey.500', textAlign: 'center' }}>vs</Typography>
-                        <FormControl size="small" fullWidth sx={darkInputStyle} disabled={isReadOnly || !formData.homeTeamId || isOpponentLoading}>
-                            <InputLabel>Auswärts</InputLabel>
-                            <Select value={formData.awayTeamId} label="Auswärts" onChange={(e) => setFormData({ ...formData, awayTeamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
-                                <MenuItem value=""><em>-</em></MenuItem>
-                                {formData.awayTeamId && !potentialOpponents.find(t => t.id === formData.awayTeamId) && (
-                                    <MenuItem value={formData.awayTeamId}>{getTeamName(formData.awayTeamId)}</MenuItem>
-                                )}
-                                {isOpponentLoading ? (
-                                    <MenuItem disabled><em>Lade Gegner...</em></MenuItem>
-                                ) : (
-                                    potentialOpponents.map(opponent => (
-                                        <MenuItem key={opponent.id} value={opponent.id}>
-                                            {opponent.name}
-                                        </MenuItem>
-                                    ))
-                                )}
-                            </Select>
-                        </FormControl>
-
-                        <Divider sx={{ my: 1, borderColor: 'grey.800' }} />
-                        <FormControl size="small" fullWidth sx={darkInputStyle} disabled={isReadOnly}>
-                            <InputLabel>Status</InputLabel>
-                            <Select
-                                value={formData.status}
-                                label="Status"
-                                onChange={(e) => {
-                                    const newStatus = e.target.value;
-                                    setFormData({ ...formData, status: newStatus, isAvailable: newStatus === 'available' });
-                                }}
-                                MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}
-                            >
-                                <MenuItem value="available" disabled={!!formData.homeTeamId || !!formData.awayTeamId}>Verfügbar</MenuItem>
-                                <MenuItem value="pending_away_confirm">Anfrage von Heimteam</MenuItem>
-                                <MenuItem value="confirmed">Bestätigt</MenuItem>
-                                <MenuItem value="cancelled">Abgesagt</MenuItem>
-                                <MenuItem value="blocked">Gesperrt</MenuItem>
-                            </Select>
-                        </FormControl>
-
-                        {(formData.status === 'cancelled' || formData.status === 'blocked') && (
-                            <Alert severity="warning" sx={{ mt: 1, bgcolor: 'rgba(237, 108, 2, 0.1)', color: '#ffcc80' }}>
-                                {formData.status === 'cancelled'
-                                    ? 'Achtung: Wenn Sie speichern, wird die Buchung wieder freigegeben (Status: Verfügbar, Teams werden entfernt).'
-                                    : 'Achtung: Wenn Sie speichern, wird der Platz gesperrt und die Teams werden entfernt.'}
-                            </Alert>
-                        )}
-
-                        <FormControlLabel
-                            control={<Checkbox
-                                checked={formData.friendly}
-                                onChange={(e) => setFormData({ ...formData, friendly: e.target.checked })}
-                                sx={{ color: 'grey.100', '&.Mui-checked': { color: '#FFD700' }, '&.Mui-disabled': { color: 'grey.700' } }}
-                                disabled={isReadOnly}
-                            />}
-                            label={<Typography sx={{ color: 'grey.100' }}>Freundschaftsspiel</Typography>}
-                        />
-                        {showDeleteConfirm && modalMode === 'view' && (<Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>Möchtest du diese Buchung wirklich endgültig löschen?</Alert>)}
-                        <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            {modalMode === 'create' && <><Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }} disabled={collisionCheck.status === 'error' || collisionCheck.status === 'checking'}>Erstellen</Button></>}
-                            {modalMode === 'view' && !showDeleteConfirm && <><Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: '#00A99D' }}>Bearbeiten</Button></>}
-                            {modalMode === 'view' && showDeleteConfirm && <><Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button variant="contained" color="error" onClick={handleDelete}>Endgültig löschen</Button></>}
-                            {modalMode === 'edit' && <><Button variant="outlined" onClick={() => { setModalMode('view'); setShowDeleteConfirm(false); }} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }} disabled={collisionCheck.status === 'error' || collisionCheck.status === 'checking'}>Speichern</Button></>}
+                {showDeleteConfirm ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'center' }}>
+                        <Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>
+                            Möchtest du diese Buchung wirklich löschen?
+                        </Alert>
+                        <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1 }}>
+                            <Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
+                                Abbrechen
+                            </Button>
+                            <Button variant="contained" color="error" onClick={handleDelete}>
+                                Endgültig löschen
+                            </Button>
                         </Box>
                     </Box>
-                </form>
+                ) : (
+                    <AdminBookingForm
+                        initialData={modalMode !== 'create' ? selectedBooking : null}
+                        currentSeason={currentSeason}
+                        allPitches={allPitches}
+                        allTeams={allTeams}
+                        mode={modalMode}
+                        onSubmit={handleSubmit}
+                        onCancel={handleCloseModal}
+                        onEdit={() => setModalMode('edit')}
+                        onDelete={() => setShowDeleteConfirm(true)}
+                    />
+                )}
             </ReusableModal>
 
             <ReusableModal open={isBulkModalOpen} onClose={handleCloseBulkModal} title={bulkModalStep === 'form' ? "Zeitslots erstellen" : "Erstellung prüfen"}>
@@ -608,7 +421,7 @@ const BookingManager = ({ currentSeason }) => {
                                     InputLabelProps={{ shrink: true }}
                                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
                                     required
-                                    sx={darkInputStyle}
+                                    sx={inputStyle}
                                 />
                                 <TextField
                                     size="small"
@@ -619,11 +432,11 @@ const BookingManager = ({ currentSeason }) => {
                                     onChange={(e) => setBulkFormData({ ...bulkFormData, endDate: e.target.value })}
                                     InputLabelProps={{ shrink: true }}
                                     inputProps={{ min: bulkFormData.startDate }}
-                                    sx={darkInputStyle}
+                                    sx={inputStyle}
                                 />
                             </Box>
                             <Box sx={{ display: 'flex', gap: 2 }}>
-                                <FormControl size="small" fullWidth required sx={darkInputStyle}>
+                                <FormControl size="small" fullWidth required sx={inputStyle} >
                                     <InputLabel>Startzeit</InputLabel>
                                     <Select
                                         value={bulkFormData.startTime}
@@ -632,14 +445,14 @@ const BookingManager = ({ currentSeason }) => {
                                             const newStartTime = e.target.value;
                                             setBulkFormData(prev => ({ ...prev, startTime: newStartTime, endTime: '' }));
                                         }}
-                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200', maxHeight: 300, ...scrollbarStyle } } }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, maxHeight: 300, ...scrollbarStyle } } }}
                                     >
                                         {timeOptions.map(time => (
                                             <MenuItem key={time} value={time}>{time}</MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
-                                <FormControl size="small" fullWidth required sx={darkInputStyle}>
+                                <FormControl size="small" fullWidth required sx={inputStyle}>
                                     <InputLabel>Endzeit</InputLabel>
                                     <Select
                                         value={bulkFormData.endTime}
@@ -656,7 +469,7 @@ const BookingManager = ({ currentSeason }) => {
                                                 timeInterval: (diffMinutes < 120 && prev.timeInterval === 120) ? 90 : prev.timeInterval
                                             }));
                                         }}
-                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200', maxHeight: 300, ...scrollbarStyle } } }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, maxHeight: 300, ...scrollbarStyle } } }}
                                     >
                                         {timeOptions.filter(t => {
                                             if (!bulkFormData.startTime) return true;
@@ -686,13 +499,13 @@ const BookingManager = ({ currentSeason }) => {
                                             </Alert>
                                         )}
                                         <Box sx={{ display: 'flex', gap: 2 }}>
-                                            <FormControl size="small" fullWidth sx={darkInputStyle}>
+                                            <FormControl size="small" fullWidth sx={inputStyle}>
                                                 <InputLabel>Dauer (Minuten)</InputLabel>
                                                 <Select
                                                     value={bulkFormData.timeInterval}
                                                     label="Dauer (Minuten)"
                                                     onChange={(e) => setBulkFormData({ ...bulkFormData, timeInterval: parseInt(e.target.value) })}
-                                                    MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200', ...scrollbarStyle } } }}
+                                                    MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, ...scrollbarStyle } } }}
                                                 >
                                                     <MenuItem value={90}>90 Minuten</MenuItem>
                                                     <MenuItem value={120} disabled={!canSelect120}>
@@ -700,13 +513,20 @@ const BookingManager = ({ currentSeason }) => {
                                                     </MenuItem>
                                                 </Select>
                                             </FormControl>
-                                            <FormControl size="small" fullWidth required sx={darkInputStyle}>
+                                            <FormControl size="small" fullWidth required sx={inputStyle}>
                                                 <InputLabel>Plätze (nur offizielle)</InputLabel>
-                                                <Select multiple value={bulkFormData.pitchIds} label="Plätze (nur offizielle)" onChange={(e) => setBulkFormData({ ...bulkFormData, pitchIds: e.target.value })} renderValue={(selected) => selected.map(id => getPitchName(id)).join(', ')} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200', ...scrollbarStyle } } }}>
+                                                <Select
+                                                    multiple
+                                                    value={bulkFormData.pitchIds}
+                                                    label="Plätze (nur offizielle)"
+                                                    onChange={(e) => setBulkFormData({ ...bulkFormData, pitchIds: e.target.value })}
+                                                    renderValue={(selected) => selected.map(id => getPitchName(id)).join(', ')}
+                                                    MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, ...scrollbarStyle } } }}
+                                                >
                                                     {officialPitches.length > 0 ? (
-                                                        officialPitches.map(p => <MenuItem key={p.id} value={p.id}><Checkbox checked={bulkFormData.pitchIds.indexOf(p.id) > -1} sx={{ color: 'grey.100', '&.Mui-checked': { color: '#00A99D' } }} /> <ListItemText primary={p.name} /></MenuItem>)
+                                                        officialPitches.map(p => <MenuItem key={p.id} value={p.id}><Checkbox checked={bulkFormData.pitchIds.indexOf(p.id) > -1} sx={{ color: theme.palette.text.secondary, '&.Mui-checked': { color: theme.palette.primary.main } }} /> <ListItemText primary={p.name} /></MenuItem>)
                                                     ) : (
-                                                        <MenuItem disabled sx={{ fontStyle: 'italic', color: 'grey.600' }}>
+                                                        <MenuItem disabled sx={{ fontStyle: 'italic', color: theme.palette.text.disabled }}>
                                                             Keine offiziellen Plätze gefunden.
                                                         </MenuItem>
                                                     )}
@@ -717,8 +537,8 @@ const BookingManager = ({ currentSeason }) => {
                                 );
                             })()}
 
-                            <Divider sx={{ my: 1, borderColor: 'grey.800' }} />
-                            <Typography sx={{ color: 'grey.300', fontFamily: 'comfortaa', fontSize: '0.9rem' }}>Wochentage</Typography>
+                            <Divider sx={{ my: 1, borderColor: theme.palette.divider }} />
+                            <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'comfortaa', fontSize: '0.9rem' }}>Wochentage</Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                 {(() => {
                                     const availableWeekdays = new Set();
@@ -748,19 +568,19 @@ const BookingManager = ({ currentSeason }) => {
                                                     }}
                                                     disabled={isDisabled}
                                                     sx={{
-                                                        color: isDisabled ? 'grey.800' : 'grey.100',
-                                                        '&.Mui-checked': { color: '#00A99D' },
-                                                        '&.Mui-disabled': { color: 'grey.800' }
+                                                        color: isDisabled ? theme.palette.action.disabled : theme.palette.text.secondary,
+                                                        '&.Mui-checked': { color: theme.palette.primary.main },
+                                                        '&.Mui-disabled': { color: theme.palette.action.disabled }
                                                     }}
                                                 />}
-                                                label={<Typography sx={{ color: isDisabled ? 'grey.700' : 'grey.100', fontSize: '0.8rem' }}>{day.label}</Typography>}
+                                                label={<Typography sx={{ color: isDisabled ? theme.palette.text.disabled : theme.palette.text.primary, fontSize: '0.8rem' }}>{day.label}</Typography>}
                                             />
                                         );
                                     });
                                 })()}
                             </Box>
                             <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                <Button variant="outlined" onClick={handleCloseBulkModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
+                                <Button variant="outlined" onClick={handleCloseBulkModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider, '&:hover': { borderColor: theme.palette.text.primary, color: theme.palette.text.primary } }}>Abbrechen</Button>
                                 {(() => {
                                     const start = new Date(`2000-01-01T${bulkFormData.startTime}`);
                                     const end = new Date(`2000-01-01T${bulkFormData.endTime}`);
@@ -768,7 +588,7 @@ const BookingManager = ({ currentSeason }) => {
                                     const isTooShort = diffMinutes < 90;
 
                                     return (
-                                        <Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }} disabled={isChecking || isTooShort}>
+                                        <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }} disabled={isChecking || isTooShort}>
                                             {isChecking ? <CircularProgress size={24} color="inherit" /> : 'Termine prüfen'}
                                         </Button>
                                     );
@@ -780,14 +600,14 @@ const BookingManager = ({ currentSeason }) => {
                     <Box>
                         {bulkCheckResult && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Typography sx={{ color: 'grey.200' }}>
+                                <Typography sx={{ color: theme.palette.text.secondary }}>
                                     Es wurden <strong>{bulkCheckResult.totalSlots}</strong> mögliche Termine gefunden.
                                 </Typography>
-                                <Alert severity="success" sx={{ bgcolor: 'rgba(46, 125, 50, 0.2)', color: '#a5d6a7' }}>
+                                <Alert severity="success" sx={{ bgcolor: 'rgba(46, 125, 50, 0.1)', color: theme.palette.success.main }}>
                                     <strong>{bulkCheckResult.validSlots.length}</strong> davon können erfolgreich erstellt werden.
                                 </Alert>
                                 {bulkCheckResult.collidingSlots.length > 0 && (
-                                    <Alert severity="warning" sx={{ bgcolor: 'rgba(237, 108, 2, 0.2)', color: '#ffcc80' }}>
+                                    <Alert severity="warning" sx={{ bgcolor: 'rgba(237, 108, 2, 0.1)', color: theme.palette.warning.main }}>
                                         <strong>{bulkCheckResult.collidingSlots.length}</strong> Termine kollidieren mit bestehenden Buchungen und werden übersprungen:
                                         <Box component="ul" sx={{ pl: 2, mt: 1, maxHeight: 150, overflowY: 'auto' }}>
                                             {bulkCheckResult.collidingSlots.map((slot, index) => (
@@ -797,8 +617,8 @@ const BookingManager = ({ currentSeason }) => {
                                     </Alert>
                                 )}
                                 <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                    <Button variant="outlined" onClick={() => setBulkModalStep('form')} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Zurück</Button>
-                                    <Button variant="contained" onClick={handleBulkCreate} sx={{ backgroundColor: '#00A99D' }} disabled={bulkCheckResult.validSlots.length === 0}>
+                                    <Button variant="outlined" onClick={() => setBulkModalStep('form')} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider, '&:hover': { borderColor: theme.palette.text.primary, color: theme.palette.text.primary } }}>Zurück</Button>
+                                    <Button variant="contained" onClick={handleBulkCreate} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }} disabled={bulkCheckResult.validSlots.length === 0}>
                                         {bulkCheckResult.validSlots.length} Termine erstellen
                                     </Button>
                                 </Box>
@@ -810,27 +630,24 @@ const BookingManager = ({ currentSeason }) => {
 
             {
                 filteredBookings.length === 0 ? (
-                    <Paper sx={{ backgroundColor: '#111', borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', border: '1px solid #222' }}>
-                        <Typography sx={{ color: 'grey.500', fontFamily: 'comfortaa' }}>
+                    <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', border: '1px solid', borderColor: theme.palette.divider }}>
+                        <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'comfortaa' }}>
                             {searchTerm ? 'Keine passenden Buchungen gefunden.' : 'Keine Buchungen für die aktuelle Saison vorhanden.'}
                         </Typography>
                     </Paper>
                 ) : (
-                    <TableContainer component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
+                    <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: theme.shape.borderRadius, border: `1px solid ${theme.palette.divider}`, mb: 5 }}>
                         <Table size="small">
                             <TableHead>
-                                {isMobile ? (
-                                    <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}><StyledTableCell align="center" colSpan={6}>Buchungen</StyledTableCell></TableRow>
-                                ) : (
-                                    <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
-                                        <StyledTableCell align="center" sx={{ width: '40px' }}> </StyledTableCell>
-                                        <StyledTableCell>Datum</StyledTableCell>
-                                        <StyledTableCell>Zeitraum</StyledTableCell>
-                                        <StyledTableCell>Platz</StyledTableCell>
-                                        <StyledTableCell>Heim</StyledTableCell>
-                                        <StyledTableCell>Auswärts</StyledTableCell>
-                                    </TableRow>
-                                )}
+                                <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+                                    <StyledTableCell sx={{ width: '5%', color: theme.palette.text.primary, fontWeight: 'bold' }}>Status</StyledTableCell>
+                                    <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Datum</StyledTableCell>
+                                    <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Uhrzeit</StyledTableCell>
+                                    <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Platz</StyledTableCell>
+                                    <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Heim</StyledTableCell>
+                                    <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Auswärts</StyledTableCell>
+                                    {!isMobile && <StyledTableCell align="center" sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Dauer</StyledTableCell>}
+                                </TableRow>
                             </TableHead>
                             <TableBody>
                                 {filteredBookings.sort((a, b) => new Date(a.date) - new Date(b.date)).map(booking => {
@@ -839,24 +656,24 @@ const BookingManager = ({ currentSeason }) => {
                                     const timeRange = `${startTime} - ${endTime}`;
 
                                     return isMobile ? (
-                                        <TableRow key={booking.id} onClick={() => handleRowClick(booking)} sx={{ backgroundColor: '#0e0e0eff', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
-                                            <TableCell colSpan={6} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.grey[800]}` }}>
+                                        <TableRow key={booking.id} onClick={() => handleRowClick(booking)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
+                                            <TableCell colSpan={6} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.divider}` }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'stretch', minHeight: '70px' }}>
                                                     <StatusIndicator status={booking.status} />
                                                     <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                                        <Typography sx={{ textAlign: 'center', fontSize: '0.65rem', color: 'grey.500', lineHeight: 1.2, mb: 0.5 }}>{getPitchName(booking.pitchId)}</Typography>
+                                                        <Typography sx={{ textAlign: 'center', fontSize: '0.65rem', color: theme.palette.text.secondary, lineHeight: 1.2, mb: 0.5 }}>{getPitchName(booking.pitchId)}</Typography>
                                                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                                             <Box sx={{ textAlign: 'center', pr: 2 }}>
-                                                                <Typography sx={{ fontSize: '0.7rem', color: 'grey.300' }}>{formatGermanDate(booking.date)}</Typography>
+                                                                <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{formatGermanDate(booking.date)}</Typography>
                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'grey.100' }}>{timeRange}</Typography>
-                                                                    {booking.friendly && <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.8rem' }}>F</Typography>}
+                                                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
+                                                                    {booking.friendly && <Typography sx={{ color: theme.palette.mode === 'light' ? theme.palette.warning.dark : '#FFD700', fontWeight: 'bold', fontSize: '0.8rem' }}>F</Typography>}
                                                                 </Box>
                                                             </Box>
-                                                            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.grey[800]}` }}>
-                                                                <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.homeTeamId)}</Typography>
-                                                                <Typography sx={{ color: 'grey.500', fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
-                                                                <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'grey.100' }}>{displayTeamName(booking.awayTeamId)}</Typography>
+                                                            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
+                                                                <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</Typography>
+                                                                <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
+                                                                <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.awayTeamId)}</Typography>
                                                             </Box>
                                                         </Box>
                                                     </Box>
@@ -864,16 +681,17 @@ const BookingManager = ({ currentSeason }) => {
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        <TableRow key={booking.id} onClick={() => handleRowClick(booking)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                                        <TableRow key={booking.id} onClick={() => handleRowClick(booking)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
                                             <StyledTableCell align="center"><StatusIndicator status={booking.status} /></StyledTableCell>
                                             <StyledTableCell>{formatGermanDate(booking.date)}</StyledTableCell>
                                             <StyledTableCell>
                                                 {timeRange}
-                                                {booking.friendly && <Typography component="span" sx={{ ml: 1, color: '#FFD700', fontWeight: 'bold' }}>F</Typography>}
+                                                {booking.friendly && <Typography component="span" sx={{ ml: 1, color: theme.palette.mode === 'light' ? theme.palette.warning.dark : '#FFD700', fontWeight: 'bold' }}>F</Typography>}
                                             </StyledTableCell>
                                             <StyledTableCell>{getPitchName(booking.pitchId)}</StyledTableCell>
                                             <StyledTableCell>{displayTeamName(booking.homeTeamId)}</StyledTableCell>
                                             <StyledTableCell>{displayTeamName(booking.awayTeamId)}</StyledTableCell>
+                                            <StyledTableCell align="center">{booking.duration ? `${booking.duration}'` : '-'}</StyledTableCell>
                                         </TableRow>
                                     )
                                 })}

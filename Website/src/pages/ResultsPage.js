@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Container, FormControl, InputLabel, Select, MenuItem, useTheme, useMediaQuery } from '@mui/material';
-import { collection, getDocs } from 'firebase/firestore';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
-import { db } from '../firebase';
 import * as seasonApi from '../services/seasonApiService';
 
 const ResultsPage = () => {
@@ -20,18 +18,13 @@ const ResultsPage = () => {
 
   const loadSeasons = async () => {
     try {
-      const [seasonData, seasonsSnap] = await Promise.all([
+      const [seasonData, allSeasonsData] = await Promise.all([
         seasonApi.getActiveSeasonPublic().catch(() => null),
-        getDocs(collection(db, 'seasons'))
+        seasonApi.getAllSeasonsPublic().catch(() => [])
       ]);
 
-      const allSeasonsData = seasonsSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // Filtere nur finished und active Saisons (nicht planning)
-      const availableSeasons = allSeasonsData.filter(s => s.status === 'finished' || s.status === 'active');
+      // Filtere nur relevante Saisons (nicht planning)
+      const availableSeasons = allSeasonsData.filter(s => s.status === 'finished' || s.status === 'active' || s.status === 'inactive');
       // Sortiere nach Name (Jahr) absteigend
       availableSeasons.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
       setAllSeasons(availableSeasons);

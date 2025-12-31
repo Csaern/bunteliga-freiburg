@@ -102,10 +102,180 @@ class BookingService {
     }
 
     /**
+     * NEU: Gleicht den Status aller leeren Zeitslots eines Platzes mit dem wöchentlichen Limit ab.
+     * Wenn das Limit erreicht ist, werden freie Slots auf 'blocked' gesetzt.
+     * Wenn wieder Platz frei wird, werden sie auf 'available' zurückgesetzt.
+     * @private
+     */
+    static async _syncPitchWeeklySlots(pitchId, date) {
+        if (!pitchId || !date) return;
+
+        const pitchDoc = await pitchesCollection.doc(pitchId).get();
+        if (!pitchDoc.exists) return;
+
+        const pitchData = pitchDoc.data();
+        const limit = pitchData.weeklyLimit;
+
+        // Wenn kein Limit gesetzt ist, beenden wir frühzeitig.
+        if (limit === null || limit === undefined || limit === '' || Number(limit) === 0) return;
+
+        const bookingDate = new Date(getMillisFromDate(date));
+
+        // Berechne Wochenbereich (Montag bis Sonntag)
+        const day = bookingDate.getDay();
+        const diffToMonday = bookingDate.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(bookingDate);
+        monday.setDate(diffToMonday);
+        monday.setHours(0, 0, 0, 0);
+
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        // 1. Zähle alle aktiven Buchungen in dieser Woche auf diesem Platz
+        const snapshot = await bookingsCollection
+            .where('pitchId', '==', pitchId)
+            .where('status', 'in', ['confirmed', 'pending_away_confirm'])
+            .get();
+
+        let activeCount = 0;
+        snapshot.forEach(doc => {
+            const d = getMillisFromDate(doc.data().date);
+            if (d >= monday.getTime() && d <= sunday.getTime()) {
+                activeCount++;
+            }
+        });
+
+        const isLimitReached = activeCount >= Number(limit);
+
+        // 2. Finde alle "leeren" Slots in dieser Woche (keine Teams zugeordnet)
+        // Wir holen alle Buchungen der Woche erneut, um sie zu aktualisieren.
+        // (Alternativ könnte man die erste Query erweitern, aber so ist es sauberer getrennt).
+        const allWeekBookings = await bookingsCollection
+            .where('pitchId', '==', pitchId)
+            .get();
+
+        const batch = db.batch();
+        let updateCount = 0;
+
+        allWeekBookings.forEach(doc => {
+            const data = doc.data();
+            const d = getMillisFromDate(data.date);
+
+            // Nur innerhalb der Woche
+            if (d < monday.getTime() || d > sunday.getTime()) return;
+
+            // Nur Slots, die wirklich leer sind (Heim und Auswärts null)
+            const isEmptySlot = !data.homeTeamId && !data.awayTeamId;
+            if (!isEmptySlot) return;
+
+            // Logik: 
+            // - Limit erreicht -> Alle leeren Slots zu blocked
+            // - Limit unterboten -> Alle blocked Slots wieder zu available
+            let newStatus = null;
+            if (isLimitReached) {
+                if (data.status !== 'blocked') {
+                    newStatus = 'blocked';
+                }
+            } else if (data.status === 'blocked') {
+                newStatus = 'available';
+            }
+
+            if (newStatus) {
+                batch.update(doc.ref, {
+                    status: newStatus,
+                    isAvailable: newStatus === 'available',
+                    autoBlocked: isLimitReached // Hilfs-Flag, falls wir es später brauchen
+                });
+                updateCount++;
+            }
+        });
+
+        if (updateCount > 0) {
+            await batch.commit();
+            console.log(`[_syncPitchWeeklySlots] ${updateCount} Slots auf '${pitchData.name}' automatisch ${isLimitReached ? 'gesperrt' : 'freigegeben'} (Limit: ${limit}, Aktiv: ${activeCount})`);
+        }
+    }
+
+    /**
+     * NEU: Löscht abgelaufene Spielanfragen (pending_away_confirm).
+     * Wird "lazy" aufgerufen, wenn Buchungen für eine Saison abgefragt werden.
+     * @private
+     */
+    static async cleanupExpiredRequests(seasonId) {
+        if (!seasonId) return;
+
+        try {
+            const seasonDoc = await seasonsCollection.doc(seasonId).get();
+            if (!seasonDoc.exists) return;
+
+            const seasonData = seasonDoc.data();
+            const expiryDays = seasonData.requestExpiryDays || 3;
+            const now = Date.now();
+            const expiryMillis = expiryDays * 24 * 60 * 60 * 1000;
+
+            const expiredSnapshot = await bookingsCollection
+                .where('seasonId', '==', seasonId)
+                .where('status', '==', 'pending_away_confirm')
+                .get();
+
+            if (expiredSnapshot.empty) return;
+
+            const batch = db.batch();
+            let expiredCount = 0;
+            const pitchesAffected = new Set();
+
+            expiredSnapshot.forEach(doc => {
+                const data = doc.data();
+                const requestedAtMillis = getMillisFromDate(data.requestedAt);
+
+                if (requestedAtMillis > 0 && (now - requestedAtMillis) > expiryMillis) {
+                    // Reset slot
+                    const updateData = {
+                        status: 'available',
+                        homeTeamId: null,
+                        awayTeamId: null,
+                        friendly: false,
+                        isAvailable: true,
+                        expiredAt: admin.firestore.FieldValue.serverTimestamp(),
+                        expiryReason: 'automated_timeout'
+                    };
+
+                    // Individuelle Buchungen werden gelöscht statt resettet
+                    if (data.isCustom) {
+                        batch.delete(doc.ref);
+                    } else {
+                        batch.update(doc.ref, updateData);
+                    }
+
+                    expiredCount++;
+                    pitchesAffected.add(JSON.stringify({ pitchId: data.pitchId, date: data.date }));
+                }
+            });
+
+            if (expiredCount > 0) {
+                await batch.commit();
+                console.log(`[cleanupExpiredRequests] ${expiredCount} Anfragen in Saison '${seasonData.name}' abgelaufen und zurückgesetzt.`);
+
+                // Sync Wochen-Limits für betroffene Plätze/Wochen
+                for (const pitchStr of pitchesAffected) {
+                    const { pitchId, date } = JSON.parse(pitchStr);
+                    await BookingService._syncPitchWeeklySlots(pitchId, date);
+                }
+            }
+        } catch (error) {
+            console.error('[cleanupExpiredRequests] Fehler bei der Bereinigung:', error);
+        }
+    }
+
+    /**
      * KORRIGIERT: Ruft alle Buchungen für eine Saison ab und behandelt alte/neue Datumsformate.
      */
     static async getBookingsForSeason(seasonId, teamId = null) {
         if (!seasonId) throw new Error("Eine Saison-ID ist erforderlich.");
+
+        // Automatisches Aufräumen abgelaufener Anfragen (Lazy Cleanup)
+        await BookingService.cleanupExpiredRequests(seasonId);
 
         let query = bookingsCollection.where('seasonId', '==', seasonId);
         if (teamId) {
@@ -232,6 +402,10 @@ class BookingService {
             friendly: bookingData.friendly || false, // NEU
         };
         const docRef = await bookingsCollection.add(newBooking);
+
+        // 3. NEU: Automatische Synchronisierung der freien Slots für diese Woche
+        await BookingService._syncPitchWeeklySlots(newBooking.pitchId, newBooking.date);
+
         return { id: docRef.id, ...newBooking };
     }
 
@@ -304,6 +478,14 @@ class BookingService {
         };
 
         await bookingRef.update(dataToUpdate);
+
+        // 3. NEU: Automatische Synchronisierung der freien Slots
+        // Wir synchronisieren sowohl den alten als auch den neuen Platz/Termin
+        await BookingService._syncPitchWeeklySlots(originalBooking.pitchId, originalBooking.date);
+        if (updateData.pitchId || updateData.date) {
+            await BookingService._syncPitchWeeklySlots(dataToUpdate.pitchId || originalBooking.pitchId, dataToUpdate.date || originalBooking.date);
+        }
+
         const updatedDoc = await bookingRef.get();
         return { id: bookingId, ...updatedDoc.data() };
     }
@@ -444,6 +626,21 @@ class BookingService {
         // Saison-Regeln prüfen (nur wenn kein Freundschaftsspiel)
         if (!friendly) {
             await BookingService._checkSeasonRulesForPairing(homeTeamId, awayTeamId, bookingData.seasonId);
+        } else if (!bookingData.friendly) {
+            // Wenn es als Freundschaftsspiel gebucht wird, aber der Slot KEIN Freundschaftsspiel-Slot ist,
+            // prüfen wir die Freigabezeit aus der Saison.
+            const seasonDoc = await seasonsCollection.doc(bookingData.seasonId).get();
+            if (seasonDoc.exists) {
+                const seasonData = seasonDoc.data();
+                const releaseHours = seasonData.friendlyGamesReleaseHours || 48;
+                const now = Date.now();
+                const slotDateMillis = getMillisFromDate(bookingData.date);
+                const releaseMillis = releaseHours * 60 * 60 * 1000;
+
+                if ((slotDateMillis - now) > releaseMillis) {
+                    throw new Error(`Dieser Termin ist noch nicht für Freundschaftsspiele freigegeben. Erst ${releaseHours} Stunden vor Spielbeginn.`);
+                }
+            }
         }
 
         // Status setzen: Wenn Auswärtsmannschaft dabei ist, muss sie bestätigen
@@ -454,9 +651,13 @@ class BookingService {
             awayTeamId,
             status,
             friendly,
+            isAvailable: false,
             requestedBy: requestingUserId,
             requestedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+
+        // 3. NEU: Automatische Synchronisierung der freien Slots
+        await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
 
         return { message: 'Buchung erfolgreich angefragt.' };
     }
@@ -486,6 +687,10 @@ class BookingService {
                 status: 'confirmed',
                 confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
+
+            // 3. NEU: Automatische Synchronisierung der freien Slots
+            await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
+
             return { message: 'Spiel bestätigt!' };
         }
 
@@ -501,10 +706,15 @@ class BookingService {
                 homeTeamId: null,
                 awayTeamId: null,
                 friendly: false,
+                isAvailable: true,
                 deniedByTeamId: actingTeamId,
                 deniedAt: admin.firestore.FieldValue.serverTimestamp(),
                 denialReason: reason,
             });
+
+            // 3. NEU: Automatische Synchronisierung der freien Slots
+            await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
+
             return { message: 'Anfrage abgelehnt. Der Termin ist wieder frei.' };
         }
 
@@ -539,7 +749,7 @@ class BookingService {
             return { message: 'Spiel abgesagt. Die individuelle Buchung wurde gelöscht.' };
         }
 
-        return await db.runTransaction(async (transaction) => {
+        const result = await db.runTransaction(async (transaction) => {
             // Entferne beide Mannschaften und setze Status auf available
             transaction.update(bookingRef, {
                 status: 'available',
@@ -557,6 +767,11 @@ class BookingService {
 
             return { message };
         });
+
+        // 3. NEU: Automatische Synchronisierung der freien Slots
+        await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
+
+        return result;
     }
 
     /**
@@ -646,19 +861,17 @@ class BookingService {
 
                 // Dann alle Writes ausführen
                 transaction.update(bookingRef, {
-                    status: 'cancelled',
+                    status: 'available',
+                    homeTeamId: null,
+                    awayTeamId: null,
+                    isAvailable: true,
                     cancelledByTeamId: bookingData.cancellationRequestedByTeamId,
                     cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
-
-                if (pitchDoc.exists && pitchDoc.data().isVerified) {
-                    const newBooking = new Booking({ ...bookingData, createdBy: 'system_recreate', homeTeamId: null, awayTeamId: null });
-                    const firestoreObject = newBooking.toFirestoreObject();
-                    firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
-                    const newBookingRef = bookingsCollection.doc();
-                    transaction.set(newBookingRef, firestoreObject);
-                }
             });
+
+            // 3. NEU: Automatische Synchronisierung der freien Slots
+            await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
 
             // Benachrichtigung an das anfragende Team senden (außerhalb der Transaction)
             await notificationService.notifyTeam(
@@ -692,6 +905,9 @@ class BookingService {
                     cancellationRejectionReason: reason,
                 });
             });
+
+            // 3. NEU: Automatische Synchronisierung der freien Slots
+            await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
 
             // Benachrichtigung an das anfragende Team senden (außerhalb der Transaction)
             await notificationService.notifyTeam(
@@ -750,6 +966,8 @@ class BookingService {
             status: awayTeamId ? 'pending_away_confirm' : 'confirmed',
             isCustom: true, // NEU: Explizit als individuelle Buchung markieren
             duration: bookingData.duration || 90, // Fallback, falls nicht übergeben
+            requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+            requestedBy: user.uid,
         };
 
         const newBooking = new Booking(newBookingData);
@@ -757,6 +975,10 @@ class BookingService {
         firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
 
         const docRef = await bookingsCollection.add(firestoreObject);
+
+        // 3. NEU: Automatische Synchronisierung der freien Slots
+        await BookingService._syncPitchWeeklySlots(pitchId, date);
+
         return { id: docRef.id, ...firestoreObject };
     }
 
@@ -765,18 +987,25 @@ class BookingService {
      */
     static async adminCancelBooking(bookingId, reason, adminUid) {
         const bookingRef = bookingsCollection.doc(bookingId);
-        const bookingDoc = await bookingRef.get();
+        const bookingDoc = await bookingRef.get(); // Added missing bookingDoc fetch
         if (bookingDoc.exists && bookingDoc.data().isCustom) {
             await bookingRef.delete();
             return { message: 'Individuelle Buchung wurde durch Admin gelöscht.' };
         }
 
         await bookingRef.update({
-            status: 'cancelled_admin',
+            status: 'available',
+            homeTeamId: null,
+            awayTeamId: null,
+            isAvailable: true,
             cancellationReason: reason,
             cancelledBy: adminUid,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+
+        // 3. NEU: Automatische Synchronisierung der freien Slots
+        await BookingService._syncPitchWeeklySlots(bookingDoc.data().pitchId, bookingDoc.data().date);
+
         return { message: 'Spiel wurde durch Admin erfolgreich storniert.' };
     }
 
@@ -877,6 +1106,9 @@ class BookingService {
         if (!seasonId || !teamId) {
             throw new Error('Saison-ID und Team-ID sind erforderlich.');
         }
+
+        // Automatisches Aufräumen abgelaufener Anfragen (Lazy Cleanup)
+        await BookingService.cleanupExpiredRequests(seasonId);
 
         // Erstelle Datum für "jetzt" - setze Zeit auf Anfang des aktuellen Tages, 
         // um auch Spiele des heutigen Tages einzubeziehen

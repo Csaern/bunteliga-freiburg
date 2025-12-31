@@ -20,6 +20,14 @@ export const getResultsForSeasonPublic = async (seasonId) => {
     return publicApiClient(`/api/results/public/season/${seasonId}`);
 };
 
+export const getHeadToHeadResults = async (teamA, teamB, excludeId = null) => {
+    let url = `/api/results/public/h2h/${teamA}/${teamB}`;
+    if (excludeId) {
+        url += `?excludeId=${excludeId}`;
+    }
+    return publicApiClient(url);
+};
+
 // Team meldet ein Ergebnis zu einer Buchung
 export const reportResult = async (bookingId, resultData) => {
     return apiClient(`/api/results/report/${bookingId}`, 'POST', resultData);

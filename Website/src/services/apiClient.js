@@ -106,3 +106,26 @@ export const apiClientFormData = async (endpoint, method = 'POST', formData) => 
 
     return response.json();
 };
+
+/**
+ * NEU: Prüft, ob das Backend erreichbar ist.
+ * Versucht, den Root-Endpunkt (/) oder einen sehr einfachen Endpunkt abzufragen.
+ */
+export const checkBackendHealth = async () => {
+    try {
+        // Timeout hinzufügen, um nicht ewig zu warten
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 Sekunden Timeout
+
+        const response = await fetch(`${API_BASE_URL}/`, {
+            method: 'GET',
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        return response.ok;
+    } catch (error) {
+        // console.error("Backend Health Check failed:", error); // Optional logging
+        return false;
+    }
+};

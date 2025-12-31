@@ -49,3 +49,13 @@ export const getActiveSeason = async () => {
 export const getActiveSeasonPublic = async () => {
     return publicApiClient('/api/seasons/public/active', 'GET');
 };
+
+// Alle Saisons (öffentlich)
+export const getAllSeasonsPublic = async () => {
+    return publicApiClient('/api/seasons/public/list', 'GET');
+};
+
+// Einzelne Saison (öffentlich)
+export const getSeasonByIdPublic = async (seasonId) => {
+    return publicApiClient(`/api/seasons/public/${seasonId}`, 'GET');
+};

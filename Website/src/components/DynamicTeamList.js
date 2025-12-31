@@ -34,9 +34,15 @@ const getFallbackColor = (name) => {
 
 // Interne Komponente für Logo Handling
 const TeamLogoItem = ({ team, isMobile }) => {
+  const theme = useTheme();
   const [imgError, setImgError] = useState(false);
-  const logoSrc = team.logoUrl
-    ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`)
+  const isLightMode = theme.palette.mode === 'light';
+
+  // Wähle das passende Logo: Light Mode Logo bevorzugen wenn im Light Mode und vorhanden
+  const logoUrlToUse = (isLightMode && team.logoUrlLight) ? team.logoUrlLight : team.logoUrl;
+
+  const logoSrc = logoUrlToUse
+    ? (logoUrlToUse.startsWith('http') ? logoUrlToUse : `${API_BASE_URL}${logoUrlToUse}`)
     : null;
 
   if (imgError || !logoSrc) {

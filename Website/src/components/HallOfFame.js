@@ -44,9 +44,9 @@ const StyledTableCell = ({ children, sx, align, ...props }) => {
     <TableCell
       align={align}
       sx={{
-        color: theme.palette.grey[300],
+        color: theme.palette.text.secondary, // Was grey[300]
         fontFamily: 'comfortaa',
-        borderBottom: `1px solid ${theme.palette.grey[800]}`,
+        borderBottom: `1px solid ${theme.palette.divider}`, // Was grey[800]
         py: 1.5,
         verticalAlign: 'middle', // Stellt sicher, dass alles vertikal zentriert ist
         ...sx,
@@ -74,7 +74,7 @@ const HallOfFame = ({ title }) => {
         sx={{
           mb: 3,
           mt: 2,
-          color: '#00A99D',
+          color: theme.palette.primary.main, // Was #00A99D (Primary Dark default)
           fontWeight: 700,
           fontFamily: 'comfortaa',
           textAlign: 'center',
@@ -87,29 +87,29 @@ const HallOfFame = ({ title }) => {
       <TableContainer
         component={Paper}
         sx={{
-          backgroundColor: '#111',
+          backgroundColor: theme.palette.background.paper, // Was #111
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.grey[800]}`,
+          border: `1px solid ${theme.palette.divider}`, // Was grey[800]
         }}
       >
         <Table aria-label="Ehrentafel der Meister">
           <TableHead>
-            <TableRow sx={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '15%' : '10%', fontSize: isMobile ? '0.7rem' : 'inherit' }}>Rang</StyledTableCell>
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '60%' : '30%', fontSize: isMobile ? '0.7rem' : 'inherit' }}>Team</StyledTableCell>
+            <TableRow sx={{ backgroundColor: theme.palette.action.hover }}> {/* Was rgba(255,255,255,0.05) */}
+              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '15%' : '10%', fontSize: isMobile ? '0.7rem' : 'inherit' }}>Rang</StyledTableCell>
+              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '60%' : '30%', fontSize: isMobile ? '0.7rem' : 'inherit' }}>Team</StyledTableCell>
               {!isMobile && (
-                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '45%' }}>Meisterjahre</StyledTableCell>
+                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '45%' }}>Meisterjahre</StyledTableCell>
               )}
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: isMobile ? '25%' : '15%', fontSize: isMobile ? '0.7rem' : 'inherit' }}>Titel</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '25%' : '15%', fontSize: isMobile ? '0.7rem' : 'inherit' }}>Titel</StyledTableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {sortedChampions.map((team, index) => (
               <TableRow
                 key={team.id}
-                sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' } }}
+                sx={{ '&:hover': { backgroundColor: theme.palette.action.hover } }}
               >
-                <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.8rem' : '1.1rem', color: theme.palette.grey[100] }}>
+                <StyledTableCell component="th" scope="row" sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.8rem' : '1.1rem', color: theme.palette.text.primary }}>
                   {index + 1}
                 </StyledTableCell>
                 <StyledTableCell>
@@ -127,24 +127,24 @@ const HallOfFame = ({ title }) => {
                     >
                       {team.name.substring(0, 1).toUpperCase()}
                     </Avatar>
-                    <Typography noWrap sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '1rem', fontWeight: 600 }}>
+                    <Typography noWrap sx={{ fontFamily: 'comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.6rem' : '1rem', fontWeight: 600 }}>
                       {team.name}
                     </Typography>
                   </Box>
                 </StyledTableCell>
-                
+
                 {/* Meisterjahre werden nur auf dem Desktop angezeigt */}
                 {!isMobile && (
                   <StyledTableCell>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {team.years.map((year) => (
-                        <Chip key={year} label={year} sx={{ fontFamily: 'comfortaa', fontWeight: 'bold', backgroundColor: theme.palette.grey[700], color: theme.palette.grey[200] }} />
+                        <Chip key={year} label={year} sx={{ fontFamily: 'comfortaa', fontWeight: 'bold', backgroundColor: theme.palette.action.selected, color: theme.palette.text.primary }} />
                       ))}
                     </Box>
                   </StyledTableCell>
                 )}
                 <StyledTableCell align="center">
-                  <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontWeight: 'bold', fontSize: isMobile ? '0.8rem' : '1.2rem' }}>
+                  <Typography variant="h6" sx={{ fontFamily: 'comfortaa', color: theme.palette.text.primary, fontWeight: 'bold', fontSize: isMobile ? '0.8rem' : '1.2rem' }}>
                     {team.championships}
                   </Typography>
                 </StyledTableCell>

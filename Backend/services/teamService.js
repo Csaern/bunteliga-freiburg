@@ -109,7 +109,7 @@ async function updateTeam(teamId, updates) {
  * @param {string} logoPath - Der relative Pfad zum neuen Logo.
  * @returns {object} Das aktualisierte Team-Objekt.
  */
-async function updateTeamLogo(teamId, logoPath) {
+async function updateTeamLogo(teamId, logoPath, logoType = 'dark') {
   const teamRef = teamsCollection.doc(teamId);
   const doc = await teamRef.get();
 
@@ -121,10 +121,17 @@ async function updateTeamLogo(teamId, logoPath) {
   // const oldLogoPath = doc.data().logoUrl;
   // if (oldLogoPath) { ... fs.unlink ... }
 
-  await teamRef.update({
-    logoUrl: logoPath,
+  const updateData = {
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+  };
+
+  if (logoType === 'light') {
+    updateData.logoUrlLight = logoPath;
+  } else {
+    updateData.logoUrl = logoPath;
+  }
+
+  await teamRef.update(updateData);
 
   const updatedDoc = await teamRef.get();
   return { id: updatedDoc.id, ...updatedDoc.data() };
@@ -312,6 +319,74 @@ async function getPotentialOpponents(teamId, isFriendly = false) {
   return eligibleOpponents;
 }
 
+/**
+ * NEU: Berechnet Statistiken für ein Team in einer bestimmten Saison.
+ * (Tore/Spiel, Gegentore/Spiel, Punkte/Spiel)
+ */
+async function getTeamStats(teamId, seasonId) {
+  if (!teamId || !seasonId) {
+    throw new Error('Team ID und Saison ID sind erforderlich.');
+  }
+
+  // Wir holen alle Ergebnisse der Saison und filtern dann im Speicher.
+  // Das spart komplexe Indexe und ist bei der zu erwartenden Datenmenge performant genug.
+  const snapshot = await resultsCollection
+    .where('seasonId', '==', seasonId)
+    .where('status', '==', 'confirmed') // Nur bestätigte Ergebnisse zählen
+    .get();
+
+  if (snapshot.empty) {
+    return {
+      gamesPlayed: 0,
+      goalsScoredPerGame: 0,
+      goalsConcededPerGame: 0,
+      pointsPerGame: 0
+    };
+  }
+
+  let gamesPlayed = 0;
+  let totalGoalsScored = 0;
+  let totalGoalsConceded = 0;
+  let totalPoints = 0;
+
+  snapshot.forEach(doc => {
+    const result = doc.data();
+
+    // Ignoriere Freundschaftsspiele
+    if (result.friendly) return;
+
+    // Prüfe ob das Team beteiligt war
+    if (result.homeTeamId !== teamId && result.awayTeamId !== teamId) return;
+
+    gamesPlayed++;
+
+    const isHome = result.homeTeamId === teamId;
+    const myScore = isHome ? result.homeScore : result.awayScore;
+    const opponentScore = isHome ? result.awayScore : result.homeScore;
+
+    totalGoalsScored += myScore;
+    totalGoalsConceded += opponentScore;
+
+    if (myScore > opponentScore) {
+      totalPoints += 3;
+    } else if (myScore === opponentScore) {
+      totalPoints += 1;
+    }
+  });
+
+  // Berechnungen und Runden auf 2 Nachkommastellen
+  const goalsScoredPerGame = gamesPlayed > 0 ? Number((totalGoalsScored / gamesPlayed).toFixed(2)) : 0;
+  const goalsConcededPerGame = gamesPlayed > 0 ? Number((totalGoalsConceded / gamesPlayed).toFixed(2)) : 0;
+  const pointsPerGame = gamesPlayed > 0 ? Number((totalPoints / gamesPlayed).toFixed(2)) : 0;
+
+  return {
+    gamesPlayed,
+    goalsScoredPerGame,
+    goalsConcededPerGame,
+    pointsPerGame
+  };
+}
+
 module.exports = {
   createTeam,
   getAllTeams,
@@ -321,6 +396,7 @@ module.exports = {
   deleteTeam,
   getTeamsByIds,
   getTeamsForSeason,
-  getTeamsForActiveSeason, // Stellt sicher, dass die neue Funktion exportiert wird
-  getPotentialOpponents, // Neue Funktion exportieren
+  getTeamsForActiveSeason,
+  getPotentialOpponents,
+  getTeamStats, // Neue Funktion exportieren
 };

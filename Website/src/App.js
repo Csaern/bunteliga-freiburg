@@ -29,6 +29,9 @@ import AdminDashboard from './components/Admin/AdminDashboard';
 import DashboardPage from './pages/DashboardPage';
 import TeamPage from './pages/TeamPage';
 import TeamDetailPage from './pages/TeamDetailPage';
+import { checkBackendHealth } from './services/apiClient';
+import BackendErrorPage from './pages/BackendErrorPage';
+
 
 // Eine kleine Helfer-Komponente, um den URL-Parameter an das AdminBoard zu übergeben
 function AdminBoardWrapper() {
@@ -38,8 +41,37 @@ function AdminBoardWrapper() {
   return <AdminBoard initialTab={tab || 'bookings'} />;
 }
 
-
 function App() {
+  const [isBackendLive, setIsBackendLive] = React.useState(null); // null = checking, true = live, false = dead
+
+  React.useEffect(() => {
+    const checkStatus = async () => {
+      const isLive = await checkBackendHealth();
+      setIsBackendLive(isLive);
+    };
+    checkStatus();
+  }, []);
+
+  if (isBackendLive === false) {
+    return (
+      <ColorModeProvider>
+        <CssBaseline />
+        <BackendErrorPage />
+      </ColorModeProvider>
+    );
+  }
+
+  // Solange wir prüfen (isBackendLive === null), könnten wir einen Ladescreen zeigen
+  // oder einfach die App rendern, die dann ggf. kurz "hakt" oder Loading zeigt.
+  // Hier rendern wir die App erst, wenn wir wissen, dass es geht. 
+  // ODER: Wir rendern die App sofort und zeigen den Error nur bei explizitem False.
+  // Entscheidung: Wir warten kurz (Ladescreen) oder zeigen App, und wenn Check fehlschlägt -> Error Page.
+  // Da der App-Start u.U. Requests feuert, ist warten sicherer um Errors zu vermeiden.
+  // Aber für "Fast Load" Gefühl: App rendern. Wenn Check fehlschlägt, wird sie durch ErrorPage ersetzt.
+  // Kompromiss: Wenn isBackendLive === false -> ErrorPage. Sonst App.
+  // (Bei 'null' wird die App schon gerendert. Falls Request failen, fängt User das ab, 
+  // bis Check fertig ist und ErrorPage kommt.)
+
   return (
     <ColorModeProvider>
       <CssBaseline />

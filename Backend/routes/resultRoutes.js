@@ -7,6 +7,21 @@ const { checkCaptainOfActingTeam } = require('../middleware/permissionMiddleware
 // --- ÖFFENTLICHE ROUTEN ---
 
 // Neueste bestätigte Ergebnisse einer Saison (öffentlich)
+// H2H Ergebnisse (öffentlich)
+router.get('/public/h2h/:teamA/:teamB', async (req, res) => {
+    try {
+        const { teamA, teamB } = req.params;
+        const { excludeId } = req.query; // Extrahiere excludeId aus den Query-Parametern
+        if (!teamA || !teamB) {
+            return res.status(400).json({ message: 'Beide Team-IDs sind erforderlich.' });
+        }
+        const results = await resultService.getHeadToHeadResults(teamA, teamB, excludeId);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 router.get('/public/season/:seasonId', async (req, res) => {
     try {
         const { seasonId } = req.params;

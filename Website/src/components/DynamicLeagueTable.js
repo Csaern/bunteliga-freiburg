@@ -26,7 +26,9 @@ import * as bookingApiService from '../services/bookingApiService';
 const TeamLogo = ({ team, isMobile }) => {
   const theme = useTheme();
   const [error, setError] = useState(false);
-  const logoUrl = team.logoUrl ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`) : null;
+  const isLightMode = theme.palette.mode === 'light';
+  const logoUrlToUse = (isLightMode && team.logoUrlLight) ? team.logoUrlLight : team.logoUrl;
+  const logoUrl = logoUrlToUse ? (logoUrlToUse.startsWith('http') ? logoUrlToUse : `${API_BASE_URL}${logoUrlToUse}`) : null;
 
   const getFallbackColor = (name) => {
     const colors = [
@@ -275,6 +277,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
           name: team.name,
           logoColor: team.logoColor || '#666666',
           logoUrl: team.logoUrl, // Logo-URL hinzufügen
+          logoUrlLight: team.logoUrlLight,
           description: team.description,
           foundedYear: team.foundedYear,
           played: 0,

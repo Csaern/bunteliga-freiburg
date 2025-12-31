@@ -27,6 +27,7 @@ class PitchService {
             notes: pitchData.notes || '',
             teamId: pitchData.teamId || null,
             isVerified: pitchData.isVerified || false,
+            weeklyLimit: pitchData.weeklyLimit !== '' && pitchData.weeklyLimit !== null ? Number(pitchData.weeklyLimit) : null,
             isArchived: false, // NEU: Standardwert für neue Plätze
             createdBy: user.uid,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -38,8 +39,15 @@ class PitchService {
 
     static async updatePitch(pitchId, updateData) {
         const pitchRef = pitchesCollection.doc(pitchId);
+        const finalUpdateData = { ...updateData };
+        if (finalUpdateData.weeklyLimit !== undefined) {
+            finalUpdateData.weeklyLimit = (finalUpdateData.weeklyLimit !== '' && finalUpdateData.weeklyLimit !== null)
+                ? Number(finalUpdateData.weeklyLimit)
+                : null;
+        }
+
         await pitchRef.update({
-            ...updateData,
+            ...finalUpdateData,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         const updatedDoc = await pitchRef.get();

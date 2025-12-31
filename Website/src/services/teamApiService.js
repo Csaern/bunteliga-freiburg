@@ -54,7 +54,10 @@ export const getTeamByIdPublic = async (teamId) => {
   return publicApiClient(`/api/teams/${teamId}`, 'GET');
 };
 
-// KORREKTUR: Verwendet jetzt die neue, korrekte Funktion für den Logo-Upload
-export const uploadTeamLogo = async (teamId, formData) => {
-  return apiClientFormData(`/api/teams/${teamId}/logo`, 'POST', formData);
+export const uploadTeamLogo = async (teamId, formData, type = 'dark') => {
+  return apiClientFormData(`/api/teams/${teamId}/logo?type=${type}`, 'POST', formData);
+};
+
+export const getTeamStats = async (teamId, seasonId) => {
+  return publicApiClient(`/api/teams/${teamId}/stats/${seasonId}`, 'GET');
 };

@@ -42,6 +42,7 @@ class Team {
     this.contactPhone = contactPhone;
     this.website = website;
     this.logoUrl = logoUrl;
+    this.logoUrlLight = null; // NEU: Logo für Light Mode
     this.logoColor = logoColor;
 
     // 3. Verschachtelte Objekte mit Standardwerten behandeln
@@ -53,7 +54,7 @@ class Team {
 
     // 4. Strukturelle Eigenschaften hinzufügen
     // Der Ersteller wird automatisch zum ersten Kapitän des Teams.
-    this.captainIds = [createdBy]; 
+    this.captainIds = [createdBy];
   }
 
   /**
@@ -72,6 +73,7 @@ class Team {
       contactPhone: this.contactPhone,
       website: this.website,
       logoUrl: this.logoUrl,
+      logoUrlLight: this.logoUrlLight || null, // NEU
       logoColor: this.logoColor,
       socialMedia: this.socialMedia,
       captainIds: this.captainIds,

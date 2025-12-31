@@ -138,12 +138,16 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
                 // Must match selected pitch
                 if (s.pitchId !== pitchSelection) return false;
 
-                // Friendly filter: If friendly game, slot must be friendly.
-                // If league game, slot must NOT be friendly (or we allow any? User said "only see slots released for friendly")
-                // Let's assume: Friendly Game -> Slot.friendly === true.
-                // League Game -> Slot.friendly === false (or undefined).
+                // Friendly filter: If friendly game, slot must be friendly OR released for friendly games by time.
+                // If league game, slot must NOT be friendly.
+                const slotDateMillis = s.date._seconds * 1000;
+                const now = Date.now();
+                const releaseHours = activeSeason?.friendlyGamesReleaseHours || 48;
+                const releaseMillis = releaseHours * 60 * 60 * 1000;
+                const isReleasedByTime = (slotDateMillis - now) < releaseMillis;
+
                 if (gameType === 'friendly') {
-                    return s.friendly === true;
+                    return s.friendly === true || isReleasedByTime;
                 } else {
                     return !s.friendly;
                 }
@@ -313,7 +317,7 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
             color: theme.palette.primary.main,
         },
         '& .MuiInputBase-input': {
-            colorScheme: 'dark',
+            color: theme.palette.text.primary,
         }
     };
 

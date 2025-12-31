@@ -18,47 +18,63 @@ router.get('/', checkAuth, checkAdmin, async (req, res) => {
 // Route zum Erstellen einer neuen Saison
 // POST /api/seasons
 router.post('/', checkAuth, checkAdmin, async (req, res) => {
-  try {
-    const seasonData = {
-      ...req.body,
-      createdBy: req.user.uid, // Die UID des Admins aus dem Token holen
-    };
-    const newSeason = await seasonService.createSeason(seasonData);
-    res.status(201).json(newSeason);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
+    try {
+        const seasonData = {
+            ...req.body,
+            createdBy: req.user.uid, // Die UID des Admins aus dem Token holen
+        };
+        const newSeason = await seasonService.createSeason(seasonData);
+        res.status(201).json(newSeason);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
 });
 
 // Route zum Ändern des Status eines Teams in einer Saison
 // PUT /api/seasons/:seasonId/teams/:teamId
 router.put('/:seasonId/teams/:teamId', checkAuth, checkAdmin, async (req, res) => {
-  try {
-    const { seasonId, teamId } = req.params;
-    const { newStatus } = req.body; // z.B. { "newStatus": "inactive" }
-    if (!newStatus) {
-        return res.status(400).json({ message: 'newStatus is required.' });
+    try {
+        const { seasonId, teamId } = req.params;
+        const { newStatus } = req.body; // z.B. { "newStatus": "inactive" }
+        if (!newStatus) {
+            return res.status(400).json({ message: 'newStatus is required.' });
+        }
+        const result = await seasonService.updateTeamStatusInSection(seasonId, teamId, newStatus);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
     }
-    const result = await seasonService.updateTeamStatusInSection(seasonId, teamId, newStatus);
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(404).json({ message: error.message });
-  }
 });
 
 // --- TEAM & ÖFFENTLICHE ROUTEN ---
 // Die aktuell aktive Saison abrufen (ÖFFENTLICH, ohne Authentifizierung)
-// WICHTIG: Diese Route muss VOR der allgemeinen '/:id' Route stehen.
 router.get('/public/active', async (req, res) => {
     try {
         const activeSeason = await seasonService.getActiveSeason();
-        if (!activeSeason) {
-            // Wir senden 200 mit einem leeren Objekt, damit das Frontend das einfach handhaben kann.
-            return res.status(200).json(null);
-        }
-        res.status(200).json(activeSeason);
+        res.status(200).json(activeSeason || null);
     } catch (error) {
         res.status(500).json({ message: error.message });
+    }
+});
+
+// Alle Saisons abrufen (ÖFFENTLICH)
+router.get('/public/list', async (req, res) => {
+    try {
+        const seasons = await seasonService.getAllSeasons();
+        res.status(200).json(seasons);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Einzelne Saison abrufen (ÖFFENTLICH)
+router.get('/public/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const season = await seasonService.getSeasonById(id);
+        res.status(200).json(season);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
     }
 });
 

@@ -12,26 +12,26 @@ const PitchManager = ({ teams }) => {
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     // KORREKTUR: Styling exakt vom UserManager übernommen
-    const darkInputStyle = {
-        '& label.Mui-focused': { color: '#00A99D' },
+    const inputStyle = {
+        '& label.Mui-focused': { color: theme.palette.primary.main },
         '& .MuiOutlinedInput-root': {
-            '& fieldset': { borderColor: 'grey.700' },
-            '&:hover fieldset': { borderColor: 'grey.500' },
-            '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+            '& fieldset': { borderColor: theme.palette.divider },
+            '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+            '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
         },
-        '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark' },
-        '& label': { color: 'grey.400' },
-        '& .MuiSelect-icon': { color: 'grey.400' },
+        '& .MuiInputBase-input': { color: theme.palette.text.primary, accentColor: theme.palette.primary.main },
+        '& label': { color: theme.palette.text.secondary },
+        '& .MuiSelect-icon': { color: theme.palette.text.secondary },
         '& .Mui-disabled': {
-            WebkitTextFillColor: `${theme.palette.grey[500]} !important`,
-            color: `${theme.palette.grey[500]} !important`,
+            WebkitTextFillColor: `${theme.palette.text.disabled} !important`,
+            color: `${theme.palette.text.disabled} !important`,
         },
         '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'grey.800',
+            borderColor: theme.palette.action.disabledBackground,
         },
     };
 
-    const initialFormData = { name: '', address: '', type: '', notes: '', teamId: '', isVerified: false };
+    const initialFormData = { name: '', address: '', type: '', notes: '', teamId: '', isVerified: false, weeklyLimit: '' };
 
     const [pitches, setPitches] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -80,6 +80,7 @@ const PitchManager = ({ teams }) => {
                 notes: selectedPitch.notes || '',
                 teamId: selectedPitch.teamId || '',
                 isVerified: selectedPitch.isVerified || false,
+                weeklyLimit: selectedPitch.weeklyLimit !== undefined ? selectedPitch.weeklyLimit : '',
             });
             // NEU: Setzt die Vorschau auf das vorhandene Bild
             if (selectedPitch.imageUrl) {
@@ -199,36 +200,36 @@ const PitchManager = ({ teams }) => {
         return (b.isVerified - a.isVerified) || a.name.localeCompare(b.name);
     });
 
-    if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
+    if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: theme.palette.primary.main }} /></Box>;
 
     return (
         <Box sx={{ p: { sm: 3 } }}>
-            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
+            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
                 Platzverwaltung
             </Typography>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }}>
+                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
                     Neuen Platz erstellen
                 </Button>
             </Box>
-            
+
             <Snackbar open={notification.open} autoHideDuration={6000} onClose={handleNotificationClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <Alert onClose={handleNotificationClose} severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>
             </Snackbar>
 
-            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Name, Adresse oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...darkInputStyle, mb: 2 }}
+            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Name, Adresse oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...inputStyle, mb: 2 }}
                 InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }}
             />
 
             <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neuen Platz erstellen' : 'Platzdetails'}>
                 <form onSubmit={handleSubmit}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '70vh', overflowY: 'auto', pr: 1, pt: 1 }}>
-                        <TextField size="small" label="Platzname" fullWidth required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={darkInputStyle} disabled={modalMode === 'view'} />
-                        <TextField size="small" label="Adresse" fullWidth value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} sx={darkInputStyle} disabled={modalMode === 'view'} />
-                        
+                        <TextField size="small" label="Platzname" fullWidth required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+                        <TextField size="small" label="Adresse" fullWidth value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+
                         {/* KORREKTUR: Live Google Maps Link zur Überprüfung */}
                         {googleMapsLink && modalMode !== 'view' && (
-                            <Button component={Link} href={googleMapsLink} target="_blank" rel="noopener noreferrer" variant="outlined" sx={{ color: '#00A99D', borderColor: 'grey.700', '&:hover': { borderColor: '#00A99D' } }}>
+                            <Button component={Link} href={googleMapsLink} target="_blank" rel="noopener noreferrer" variant="outlined" sx={{ color: theme.palette.primary.main, borderColor: theme.palette.divider, '&:hover': { borderColor: theme.palette.primary.main } }}>
                                 Adresse auf Google Maps prüfen
                             </Button>
                         )}
@@ -245,7 +246,7 @@ const PitchManager = ({ teams }) => {
                                         sx={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 1, mb: 2 }}
                                     />
                                 )}
-                                
+
                                 {/* NEU: Sektion für Lösch-Bestätigung */}
                                 {showImageDeleteConfirm ? (
                                     <Box>
@@ -269,7 +270,7 @@ const PitchManager = ({ teams }) => {
                                             </Button>
                                         </label>
                                         {pitchImageFile && (
-                                            <Button variant="contained" onClick={handleImageUpload} sx={{ backgroundColor: '#00A99D' }}>
+                                            <Button variant="contained" onClick={handleImageUpload} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
                                                 Jetzt hochladen
                                             </Button>
                                         )}
@@ -284,9 +285,9 @@ const PitchManager = ({ teams }) => {
                             </Box>
                         )}
 
-                        <FormControl size="small" fullWidth sx={darkInputStyle} disabled={modalMode === 'view'}>
+                        <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
                             <InputLabel>Typ</InputLabel>
-                            <Select value={formData.type} label="Typ" onChange={(e) => setFormData({ ...formData, type: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
+                            <Select value={formData.type} label="Typ" onChange={(e) => setFormData({ ...formData, type: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
                                 <MenuItem value="Rasen">Rasen</MenuItem>
                                 <MenuItem value="Kunstrasen">Kunstrasen</MenuItem>
                                 <MenuItem value="Hartplatz">Hartplatz</MenuItem>
@@ -294,15 +295,27 @@ const PitchManager = ({ teams }) => {
                                 <MenuItem value="Sonstiges">Sonstiges</MenuItem>
                             </Select>
                         </FormControl>
-                        <FormControl size="small" fullWidth sx={darkInputStyle} disabled={modalMode === 'view'}>
+                        <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
                             <InputLabel>Gehört zu Team</InputLabel>
-                            <Select value={formData.teamId} label="Gehört zu Team" onChange={(e) => setFormData({ ...formData, teamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
+                            <Select value={formData.teamId} label="Gehört zu Team" onChange={(e) => setFormData({ ...formData, teamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
                                 <MenuItem value=""><em>Kein Team / Liga-Platz</em></MenuItem>
                                 {teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
                             </Select>
                         </FormControl>
-                        <TextField size="small" label="Hinweise" multiline rows={3} fullWidth value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} sx={darkInputStyle} disabled={modalMode === 'view'} />
-                        
+                        <TextField size="small" label="Hinweise" multiline rows={3} fullWidth value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+
+                        <TextField
+                            size="small"
+                            label="Wöchentliches Buchungslimit"
+                            type="number"
+                            fullWidth
+                            value={formData.weeklyLimit}
+                            onChange={(e) => setFormData({ ...formData, weeklyLimit: e.target.value })}
+                            sx={inputStyle}
+                            disabled={modalMode === 'view'}
+                            helperText="Wie viele Spiele dürfen hier pro Woche stattfinden?"
+                        />
+
                         {/* KORREKTUR: Styling für Switch und Label vom UserManager übernommen */}
                         <FormControlLabel
                             control={
@@ -311,57 +324,61 @@ const PitchManager = ({ teams }) => {
                                     onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
                                     disabled={modalMode === 'view'}
                                     sx={{
-                                        '& .MuiSwitch-switchBase.Mui-checked': { color: '#FFBF00' },
-                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#FFBF00' },
+                                        '& .MuiSwitch-switchBase.Mui-checked': { color: theme.palette.warning.main },
+                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: theme.palette.warning.main },
                                     }}
                                 />
                             }
                             label="Offizieller Liga-Platz"
-                            sx={{ color: 'grey.100', '& .MuiFormControlLabel-label.Mui-disabled': { color: theme.palette.grey[500] } }}
+                            sx={{
+                                color: theme.palette.text.secondary,
+                                '& .MuiFormControlLabel-label.Mui-disabled': { color: theme.palette.text.disabled }
+                            }}
                         />
-                        
-                        {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>Platz wirklich archivieren?</Alert>)}
+
+                        {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: theme.palette.background.default, color: theme.palette.error.main }}>Platz wirklich archivieren?</Alert>)}
 
                         <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            {modalMode === 'create' && <><Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }}>Erstellen</Button></>}
-                            {modalMode === 'view' && !showDeleteConfirm && <><Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Archivieren</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: '#00A99D' }}>Bearbeiten</Button></>}
-                            {modalMode === 'view' && showDeleteConfirm && <><Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button variant="contained" color="error" onClick={handleArchive}>Endgültig archivieren</Button></>}
-                            {modalMode === 'edit' && <><Button variant="outlined" onClick={() => setModalMode('view')} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D' }}>Speichern</Button></>}
+                            {modalMode === 'create' && <><Button variant="outlined" onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Erstellen</Button></>}
+                            {modalMode === 'view' && !showDeleteConfirm && <><Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Archivieren</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button></>}
+                            {modalMode === 'view' && showDeleteConfirm && <><Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button variant="contained" color="error" onClick={handleArchive}>Endgültig archivieren</Button></>}
+                            {modalMode === 'edit' && <><Button variant="outlined" onClick={() => setModalMode('view')} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Speichern</Button></>}
                         </Box>
                     </Box>
                 </form>
             </ReusableModal>
 
-            <TableContainer component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
+            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
                 <Table size="small">
                     <TableHead>
-                        <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
-                            <StyledTableCell align="center" sx={{ width: isMobile ? '15%' : '5%' }}>Bild</StyledTableCell>
-                            <StyledTableCell>Name</StyledTableCell>
-                            {!isMobile && <StyledTableCell>Team</StyledTableCell>}
-                            {!isMobile && <StyledTableCell>Adresse</StyledTableCell>}
+                        <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+                            <StyledTableCell align="center" sx={{ width: isMobile ? '15%' : '5%', color: theme.palette.text.primary, fontWeight: 'bold' }}>Bild</StyledTableCell>
+                            <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Name</StyledTableCell>
+                            {!isMobile && <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Team</StyledTableCell>}
+                            {!isMobile && <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Adresse</StyledTableCell>}
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {sortedPitches.map(pitch => (
-                            <TableRow key={pitch.id} onClick={() => handleRowClick(pitch)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                            <TableRow key={pitch.id} onClick={() => handleRowClick(pitch)} sx={{ cursor: 'pointer', height: '64px', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
                                 <StyledTableCell align="center">
-                                    {pitch.imageUrl ? (
-                                        <Box
-                                            component="img"
-                                            src={`${API_BASE_URL}${pitch.imageUrl}`}
-                                            alt={pitch.name}
-                                            sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1.5 }}
-                                        />
-                                    ) : (
-                                        <VerifiedUserIcon sx={{ color: pitch.isVerified ? '#FFBF00' : 'grey.700', fontSize: 24 }} />
-                                    )}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                        {pitch.imageUrl ? (
+                                            <Box
+                                                component="img"
+                                                src={`${API_BASE_URL}${pitch.imageUrl}`}
+                                                alt={pitch.name}
+                                                sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1.5 }}
+                                            />
+                                        ) : (
+                                            <VerifiedUserIcon sx={{ color: pitch.isVerified ? theme.palette.warning.main : theme.palette.action.disabled, fontSize: 24 }} />
+                                        )}
+                                    </Box>
                                 </StyledTableCell>
                                 <StyledTableCell>
                                     <Box>
-                                        <Typography sx={{ fontSize: '0.9rem', color: 'grey.100' }}>{pitch.name}</Typography>
-                                        {/* KORREKTUR: Zeigt "Bunte Liga" oder Teamname an */}
-                                        <Typography sx={{ fontSize: '0.8rem', color: pitch.isVerified ? 'warning.light' : 'grey.500' }}>
+                                        <Typography sx={{ fontSize: '0.9rem', color: theme.palette.text.primary, fontWeight: 500, fontFamily: 'comfortaa' }}>{pitch.name}</Typography>
+                                        <Typography sx={{ fontSize: '0.8rem', color: pitch.isVerified ? theme.palette.warning.main : theme.palette.text.secondary, fontFamily: 'comfortaa' }}>
                                             {pitch.isVerified ? 'Bunte Liga' : (isMobile ? getTeamName(pitch.teamId) : '')}
                                         </Typography>
                                     </Box>

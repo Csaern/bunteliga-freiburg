@@ -6,40 +6,42 @@ import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import * as userApiService from '../../services/userApiService'; // NEU
 
 // NEU: Status-Indikator für die mobile Ansicht
-const StatusIndicator = ({ isAdmin }) => (
-    <Box
-        sx={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            backgroundColor: isAdmin ? '#FFBF00' : 'grey.600', // Gelb für Admin, Grau für normal
-            mr: 2,
-            flexShrink: 0,
-        }}
-    />
-);
+const StatusIndicator = ({ isAdmin }) => {
+    const theme = useTheme();
+    return (
+        <Box
+            sx={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                backgroundColor: isAdmin ? theme.palette.warning.main : theme.palette.text.disabled,
+                mr: 2,
+                flexShrink: 0,
+            }}
+        />
+    );
+};
 
 const UserManager = ({ teams, getTeamName }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    const darkInputStyle = {
-        '& label.Mui-focused': { color: '#00A99D' },
+    const inputStyle = {
+        '& label.Mui-focused': { color: theme.palette.primary.main },
         '& .MuiOutlinedInput-root': {
-            '& fieldset': { borderColor: 'grey.700' },
-            '&:hover fieldset': { borderColor: 'grey.500' },
-            '&.Mui-focused fieldset': { borderColor: '#00A99D' },
+            '& fieldset': { borderColor: theme.palette.divider },
+            '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+            '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
         },
-        '& .MuiInputBase-input': { color: 'grey.100', colorScheme: 'dark' },
-        '& label': { color: 'grey.400' },
-        '& .MuiSelect-icon': { color: 'grey.400' },
-        // NEU: Styling für deaktivierte Elemente
+        '& .MuiInputBase-input': { color: theme.palette.text.primary, accentColor: theme.palette.primary.main },
+        '& label': { color: theme.palette.text.secondary },
+        '& .MuiSelect-icon': { color: theme.palette.text.secondary },
         '& .Mui-disabled': {
-            WebkitTextFillColor: `${theme.palette.grey[500]} !important`,
-            color: `${theme.palette.grey[500]} !important`,
+            WebkitTextFillColor: `${theme.palette.text.disabled} !important`,
+            color: `${theme.palette.text.disabled} !important`,
         },
         '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'grey.800',
+            borderColor: theme.palette.action.disabledBackground,
         },
     };
 
@@ -171,62 +173,48 @@ const UserManager = ({ teams, getTeamName }) => {
 
     return (
         <Box sx={{ p: { sm: 3 } }}>
-            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: '#00A99D', fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
+            <Typography variant={isMobile ? 'h6' : 'h4'} sx={{ mb: 2, mt: 2, color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textAlign: 'center', textTransform: 'uppercase' }}>
                 Benutzerverwaltung
             </Typography>
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }}>
+                <Button variant="contained" onClick={handleOpenCreateModal} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
                     Neuen Benutzer erstellen
                 </Button>
             </Box>
-            
+
             <Snackbar open={notification.open} autoHideDuration={6000} onClose={handleNotificationClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <Alert onClose={handleNotificationClose} severity={notification.severity} sx={{ width: '100%', '.MuiAlert-message': { overflow: 'hidden' } }}>
                     {notification.message}
                 </Alert>
             </Snackbar>
 
-            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Email, Name oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...darkInputStyle, mb: 2 }}
+            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Email, Name oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...inputStyle, mb: 2 }}
                 InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }}
             />
 
             <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neuen Benutzer erstellen' : 'Benutzerdetails'}>
                 <form onSubmit={handleSubmit}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <TextField size="small" label="Email" type="email" fullWidth required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={darkInputStyle} disabled={modalMode !== 'create'} />
-                        <TextField size="small" label="Anzeigename" type="text" fullWidth value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} sx={darkInputStyle} disabled={modalMode === 'view'} />
+                        <TextField size="small" label="Email" type="email" fullWidth required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={inputStyle} disabled={modalMode !== 'create'} />
+                        <TextField size="small" label="Anzeigename" type="text" fullWidth value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
                         {modalMode === 'create' && (
-                            <TextField size="small" label="Passwort (optional)" type="password" fullWidth placeholder="Leer lassen für autom. Passwort" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} sx={darkInputStyle} />
+                            <TextField size="small" label="Passwort (optional)" type="password" fullWidth placeholder="Leer lassen für autom. Passwort" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} sx={inputStyle} />
                         )}
-                        <FormControl size="small" fullWidth sx={darkInputStyle} disabled={modalMode === 'view'}>
+                        <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
                             <InputLabel>Team</InputLabel>
-                            <Select value={formData.teamId} label="Team" onChange={(e) => setFormData({ ...formData, teamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: '#333', color: 'grey.200' } } }}>
+                            <Select value={formData.teamId} label="Team" onChange={(e) => setFormData({ ...formData, teamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
                                 <MenuItem value=""><em>Kein Team</em></MenuItem>
                                 {teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
                             </Select>
                         </FormControl>
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={formData.isAdmin}
-                                    onChange={(e) => setFormData({ ...formData, isAdmin: e.target.checked })}
-                                    disabled={modalMode === 'view'}
-                                    sx={{
-                                        '& .MuiSwitch-switchBase.Mui-checked': { color: '#FFBF00' },
-                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#FFBF00' },
-                                    }}
-                                />
-                            }
-                            label="Administrator"
-                            sx={{
-                                color: 'grey.100',
-                                // Stellt sicher, dass das Label im deaktivierten Zustand hell bleibt
-                                '& .MuiFormControlLabel-label.Mui-disabled': {
-                                    color: theme.palette.grey[500],
-                                }
-                            }}
-                        />
-                        
+                        <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
+                            <InputLabel>Rolle</InputLabel>
+                            <Select value={formData.role} label="Rolle" onChange={(e) => setFormData({ ...formData, role: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
+                                <MenuItem value="user">User</MenuItem>
+                                <MenuItem value="admin">Admin</MenuItem>
+                            </Select>
+                        </FormControl>
+
                         {showDeleteConfirm && modalMode === 'view' && (
                             <Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>
                                 Benutzer wirklich löschen? Dies kann nicht rückgängig gemacht werden.
@@ -236,11 +224,11 @@ const UserManager = ({ teams, getTeamName }) => {
                         <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
                             {modalMode === 'create' && <>
                                 <Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700', '&:hover': { borderColor: 'grey.500' } }}>Abbrechen</Button>
-                                <Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }}>Erstellen</Button>
+                                <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Erstellen</Button>
                             </>}
                             {modalMode === 'view' && !showDeleteConfirm && <>
                                 <Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button>
-                                <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }}>Bearbeiten</Button>
+                                <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button>
                             </>}
                             {modalMode === 'view' && showDeleteConfirm && <>
                                 <Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700', '&:hover': { borderColor: 'grey.500' } }}>Abbrechen</Button>
@@ -256,11 +244,12 @@ const UserManager = ({ teams, getTeamName }) => {
                                             password: '',
                                             teamId: selectedUser.teamId || '',
                                             isAdmin: selectedUser.isAdmin || false,
+                                            role: selectedUser.role || 'user', // 'role' hinzugefügt
                                         });
                                     }
                                     setModalMode('view');
                                 }} sx={{ color: 'grey.400', borderColor: 'grey.700', '&:hover': { borderColor: 'grey.500' } }}>Abbrechen</Button>
-                                <Button type="submit" variant="contained" sx={{ backgroundColor: '#00A99D', '&:hover': { backgroundColor: '#00897B' } }}>Speichern</Button>
+                                <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Speichern</Button>
                             </>}
 
                         </Box>
@@ -269,45 +258,50 @@ const UserManager = ({ teams, getTeamName }) => {
             </ReusableModal>
 
             {filteredUsers.length === 0 ? (
-                <Paper sx={{ backgroundColor: '#111', borderRadius: 2, p: 3, textAlign: 'center', border: '1px solid #222' }}>
-                    <Typography sx={{ color: 'grey.500' }}>{searchTerm ? 'Keine passenden Benutzer gefunden.' : 'Keine Benutzer vorhanden.'}</Typography>
+                <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: 3, textAlign: 'center', border: '1px solid', borderColor: theme.palette.divider }}>
+                    <Typography sx={{ color: theme.palette.text.secondary }}>{searchTerm ? 'Keine passenden Benutzer gefunden.' : 'Keine Benutzer vorhanden.'}</Typography>
                 </Paper>
             ) : (
-                <TableContainer component={Paper} sx={{ backgroundColor: '#111', borderRadius: 2, border: '1px solid', borderColor: 'grey.800' }}>
+                <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: theme.shape.borderRadius, border: `1px solid ${theme.palette.divider}` }}>
                     <Table size="small">
                         <TableHead>
-                            <TableRow sx={{ borderBottom: `2px solid ${theme.palette.grey[800]}` }}>
+                            <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
                                 {isMobile ? (
-                                    <StyledTableCell>Benutzer</StyledTableCell>
+                                    <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Benutzer</StyledTableCell>
                                 ) : (
                                     <>
-                                        <StyledTableCell sx={{ width: '5%' }} />
-                                        <StyledTableCell>Email</StyledTableCell>
-                                        <StyledTableCell>Team</StyledTableCell>
+                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Email</StyledTableCell>
+                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Anzeigename</StyledTableCell>
+                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Team</StyledTableCell>
+                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Rolle</StyledTableCell>
                                     </>
                                 )}
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {filteredUsers.map(user => (
-                                <TableRow key={user.id} onClick={() => handleRowClick(user)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' } }}>
+                                <TableRow key={user.id} onClick={() => handleRowClick(user)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
                                     {isMobile ? (
                                         <StyledTableCell>
                                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                                 <StatusIndicator isAdmin={user.isAdmin} />
                                                 <Box>
-                                                    <Typography sx={{ fontSize: '0.9rem', color: 'grey.100' }}>{user.email}</Typography>
-                                                    <Typography sx={{ fontSize: '0.8rem', color: 'grey.500' }}>{user.teamName || 'Kein Team'}</Typography>
+                                                    <Typography sx={{ fontSize: '0.9rem', color: theme.palette.text.primary }}>{user.email}</Typography>
+                                                    <Typography sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>{user.teamName || 'Kein Team'}</Typography>
                                                 </Box>
                                             </Box>
                                         </StyledTableCell>
                                     ) : (
                                         <>
                                             <StyledTableCell sx={{ py: 1.5 }}>
-                                                <StatusIndicator isAdmin={user.isAdmin} />
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <StatusIndicator isAdmin={user.isAdmin} />
+                                                    {user.email}
+                                                </Box>
                                             </StyledTableCell>
-                                            <StyledTableCell sx={{ py: 1.5 }}>{user.email}</StyledTableCell>
+                                            <StyledTableCell sx={{ py: 1.5 }}>{user.displayName || '-'}</StyledTableCell>
                                             <StyledTableCell sx={{ py: 1.5 }}>{user.teamName || '-'}</StyledTableCell>
+                                            <StyledTableCell sx={{ py: 1.5 }}>{user.isAdmin ? 'Admin' : 'User'}</StyledTableCell>
                                         </>
                                     )}
                                 </TableRow>

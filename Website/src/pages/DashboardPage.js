@@ -12,6 +12,7 @@ import * as seasonApi from '../services/seasonApiService';
 import * as teamApi from '../services/teamApiService';
 import * as bookingApi from '../services/bookingApiService';
 import * as resultApi from '../services/resultApiService';
+import { getRequestExpiryInfo } from '../components/Helpers/dateUtils';
 
 // Icons
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -20,6 +21,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 import SettingsIcon from '@mui/icons-material/Settings';
 import EventIcon from '@mui/icons-material/Event';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 const DashboardPage = () => {
   const { currentUser, teamId, isAdmin } = useAuth();
@@ -79,8 +81,8 @@ const DashboardPage = () => {
     borderRadius: 4,
     border: '1px solid',
     borderColor: theme.palette.divider,
-    background: `linear-gradient(135deg, ${theme.palette.primary.main}1F 0%, ${theme.palette.background.paper} 100%)`,
-    boxShadow: theme.shadows[4],
+    background: theme.palette.background.paper,
+    boxShadow: 'none', // Cleaner look matches other tables
     p: { xs: 2, sm: 3 },
     display: 'flex',
     flexDirection: 'column',
@@ -97,22 +99,23 @@ const DashboardPage = () => {
       setCurrentSeason(activeSeason);
 
       const teamsArr = await teamApi.getTeamsForActiveSeason().catch(() => []);
-      const map = teamsArr.reduce((acc, t) => { acc[t.id] = { name: t.name, logoUrl: t.logoUrl, logoColor: t.logoColor }; return acc; }, {});
+      const map = teamsArr.reduce((acc, t) => { acc[t.id] = { name: t.name, logoUrl: t.logoUrl, logoUrlLight: t.logoUrlLight, logoColor: t.logoColor }; return acc; }, {});
       setTeamsMap(map);
       if (teamId && map[teamId]) {
-        setTeam({ id: teamId, name: map[teamId].name, logoUrl: map[teamId].logoUrl, logoColor: map[teamId].logoColor });
+        setTeam({ id: teamId, name: map[teamId].name, logoUrl: map[teamId].logoUrl, logoUrlLight: map[teamId].logoUrlLight, logoColor: map[teamId].logoColor });
       } else if (teamId) {
         try {
           const fallbackTeam = await teamApi.getTeamByIdPublic(teamId);
           if (fallbackTeam) {
             setTeamsMap(prev => ({
               ...prev,
-              [teamId]: { name: fallbackTeam.name, logoUrl: fallbackTeam.logoUrl, logoColor: fallbackTeam.logoColor }
+              [teamId]: { name: fallbackTeam.name, logoUrl: fallbackTeam.logoUrl, logoUrlLight: fallbackTeam.logoUrlLight, logoColor: fallbackTeam.logoColor }
             }));
             setTeam({
               id: teamId,
               name: fallbackTeam.name,
               logoUrl: fallbackTeam.logoUrl,
+              logoUrlLight: fallbackTeam.logoUrlLight,
               logoColor: fallbackTeam.logoColor
             });
           }
@@ -375,7 +378,7 @@ const DashboardPage = () => {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
   }
 
-  const renderIconButton = (title, icon, link, onClick) => (
+  const renderIconButton = (title, icon, link, color, onClick) => (
     <Grid xs={teamId ? 3 : 4} sm>
       <Tooltip title={title} placement="bottom">
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -386,12 +389,12 @@ const DashboardPage = () => {
             sx={{
               border: '1px solid',
               borderColor: theme.palette.divider,
-              color: theme.palette.text.secondary,
+              color: color || theme.palette.primary.main,
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
-                backgroundColor: `${theme.palette.secondary.main}1A`,
-                borderColor: theme.palette.secondary.main,
-                color: theme.palette.secondary.main,
+                backgroundColor: `${color || theme.palette.secondary.main}1A`,
+                borderColor: color || theme.palette.secondary.main,
+                color: color || theme.palette.secondary.main,
               },
             }}
           >
@@ -407,6 +410,44 @@ const DashboardPage = () => {
     </Grid>
   );
 
+  const renderTeamLogo = (teamId) => {
+    const teamData = teamsMap[teamId];
+    if (!teamData) return <Avatar sx={{ width: 30, height: 30, fontSize: '0.75rem', bgcolor: theme.palette.grey[500] }}>?</Avatar>;
+
+    // NEU: Light Mode Check
+    const isLightMode = theme.palette.mode === 'light';
+    const logoToUse = (isLightMode && teamData.logoUrlLight) ? teamData.logoUrlLight : teamData.logoUrl;
+
+    if (logoToUse) {
+      return (
+        <Box
+          component="img"
+          src={logoToUse.startsWith('http') ? logoToUse : `${API_BASE_URL}${logoToUse}`}
+          alt={teamData.name}
+          sx={{
+            width: 30,
+            height: 30,
+            objectFit: 'contain',
+          }}
+        />
+      );
+    }
+
+    return (
+      <Avatar
+        sx={{
+          width: 30,
+          height: 30,
+          fontSize: '0.75rem',
+          color: theme.palette.getContrastText(teamData.logoColor || theme.palette.grey[700]),
+          backgroundColor: teamData.logoColor || theme.palette.grey[700],
+        }}
+      >
+        {(teamData.name || '?').substring(0, 1).toUpperCase()}
+      </Avatar>
+    );
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
       <Grid container spacing={3} direction="column">
@@ -417,18 +458,38 @@ const DashboardPage = () => {
             Teamboard
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-            <Avatar
-              src={team?.logoUrl ? (team.logoUrl.startsWith('http') ? team.logoUrl : `${API_BASE_URL}${team.logoUrl}`) : null}
-              sx={{
-                width: 48,
-                height: 48,
-                bgcolor: team?.logoColor || theme.palette.primary.main,
-                border: team?.logoUrl ? `1px solid ${team?.logoColor || theme.palette.primary.main}` : 'none'
-              }}
-            >
-              {!team?.logoUrl && team?.name ? team.name.charAt(0).toUpperCase() : null}
-            </Avatar>
-            <Typography variant="h6" component="h2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.common.white }}>
+            {(() => {
+              const isLightMode = theme.palette.mode === 'light';
+              const logoToUse = (isLightMode && team?.logoUrlLight) ? team.logoUrlLight : team?.logoUrl;
+
+              if (logoToUse) {
+                return (
+                  <Box
+                    component="img"
+                    src={logoToUse.startsWith('http') ? logoToUse : `${API_BASE_URL}${logoToUse}`}
+                    alt={team.name}
+                    sx={{
+                      width: 64, // Slightly larger to look good without circle crop
+                      height: 64,
+                      objectFit: 'contain',
+                    }}
+                  />
+                );
+              } else {
+                return (
+                  <Avatar
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      bgcolor: team?.logoColor || theme.palette.primary.main,
+                    }}
+                  >
+                    {team?.name ? team.name.charAt(0).toUpperCase() : null}
+                  </Avatar>
+                );
+              }
+            })()}
+            <Typography variant="h6" component="h2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary }}>
               {team?.name || (isAdmin ? 'Administrator' : 'Ohne Team')}
             </Typography>
           </Box>
@@ -447,10 +508,10 @@ const DashboardPage = () => {
             }}
           >
             <Grid container spacing={1} justifyContent="space-around" alignItems="center">
-              {renderIconButton('Platz buchen', <EventIcon />, '/platzreservierung', null)}
-              {renderIconButton('Neues Spiel', <AddCircleOutlineIcon />, null, () => setIsCreateGameModalOpen(true))}
-              {renderIconButton('Ergebnis melden', <PostAddIcon />, null, handleOpenReportModal)}
-              {teamId && renderIconButton('Team-Einstellungen', <SettingsIcon />, null, () => setShowTeamSettings(true))}
+              {renderIconButton('Platz buchen', <EventIcon />, '/platzreservierung', '#4CAF50', null)}
+              {renderIconButton('Neues Spiel', <AddCircleOutlineIcon />, null, '#2196F3', () => setIsCreateGameModalOpen(true))}
+              {renderIconButton('Ergebnis melden', <PostAddIcon />, null, '#FFB74D', handleOpenReportModal)}
+              {teamId && renderIconButton('Team-Einstellungen', <SettingsIcon />, null, '#9C27B0', () => setShowTeamSettings(true))}
             </Grid>
           </Paper>
         </Grid>
@@ -492,35 +553,11 @@ const DashboardPage = () => {
                     />
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <Avatar
-                      src={teamsMap[result.homeTeamId]?.logoUrl ? (teamsMap[result.homeTeamId].logoUrl.startsWith('http') ? teamsMap[result.homeTeamId].logoUrl : `${API_BASE_URL}${teamsMap[result.homeTeamId].logoUrl}`) : null}
-                      sx={{
-                        width: 24,
-                        height: 24,
-                        fontSize: '0.7rem',
-                        color: theme.palette.getContrastText(teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700]),
-                        backgroundColor: teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700],
-                        border: teamsMap[result.homeTeamId]?.logoUrl ? `1px solid ${teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                      }}
-                    >
-                      {!teamsMap[result.homeTeamId]?.logoUrl && (teamsMap[result.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
-                    </Avatar>
+                    {renderTeamLogo(result.homeTeamId)}
                     <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
                       {teamsMap[result.homeTeamId]?.name} vs. {teamsMap[result.awayTeamId]?.name}
                     </Typography>
-                    <Avatar
-                      src={teamsMap[result.awayTeamId]?.logoUrl ? (teamsMap[result.awayTeamId].logoUrl.startsWith('http') ? teamsMap[result.awayTeamId].logoUrl : `${API_BASE_URL}${teamsMap[result.awayTeamId].logoUrl}`) : null}
-                      sx={{
-                        width: 24,
-                        height: 24,
-                        fontSize: '0.7rem',
-                        color: theme.palette.getContrastText(teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700]),
-                        backgroundColor: teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700],
-                        border: teamsMap[result.awayTeamId]?.logoUrl ? `1px solid ${teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                      }}
-                    >
-                      {!teamsMap[result.awayTeamId]?.logoUrl && (teamsMap[result.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
-                    </Avatar>
+                    {renderTeamLogo(result.awayTeamId)}
                   </Box>
                   <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 700 }}>
                     {result.homeScore} : {result.awayScore}
@@ -554,35 +591,11 @@ const DashboardPage = () => {
                     />
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <Avatar
-                      src={teamsMap[result.homeTeamId]?.logoUrl ? (teamsMap[result.homeTeamId].logoUrl.startsWith('http') ? teamsMap[result.homeTeamId].logoUrl : `${API_BASE_URL}${teamsMap[result.homeTeamId].logoUrl}`) : null}
-                      sx={{
-                        width: 24,
-                        height: 24,
-                        fontSize: '0.7rem',
-                        color: theme.palette.getContrastText(teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700]),
-                        backgroundColor: teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700],
-                        border: teamsMap[result.homeTeamId]?.logoUrl ? `1px solid ${teamsMap[result.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                      }}
-                    >
-                      {!teamsMap[result.homeTeamId]?.logoUrl && (teamsMap[result.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
-                    </Avatar>
+                    {renderTeamLogo(result.homeTeamId)}
                     <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
                       {teamsMap[result.homeTeamId]?.name} vs. {teamsMap[result.awayTeamId]?.name}
                     </Typography>
-                    <Avatar
-                      src={teamsMap[result.awayTeamId]?.logoUrl ? (teamsMap[result.awayTeamId].logoUrl.startsWith('http') ? teamsMap[result.awayTeamId].logoUrl : `${API_BASE_URL}${teamsMap[result.awayTeamId].logoUrl}`) : null}
-                      sx={{
-                        width: 24,
-                        height: 24,
-                        fontSize: '0.7rem',
-                        color: theme.palette.getContrastText(teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700]),
-                        backgroundColor: teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700],
-                        border: teamsMap[result.awayTeamId]?.logoUrl ? `1px solid ${teamsMap[result.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                      }}
-                    >
-                      {!teamsMap[result.awayTeamId]?.logoUrl && (teamsMap[result.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
-                    </Avatar>
+                    {renderTeamLogo(result.awayTeamId)}
                   </Box>
                   <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 700 }}>
                     {result.homeScore} : {result.awayScore}
@@ -633,46 +646,32 @@ const DashboardPage = () => {
                       </Box>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Avatar
-                        src={teamsMap[booking.homeTeamId]?.logoUrl ? (teamsMap[booking.homeTeamId].logoUrl.startsWith('http') ? teamsMap[booking.homeTeamId].logoUrl : `${API_BASE_URL}${teamsMap[booking.homeTeamId].logoUrl}`) : null}
-                        sx={{
-                          width: 24,
-                          height: 24,
-                          fontSize: '0.7rem',
-                          color: theme.palette.getContrastText(teamsMap[booking.homeTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: teamsMap[booking.homeTeamId]?.logoColor || theme.palette.grey[700],
-                          border: teamsMap[booking.homeTeamId]?.logoUrl ? `1px solid ${teamsMap[booking.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                        }}
-                      >
-                        {!teamsMap[booking.homeTeamId]?.logoUrl && (teamsMap[booking.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
-                      </Avatar>
+                      {renderTeamLogo(booking.homeTeamId)}
                       <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
                         {teamsMap[booking.homeTeamId]?.name} vs. {teamsMap[booking.awayTeamId]?.name}
                       </Typography>
-                      <Avatar
-                        src={teamsMap[booking.awayTeamId]?.logoUrl ? (teamsMap[booking.awayTeamId].logoUrl.startsWith('http') ? teamsMap[booking.awayTeamId].logoUrl : `${API_BASE_URL}${teamsMap[booking.awayTeamId].logoUrl}`) : null}
-                        sx={{
-                          width: 24,
-                          height: 24,
-                          fontSize: '0.7rem',
-                          color: theme.palette.getContrastText(teamsMap[booking.awayTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: teamsMap[booking.awayTeamId]?.logoColor || theme.palette.grey[700],
-                          border: teamsMap[booking.awayTeamId]?.logoUrl ? `1px solid ${teamsMap[booking.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                        }}
-                      >
-                        {!teamsMap[booking.awayTeamId]?.logoUrl && (teamsMap[booking.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
-                      </Avatar>
+                      {renderTeamLogo(booking.awayTeamId)}
                     </Box>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
                       {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleAcceptBookingRequest(booking.id)}>
-                        Annehmen
-                      </Button>
-                      <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleDeclineBookingRequest(booking.id)}>
-                        Ablehnen
-                      </Button>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleAcceptBookingRequest(booking.id)}>
+                          Annehmen
+                        </Button>
+                        <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleDeclineBookingRequest(booking.id)}>
+                          Ablehnen
+                        </Button>
+                      </Box>
+                      {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays) && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
+                          <AccessTimeIcon sx={{ fontSize: '1rem', color: theme.palette.text.secondary }} />
+                          <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 600, display: 'block', lineHeight: 1 }}>
+                            {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays)}
+                          </Typography>
+                        </Box>
+                      )}
                     </Box>
                   </Paper>
                 );
@@ -716,43 +715,29 @@ const DashboardPage = () => {
                       </Box>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Avatar
-                        src={teamsMap[booking.homeTeamId]?.logoUrl ? (teamsMap[booking.homeTeamId].logoUrl.startsWith('http') ? teamsMap[booking.homeTeamId].logoUrl : `${API_BASE_URL}${teamsMap[booking.homeTeamId].logoUrl}`) : null}
-                        sx={{
-                          width: 24,
-                          height: 24,
-                          fontSize: '0.7rem',
-                          color: theme.palette.getContrastText(teamsMap[booking.homeTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: teamsMap[booking.homeTeamId]?.logoColor || theme.palette.grey[700],
-                          border: teamsMap[booking.homeTeamId]?.logoUrl ? `1px solid ${teamsMap[booking.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                        }}
-                      >
-                        {!teamsMap[booking.homeTeamId]?.logoUrl && (teamsMap[booking.homeTeamId]?.name || 'H').substring(0, 1).toUpperCase()}
-                      </Avatar>
+                      {renderTeamLogo(booking.homeTeamId)}
                       <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
                         {teamsMap[booking.homeTeamId]?.name} vs. {teamsMap[booking.awayTeamId]?.name}
                       </Typography>
-                      <Avatar
-                        src={teamsMap[booking.awayTeamId]?.logoUrl ? (teamsMap[booking.awayTeamId].logoUrl.startsWith('http') ? teamsMap[booking.awayTeamId].logoUrl : `${API_BASE_URL}${teamsMap[booking.awayTeamId].logoUrl}`) : null}
-                        sx={{
-                          width: 24,
-                          height: 24,
-                          fontSize: '0.7rem',
-                          color: theme.palette.getContrastText(teamsMap[booking.awayTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: teamsMap[booking.awayTeamId]?.logoColor || theme.palette.grey[700],
-                          border: teamsMap[booking.awayTeamId]?.logoUrl ? `1px solid ${teamsMap[booking.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none'
-                        }}
-                      >
-                        {!teamsMap[booking.awayTeamId]?.logoUrl && (teamsMap[booking.awayTeamId]?.name || 'A').substring(0, 1).toUpperCase()}
-                      </Avatar>
+                      {renderTeamLogo(booking.awayTeamId)}
                     </Box>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
                       {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelMyRequest(booking.id)}>
-                        Stornieren
-                      </Button>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelMyRequest(booking.id)}>
+                          Stornieren
+                        </Button>
+                      </Box>
+                      {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays) && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
+                          <AccessTimeIcon sx={{ fontSize: '1rem', color: theme.palette.error.main }} />
+                          <Typography variant="caption" sx={{ color: theme.palette.error.main, fontWeight: 700, display: 'block', lineHeight: 1 }}>
+                            {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays)}
+                          </Typography>
+                        </Box>
+                      )}
                     </Box>
                   </Paper>
                 );

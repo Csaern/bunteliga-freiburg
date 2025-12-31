@@ -88,14 +88,14 @@ const TeamSettings = ({ onClose }) => {
     }
   };
 
-  const darkInputStyle = {
+  const inputStyle = {
     '& label.Mui-focused': { color: theme.palette.primary.main },
     '& .MuiOutlinedInput-root': {
       '& fieldset': { borderColor: theme.palette.divider },
       '&:hover fieldset': { borderColor: theme.palette.text.secondary },
       '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
     },
-    '& .MuiInputBase-input': { color: theme.palette.text.primary, colorScheme: 'dark' },
+    '& .MuiInputBase-input': { color: theme.palette.text.primary },
     '& label': { color: theme.palette.text.secondary },
   };
 
@@ -131,7 +131,7 @@ const TeamSettings = ({ onClose }) => {
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             fullWidth
-            sx={darkInputStyle}
+            sx={inputStyle}
             placeholder="Beschreiben Sie Ihr Team..."
           />
 
@@ -141,7 +141,7 @@ const TeamSettings = ({ onClose }) => {
             value={formData.foundedYear}
             onChange={(e) => setFormData({ ...formData, foundedYear: e.target.value })}
             fullWidth
-            sx={darkInputStyle}
+            sx={inputStyle}
             placeholder="z.B. 2020"
           />
 
@@ -156,7 +156,7 @@ const TeamSettings = ({ onClose }) => {
                 value={formData.contactPerson}
                 onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
                 fullWidth
-                sx={darkInputStyle}
+                sx={inputStyle}
                 placeholder="Name des Ansprechpartners"
               />
 
@@ -166,7 +166,7 @@ const TeamSettings = ({ onClose }) => {
                 value={formData.contactEmail}
                 onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
                 fullWidth
-                sx={darkInputStyle}
+                sx={inputStyle}
                 placeholder="team@example.com"
               />
 
@@ -176,7 +176,7 @@ const TeamSettings = ({ onClose }) => {
                 value={formData.contactPhone}
                 onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
                 fullWidth
-                sx={darkInputStyle}
+                sx={inputStyle}
                 placeholder="+49 123 456789"
               />
 
@@ -186,7 +186,7 @@ const TeamSettings = ({ onClose }) => {
                 value={formData.website}
                 onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                 fullWidth
-                sx={darkInputStyle}
+                sx={inputStyle}
                 placeholder="https://www.team-website.com"
               />
             </Box>
@@ -206,7 +206,7 @@ const TeamSettings = ({ onClose }) => {
                   socialMedia: { ...formData.socialMedia, facebook: e.target.value }
                 })}
                 fullWidth
-                sx={darkInputStyle}
+                sx={inputStyle}
                 placeholder="https://facebook.com/team"
               />
               <TextField
@@ -218,7 +218,7 @@ const TeamSettings = ({ onClose }) => {
                   socialMedia: { ...formData.socialMedia, instagram: e.target.value }
                 })}
                 fullWidth
-                sx={darkInputStyle}
+                sx={inputStyle}
                 placeholder="https://instagram.com/team"
               />
               <TextField
@@ -230,7 +230,7 @@ const TeamSettings = ({ onClose }) => {
                   socialMedia: { ...formData.socialMedia, twitter: e.target.value }
                 })}
                 fullWidth
-                sx={darkInputStyle}
+                sx={inputStyle}
                 placeholder="https://twitter.com/team"
               />
             </Box>
