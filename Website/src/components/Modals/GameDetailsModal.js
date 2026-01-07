@@ -9,17 +9,21 @@ import { API_BASE_URL } from '../../services/apiClient';
 const formatDate = (dateString, includeTime = true) => {
     if (!dateString) return '';
 
-    // Handle Firestore Timestamp or Date object or String
-    let d;
-    if (typeof dateString?.toDate === 'function') {
+    // Robust handling of various date formats (including serialised Firestore Timestamps)
+    let d = null;
+
+    if (typeof dateString.toDate === 'function') {
         d = dateString.toDate();
     } else if (dateString instanceof Date) {
         d = dateString;
+    } else if (typeof dateString === 'object' && typeof dateString._seconds === 'number') {
+        const ms = dateString._seconds * 1000 + (dateString._nanoseconds ? dateString._nanoseconds / 1000000 : 0);
+        d = new Date(ms);
     } else {
         d = new Date(dateString);
     }
 
-    if (isNaN(d.getTime())) return '';
+    if (!d || isNaN(d.getTime())) return '';
 
     const options = { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' };
     if (includeTime) {

@@ -84,8 +84,12 @@ async function calculateTable(seasonId, applyFinalRules = false) {
   }
 
   // 5. Sortiere die Tabelle
+  const criteriaList = season.rankingCriteria && season.rankingCriteria.length > 0
+    ? season.rankingCriteria
+    : ['points', 'goalDifference', 'goalsScored'];
+
   tableArray.sort((a, b) => {
-    for (const criteria of season.rankingCriteria) {
+    for (const criteria of criteriaList) {
       let comparison = 0;
       switch (criteria) {
         case 'points':
@@ -97,8 +101,12 @@ async function calculateTable(seasonId, applyFinalRules = false) {
         case 'goalsScored':
           comparison = b.goalsScored - a.goalsScored;
           break;
-        // 'headToHead' (direkter Vergleich) ist komplexer und würde eine separate Logik erfordern.
-        // Fürs Erste lassen wir es bei den Standardkriterien.
+        case 'headToHead':
+          // Platzhalter für Direkter Vergleich - falls Punkte gleich sind
+          // Für eine einfache Implementierung nutzen wir hier Tore/Differenz als Fallback
+          // Eine echte H2H-Logik erfordert eine Teil-Tabelle der betroffenen Teams.
+          comparison = 0;
+          break;
       }
       if (comparison !== 0) return comparison;
     }

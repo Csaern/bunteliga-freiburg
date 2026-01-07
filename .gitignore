@@ -20,6 +20,8 @@ Teamboard/.next/
 
 # production
 /build
+Website/build
+Teamboard/build
 
 # misc
 .DS_Store

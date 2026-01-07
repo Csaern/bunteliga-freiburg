@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthProvider';
 import DynamicLeagueTable from '../DynamicLeagueTable';
 import DynamicFixtureList from '../DynamicFixtureList';
-import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, Alert, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, Typography, Container, CircularProgress, Grid, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Alert, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import * as seasonApi from '../../services/seasonApiService';
 import * as teamApi from '../../services/teamApiService';
 import * as bookingApi from '../../services/bookingApiService';
@@ -11,7 +11,7 @@ import * as resultApi from '../../services/resultApiService';
 import * as userApiService from '../../services/userApiService';
 
 // Icons
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+
 import EventIcon from '@mui/icons-material/Event';
 import GroupIcon from '@mui/icons-material/Group';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -19,9 +19,9 @@ import InsightsIcon from '@mui/icons-material/Insights';
 import StyleIcon from '@mui/icons-material/Style';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import WarningIcon from '@mui/icons-material/Warning';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import LanguageIcon from '@mui/icons-material/Language';
 import * as pitchApi from '../../services/pitchApiService'; // New import
 import AdminResultForm from './Forms/AdminResultForm';
 import AdminBookingForm from './Forms/AdminBookingForm';
@@ -41,13 +41,7 @@ const AdminDashboard = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const menuOpen = Boolean(anchorEl);
 
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalTeams: 0,
-    pendingResults: 0,
-    totalBookings: 0,
-    openMatches: 0,
-  });
+
   const [currentSeason, setCurrentSeason] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -63,20 +57,7 @@ const AdminDashboard = () => {
   const [selectedAction, setSelectedAction] = useState(null); // { type: 'result'|'booking', data: ... }
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
 
-  const sectionCardSx = {
-    borderRadius: 4,
-    border: '1px solid',
-    borderColor: theme.palette.divider,
-    background: theme.palette.background.paper,
-    boxShadow: 'none',
-    p: { xs: 2, sm: 3 },
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%',
-    minHeight: { xs: 120, md: 160 },
-  };
+
 
   const fetchData = useCallback(async () => {
     if (!currentUser || !isAdmin) return;
@@ -86,11 +67,13 @@ const AdminDashboard = () => {
       setCurrentSeason(activeSeason);
 
       // Lade Statistiken und Daten für Aktionen
-      const [teamsArr, bookingsArr, resultsArr, usersArr, pitchesArr, pendingResultsBookings] = await Promise.all([
+      const [teamsArr, bookingsArr, resultsArr, pitchesArr, pendingResultsBookings] = await Promise.all([
         teamApi.getAllTeams().catch(() => []),
         activeSeason?.id ? bookingApi.getBookingsForSeason(activeSeason.id).catch(() => []) : Promise.resolve([]),
         activeSeason?.id ? resultApi.getResultsForSeason(activeSeason.id).catch(() => []) : Promise.resolve([]),
-        userApiService.getAllUsers().catch(() => []),
+        userApiService.getAllUsers().catch(() => {
+          return [];
+        }),
         pitchApi.getAllPitches().catch(() => []),
         activeSeason?.id ? bookingApi.getBookingsNeedingResult(activeSeason.id).catch(() => []) : Promise.resolve([]),
       ]);
@@ -110,25 +93,6 @@ const AdminDashboard = () => {
         : resultsArr;
 
       setAllResults(seasonResults);
-
-      // Berechne Statistiken
-      const totalTeams = teamsArr.length;
-      const totalUsers = usersArr.length;
-      const totalBookings = seasonBookings.length;
-      const pendingResultsCount = seasonResults.filter(r => r.status === 'pending').length;
-
-      const confirmedResults = seasonResults.filter(r => r.status === 'confirmed');
-      const scheduledMatches = seasonBookings.filter(b => b.homeTeamId && b.awayTeamId && b.status === 'confirmed');
-      const resultBookingIds = new Set(confirmedResults.map(r => r.bookingId));
-      const openMatches = scheduledMatches.filter(match => !resultBookingIds.has(match.id));
-
-      setStats({
-        totalUsers,
-        totalTeams,
-        pendingResults: pendingResultsCount + pendingResultsBookings.length, // Include unentered
-        totalBookings,
-        openMatches: openMatches.length,
-      });
 
       // --- Build Actions List ---
       const actions = [];
@@ -256,6 +220,7 @@ const AdminDashboard = () => {
     { title: 'Saisons', icon: <EmojiEventsIcon />, link: '/admin/season', color: '#00A99D' }, // Teal
     { title: 'Teams', icon: <StyleIcon />, link: '/admin/teams', color: '#E91E63' }, // Pink
     { title: 'Plätze', icon: <StadiumIcon />, link: '/admin/pitches', color: '#4CAF50' }, // Green
+    { title: 'Website', icon: <LanguageIcon />, link: '/admin/website', color: '#607D8B' }, // Blue Grey
   ];
 
   const visibleActions = isDesktop
@@ -459,7 +424,23 @@ const AdminDashboard = () => {
                         </StyledTableCell>
                       )}
                       <StyledTableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{action.description}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {action.description}
+                          </Typography>
+                          {action.data?.friendly && (
+                            <Typography
+                              component="span"
+                              sx={{
+                                color: theme.palette.mode === 'light' ? theme.palette.warning.dark : '#FFD700',
+                                fontWeight: 'bold',
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              (F)
+                            </Typography>
+                          )}
+                        </Box>
                         {action.expiryInfo && (
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                             <AccessTimeIcon sx={{ fontSize: '0.875rem', color: theme.palette.text.secondary }} />

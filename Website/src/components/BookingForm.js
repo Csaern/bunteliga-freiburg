@@ -5,10 +5,9 @@ import { db } from "../firebase";
 
 const BookingForm = () => {
   const [teams, setTeams] = useState([]);
-  const [pitches, setPitches] = useState([]);
+
   const [homeTeam, setHomeTeam] = useState('');
-  const [awayTeam, setAwayTeam] = useState('');
-  const [selectedPitch, setSelectedPitch] = useState('');
+
 
   useEffect(() => {
     // Teams laden
@@ -18,15 +17,10 @@ const BookingForm = () => {
       setTeams(teamList);
     };
 
-    // Plätze laden
-    const fetchPitches = async () => {
-      const querySnapshot = await getDocs(collection(db, "pitches"));
-      const pitchList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPitches(pitchList);
-    };
+
 
     fetchTeams();
-    fetchPitches();
+
   }, []);
 
   const handleSubmit = (e) => {

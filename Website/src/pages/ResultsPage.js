@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Container, FormControl, InputLabel, Select, MenuItem, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Typography, Container, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import * as seasonApi from '../services/seasonApiService';
 
 const ResultsPage = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [currentSeason, setCurrentSeason] = useState(null);
+
   const [allSeasons, setAllSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +29,7 @@ const ResultsPage = () => {
 
       // Setze die aktive Saison als Standard, falls vorhanden
       if (seasonData) {
-        setCurrentSeason(seasonData);
+
         setSelectedSeasonId(seasonData.id);
       } else if (availableSeasons.length > 0) {
         // Falls keine aktive Saison, nimm die erste verfügbare
@@ -47,8 +45,8 @@ const ResultsPage = () => {
   const handleSeasonChange = (event) => {
     const newSeasonId = event.target.value;
     setSelectedSeasonId(newSeasonId);
-    const selectedSeason = allSeasons.find(s => s.id === newSeasonId);
-    setCurrentSeason(selectedSeason || null);
+    // const selectedSeason = allSeasons.find(s => s.id === newSeasonId);
+
   };
 
   if (loading) {

@@ -46,6 +46,7 @@ import ArticleIcon from '@mui/icons-material/Article';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
+import LanguageIcon from '@mui/icons-material/Language';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../img/logo.png';
@@ -62,7 +63,7 @@ const pages = [
   { text: 'Teams', iconName: 'Diversity3Icon', path: '/teams' },
   { text: 'Historiker-Ecke', iconName: 'ScheduleIcon', path: '/historie' },
   { text: 'Regeln', iconName: 'GavelIcon', path: '/regeln' },
-  { text: 'Über uns', iconName: 'ScheduleIcon', path: '/ueberuns' },
+  { text: 'Über uns', iconName: 'ArticleIcon', path: '/ueberuns' },
 ];
 
 const adminPages = [
@@ -73,6 +74,7 @@ const adminPages = [
   { text: 'Ergebnisse', path: '/admin/results', iconName: 'InsightsIcon' },
   { text: 'Teams', path: '/admin/teams', iconName: 'StyleIcon' },
   { text: 'Plätze', path: '/admin/pitches', iconName: 'StadiumIcon' },
+  { text: 'Website', path: '/admin/website', iconName: 'LanguageIcon' },
 ];
 
 const teamboardPages = [
@@ -100,6 +102,7 @@ const iconMap = {
   StyleIcon: StyleIcon,
   DashboardIcon: DashboardIcon,
   StadiumIcon: StadiumIcon,
+  LanguageIcon: LanguageIcon,
   AddCircleOutlineIcon: AddCircleOutlineIcon,
 };
 

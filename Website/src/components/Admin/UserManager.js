@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Switch, InputAdornment, FormControlLabel, Alert, useTheme, useMediaQuery, CircularProgress, Snackbar } from '@mui/material';
+import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment, Alert, useTheme, useMediaQuery, CircularProgress, Snackbar } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { ReusableModal } from '../Helpers/modalUtils';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';

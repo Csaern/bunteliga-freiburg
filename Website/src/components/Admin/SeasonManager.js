@@ -28,6 +28,8 @@ const defaultSeasonData = {
     pointsForWin: 2,
     pointsForDraw: 1,
     pointsForLoss: 0,
+    minGamesPlayed: 0,
+    rankingCriteria: ['points', 'goalDifference', 'goalsScored'],
     teams: []
 };
 
@@ -132,13 +134,24 @@ const SeasonManager = () => {
 
     const handleFormChange = (e) => {
         const { name, value, type } = e.target;
+        if (name.startsWith('rankingCriteria_')) {
+            const index = parseInt(name.split('_')[1], 10);
+            const newCriteria = [...formData.rankingCriteria];
+            newCriteria[index] = value;
+            setFormData(prev => ({ ...prev, rankingCriteria: newCriteria }));
+            return;
+        }
         setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const dataToSend = { ...formData, teams: formData.teams.map(t => ({ id: t.id, name: t.name })) };
+            const dataToSend = {
+                ...formData,
+                teams: formData.teams.map(t => ({ id: t.id, name: t.name })),
+                rankingCriteria: (formData.rankingCriteria || []).slice(0, 3)
+            };
 
             // FINALE KORREKTUR: Sende ein vollständiges, unmissverständliches ISO-Datum (UTC).
             if (dataToSend.startDate && typeof dataToSend.startDate === 'string') {
@@ -426,8 +439,31 @@ const SeasonManager = () => {
                             </FormControl>
                             <TextField size="small" label="Punkte für Sieg" name="pointsForWin" type="number" value={formData.pointsForWin} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
                             <TextField size="small" label="Punkte für Unentschieden" name="pointsForDraw" type="number" value={formData.pointsForDraw} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
+                            <TextField size="small" label="Punkte für Niederlage" name="pointsForLoss" type="number" value={formData.pointsForLoss} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
+                            <TextField size="small" label="Mindestspiele für Tabellenwertung" name="minGamesPlayed" type="number" value={formData.minGamesPlayed} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
                             <TextField size="small" label="Ablauf von Anfragen (Tage)" name="requestExpiryDays" type="number" value={formData.requestExpiryDays} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
                             <TextField size="small" label="Freigabe für Freundschaftsspiele (Stunden)" name="friendlyGamesReleaseHours" type="number" value={formData.friendlyGamesReleaseHours} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
+
+                            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: theme.palette.text.secondary }}>Platzierungs-Kriterien (Sortierung)</Typography>
+                            <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
+                                {[0, 1, 2].map((i) => (
+                                    <FormControl key={i} size="small" fullWidth sx={darkInputStyle} disabled={isReadOnly}>
+                                        <InputLabel>{`${i + 1}. Kriterium`}</InputLabel>
+                                        <Select
+                                            name={`rankingCriteria_${i}`}
+                                            value={formData.rankingCriteria?.[i] || ''}
+                                            label={`${i + 1}. Kriterium`}
+                                            onChange={handleFormChange}
+                                            MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}
+                                        >
+                                            <MenuItem value="points">Punkte</MenuItem>
+                                            <MenuItem value="goalDifference">Tordifferenz</MenuItem>
+                                            <MenuItem value="goalsScored">Erzielte Tore</MenuItem>
+                                            <MenuItem value="headToHead">Direkter Vergleich</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                ))}
+                            </Box>
                         </TabPanel>
                         <TabPanel value={activeTab} index={1}>
                             {!isReadOnly && (

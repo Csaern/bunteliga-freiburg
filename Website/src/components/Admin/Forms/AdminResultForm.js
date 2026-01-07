@@ -115,6 +115,7 @@ const AdminResultForm = ({ initialData, teams, pitches, results = [], bookings =
                 location: initialData.location || (initialData.pitchId ? pitches?.find(p => p.id === initialData.pitchId)?.name : '') || ''
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialData]);
 
     const handleSubmit = (e) => {

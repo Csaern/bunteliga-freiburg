@@ -1,8 +1,8 @@
 import React from 'react';
 import LeagueTable from '../components/HistoryLeagueTable';
-import HallOfFame from '../components/HallOfFame';
-import RecordsList from '../components/RecordsList';
-import SeasonChampionsList from '../components/SeasonChampionsList';
+// import HallOfFame from '../components/HallOfFame';
+// import RecordsList from '../components/RecordsList';
+// import SeasonChampionsList from '../components/SeasonChampionsList';
 
 const HistoryPage = () => {
   return (

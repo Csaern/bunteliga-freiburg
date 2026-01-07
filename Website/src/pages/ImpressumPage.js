@@ -1,166 +1,125 @@
-import * as React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Box,
   Container,
   Typography,
+  Box,
   Paper,
+  Divider,
   useTheme,
-  useMediaQuery,
+  useMediaQuery
 } from '@mui/material';
+import * as websiteApi from '../services/websiteApiService';
 
-// Wiederverwendbare Sektion für das Impressum
-const LegalSection = ({ title, children }) => {
+// Hardcoded legal texts
+const LEGAL_TEXTS = {
+  liability: `Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschließlich deren Betreiber verantwortlich.`,
+  copyright: `Das Copyright für veröffentlichte, vom Autor selbst erstellte Objekte bleibt allein beim Autor der Seiten. Eine Vervielfältigung oder Verwendung solcher Grafiken, Tondokumente, Videosequenzen und Texte in anderen elektronischen oder gedruckten Publikationen ist ohne ausdrückliche Zustimmung des Autors nicht gestattet.`,
+  euDispute: `Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr.\nUnsere E-Mail-Adresse finden Sie oben im Impressum.`,
+  consumerDispute: `Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.`
+};
+
+const ImpressumPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [clubInfo, setClubInfo] = useState(null);
 
-  return (
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const data = await websiteApi.getSettings('club-info');
+        // If data is missing (not yet saved), use an empty structure or defaults
+        if (data) {
+          setClubInfo(data);
+        } else {
+          // Fallback to minimal structure to allow page to render
+          setClubInfo({
+            address: {}, bankDetails: {}, contact: {}, register: {}, dataProtection: {}
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load impressum data', error);
+        // Stop loading even on error
+        setClubInfo({ address: {}, bankDetails: {}, contact: {}, register: {}, dataProtection: {} });
+      }
+    };
+    loadData();
+  }, []);
+
+  const Section = ({ title, children }) => (
     <Box sx={{ mb: 4 }}>
-      <Typography
-        variant={isMobile ? 'h6' : 'h5'}
-        component="h2"
-        sx={{
-          fontFamily: 'Comfortaa',
-          fontWeight: 600,
-          color: theme.palette.primary.main,
-          mb: 1.5,
-          borderBottom: `2px solid ${theme.palette.divider}`,
-          pb: 0.5,
-          fontSize: isMobile ? '1.1rem' : '1.5rem',
-        }}
-      >
+      <Typography variant="h6" component="h2" sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold', color: theme.palette.primary.main, mb: 1.5 }}>
         {title}
       </Typography>
-      <Typography
-        variant="body1"
-        component="div"
-        sx={{
-          fontFamily: 'Comfortaa',
-          lineHeight: 1.7,
-          color: theme.palette.text.secondary,
-          fontSize: { xs: '0.85rem', sm: '1rem' }, // Kleinere Schriftgröße für Mobile
-          '& a': { // Link-Styling
-            color: theme.palette.secondary.main,
-            textDecoration: 'none',
-            '&:hover': {
-              textDecoration: 'underline',
-            }
-          },
-          // Stellt sicher, dass <p> Tags den richtigen Abstand haben
-          '& p': {
-            mt: 0,
-            mb: 1,
-          }
-        }}
-      >
+      <Typography variant="body1" component="div" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, lineHeight: 1.7, whiteSpace: 'pre-line' }}>
         {children}
       </Typography>
     </Box>
   );
-};
 
-const LegalNoticePage = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  if (!clubInfo) {
+    return <Container sx={{ py: 4 }}><Typography textAlign="center">Lade Daten...</Typography></Container>;
+  }
 
   return (
-    <Container maxWidth="md" sx={{ my: 4, px: isMobile ? 2 : 3 }}>
-      <Typography
-        variant={isMobile ? 'h4' : 'h3'} // Kleinere Hauptüberschrift für Mobile
-        component="h1"
-        sx={{
-          mb: 4,
-          mt: 2,
-          color: theme.palette.primary.main,
-          fontWeight: 700,
-          fontFamily: 'Comfortaa',
-          textAlign: 'center',
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-        }}
-      >
-        Impressum
-      </Typography>
+    <Container maxWidth="md" sx={{ py: { xs: 4, sm: 6 } }}>
+      <Box textAlign="center" sx={{ mb: 6 }}>
+        <Typography variant={isMobile ? 'h4' : 'h3'} component="h1" sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.primary.main, mb: 1 }}>
+          IMPRESSUM
+        </Typography>
+        <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary }}>
+          Angaben gemäß § 5 TMG
+        </Typography>
+      </Box>
 
-      <Paper
-        sx={{
-          backgroundColor: theme.palette.background.paper,
-          borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.divider}`,
-          p: { xs: 2.5, sm: 4 },
-        }}
-      >
-        <LegalSection title="Herausgeber">
-          <p>
-            Bunte-Liga-Freiburg e.V.<br />
-            c/o Jonas Krause<br />
-            Ferdinand-Weiß-Str. 92<br />
-            79106 Freiburg
-          </p>
-        </LegalSection>
+      <Paper sx={{ p: { xs: 3, sm: 5 }, borderRadius: 2 }}>
+        <Section title="Herausgeber & Kontakt">
+          {clubInfo?.address?.name}<br />
+          {clubInfo?.address?.person && <>{clubInfo.address.person}<br /></>}
+          {clubInfo?.address?.street}<br />
+          {clubInfo?.address?.city}<br />
+          <br />
+          {clubInfo?.contact?.phone && <>Telefon: {clubInfo.contact.phone}<br /></>}
+          {clubInfo?.contact?.fax && <>Fax: {clubInfo.contact.fax}<br /></>}
+          {clubInfo?.contact?.email && <>E-Mail: {clubInfo.contact.email}<br /></>}
+        </Section>
 
-        <LegalSection title="Vertretungsberechtigte">
-          <p>
-            Uwe Schmitt, Jens Karsten, Peter Deutschmann
-          </p>
-        </LegalSection>
+        <Divider sx={{ my: 3 }} />
 
-        <LegalSection title="Kontakt">
-          <p>
-            Tel.: 0761-809312<br />
-            Fax: 0761-1377804<br />
-            E-Mail: <a href="mailto:vorstand@bunteligafreiburg.de">vorstand@bunteligafreiburg.de</a><br />
-            Internet: <a href="https://www.bunteligafreiburg.de" target="_blank" rel="noopener noreferrer">www.bunteligafreiburg.de</a>
-          </p>
-          <p>
-            Bei Fragen zur Webseite:<br />
-            <a href="mailto:webmaster@bunteligafreiburg.de">webmaster@bunteligafreiburg.de</a>
-          </p>
-        </LegalSection>
+        <Section title="Vertretungsberechtigter Vorstand">
+          {clubInfo?.representatives || "Vorstandsinformationen folgen."}
+        </Section>
 
-        <LegalSection title="Registereintrag & Steuer">
-          <p>
-            Eintragung im Vereinsregister.<br />
-            Registergericht: Amtsgericht Freiburg im Breisgau<br />
-            Vereinsregister-Nr.: 3364
-          </p>
-          <p>
-            Steuer-Nr.: 06469/42621 beim Finanzamt Freiburg-Stadt
-          </p>
-        </LegalSection>
+        <Section title="Registereintrag & Steuernummer">
+          Eintragung im Vereinsregister.<br />
+          Registergericht: {clubInfo?.register?.court}<br />
+          Registernummer: {clubInfo?.register?.number}<br />
+          {clubInfo?.taxId && <>Steuernummer: {clubInfo.taxId}</>}
+        </Section>
 
-        <LegalSection title="Verantwortlich für den Inhalt">
-          <p>
-            Stefan Schultheis, Jens Karsten, Thorsten Wrobel
-          </p>
-        </LegalSection>
+        <Divider sx={{ my: 3 }} />
 
-        <LegalSection title="Haftungshinweis">
-          <p>
-            Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschließlich deren Betreiber verantwortlich.
-          </p>
-        </LegalSection>
+        <Section title="Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV">
+          {clubInfo?.contentResponsibility || "Vorstand"}
+        </Section>
 
-        <LegalSection title="Copyright">
-          <p>
-            Das Copyright für Inhalt und Gestaltung liegt bei der Bunte-Liga-Freiburg e.V.
-          </p>
-        </LegalSection>
+        <Section title="Haftung für Inhalte & Links">
+          {LEGAL_TEXTS.liability}
+        </Section>
 
-        <LegalSection title="EU-Streitschlichtung">
-          <p>
-            Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener noreferrer">https://ec.europa.eu/consumers/odr</a>.<br />
-            Unsere E-Mail-Adresse finden Sie oben im Impressum.
-          </p>
-        </LegalSection>
+        <Section title="Urheberrecht">
+          {LEGAL_TEXTS.copyright}
+        </Section>
 
-        <LegalSection title="Verbraucher­streit­beilegung">
-          <p>
-            Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
-          </p>
-        </LegalSection>
+        <Section title="EU-Streitschlichtung">
+          {LEGAL_TEXTS.euDispute}
+        </Section>
+
+        <Section title="Verbraucherstreitbeilegung/Universalschlichtungsstelle">
+          {LEGAL_TEXTS.consumerDispute}
+        </Section>
       </Paper>
     </Container>
   );
 };
 
-export default LegalNoticePage;
+export default ImpressumPage;

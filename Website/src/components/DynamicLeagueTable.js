@@ -12,7 +12,6 @@ import {
   Paper,
   Box,
   Typography,
-  Avatar,
   useTheme,
   Chip,
   Container,
@@ -178,6 +177,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
   const navigate = useNavigate();
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [rankingCriteria, setRankingCriteria] = useState(['points', 'goalDifference', 'goalsScored']);
 
   const loadTableData = useCallback(async () => {
     try {
@@ -200,6 +200,9 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
             const seasonDoc = await getDoc(doc(db, 'seasons', seasonId));
             if (seasonDoc.exists()) {
               const seasonData = seasonDoc.data();
+              if (seasonData.rankingCriteria && seasonData.rankingCriteria.length > 0) {
+                setRankingCriteria(seasonData.rankingCriteria);
+              }
               if (seasonData.teams && Array.isArray(seasonData.teams)) {
                 seasonTeams = seasonData.teams;
                 // Nur aktive Teams berücksichtigen
@@ -337,21 +340,28 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
       // In Array umwandeln und sortieren
       const sortedTeams = Object.values(teamStats)
         .sort((a, b) => {
-          // Sortiere nach Punkten (absteigend)
-          if (b.points !== a.points) {
-            return b.points - a.points;
+          for (const criteria of rankingCriteria) {
+            let comparison = 0;
+            switch (criteria) {
+              case 'points':
+                comparison = b.points - a.points;
+                break;
+              case 'goalDifference':
+                comparison = (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
+                break;
+              case 'goalsScored':
+                comparison = b.goalsFor - a.goalsFor;
+                break;
+              case 'headToHead':
+                // H2H is complex, fallback to name for stability if other criteria are equal
+                comparison = 0;
+                break;
+              default:
+                comparison = 0;
+            }
+            if (comparison !== 0) return comparison;
           }
-          // Bei gleichen Punkten: Tordifferenz
-          const aDiff = a.goalsFor - a.goalsAgainst;
-          const bDiff = b.goalsFor - b.goalsAgainst;
-          if (bDiff !== aDiff) {
-            return bDiff - aDiff;
-          }
-          // Bei gleicher Tordifferenz: mehr Tore
-          if (b.goalsFor !== a.goalsFor) {
-            return b.goalsFor - a.goalsFor;
-          }
-          // Alphabetisch nach Namen
+          // Alphabetisch nach Namen als letzter Fallback
           return a.name.localeCompare(b.name);
         })
         .map((team, index) => ({
@@ -366,7 +376,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
     } finally {
       setLoading(false);
     }
-  }, [seasonId]);
+  }, [seasonId, rankingCriteria]);
 
   useEffect(() => {
     loadTableData();

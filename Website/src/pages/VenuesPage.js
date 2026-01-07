@@ -14,6 +14,8 @@ import MapIcon from '@mui/icons-material/Map';
 import { getPublicPitches } from '../services/pitchApiService';
 import { API_BASE_URL } from '../services/apiClient';
 import ContactContent from '../components/ContactContent';
+import * as websiteApi from '../services/websiteApiService';
+import 'react-quill-new/dist/quill.snow.css';
 import mrp from '../img/mrp.jpg'; // Fallback image
 
 // Sub-Komponente für eine einzelne Platz-Karte
@@ -109,23 +111,30 @@ const VenuesPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [venues, setVenues] = React.useState([]);
+  const [aboutUsSections, setAboutUsSections] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
 
   React.useEffect(() => {
-    const fetchPitches = async () => {
+    const fetchData = async () => {
       try {
-        const data = await getPublicPitches();
-        setVenues(data);
+        const [venuesData, aboutUsData] = await Promise.all([
+          getPublicPitches(),
+          websiteApi.getSettings('about-us')
+        ]);
+        setVenues(venuesData);
+        if (aboutUsData && Array.isArray(aboutUsData.sections)) {
+          setAboutUsSections(aboutUsData.sections);
+        }
       } catch (err) {
-        console.error("Fehler beim Laden der Plätze:", err);
-        setError("Die Plätze konnten nicht geladen werden.");
+        console.error("Fehler beim Laden der Daten:", err);
+        setError("Die Daten konnten nicht geladen werden.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPitches();
+    fetchData();
   }, []);
 
   return (
@@ -147,45 +156,58 @@ const VenuesPage = () => {
         Über uns
       </Typography>
 
-      {/* Beschreibung über die Bunte Liga */}
-      <Paper
-        sx={{
-          backgroundColor: theme.palette.background.paper,
-          borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.divider}`,
-          p: { xs: 2, sm: 3 },
-          mb: 4,
-        }}
-      >
-        <Typography
-          variant="h5"
-          sx={{
-            color: theme.palette.primary.main,
-            fontFamily: 'Comfortaa',
-            fontWeight: 700,
-            mb: 2,
-            textAlign: 'center',
-          }}
-        >
-          Die Bunte Liga Freiburg
-        </Typography>
-        <Typography
-          variant="body1"
-          sx={{
-            color: theme.palette.text.secondary,
-            fontFamily: 'Comfortaa',
-            lineHeight: 1.8,
-            textAlign: 'justify',
-          }}
-        >
-          Die Bunte Liga Freiburg ist eine inklusive Hans Fußballliga, die Menschen aller Hintergründe zusammenbringt.
-          Wir fördern Fairplay, Gemeinschaft und den Spaß am Fußball. Unsere Liga steht für Vielfalt, Respekt und
-          sportliche Begeisterung. Egal ob Anfänger oder erfahrener Spieler – bei uns ist jeder willkommen, der
-          die Leidenschaft für den Fußball teilt.
-
-          Dumm wer nicht mitmacht!
-        </Typography>
-      </Paper>
+      {/* Dynamische "Über uns" Sektionen */}
+      {aboutUsSections.length > 0 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mb: 6 }}>
+          {aboutUsSections.map((section, index) => (
+            <Paper
+              key={section.id || index}
+              sx={{
+                backgroundColor: theme.palette.background.paper,
+                borderRadius: theme.shape.borderRadius,
+                border: `1px solid ${theme.palette.divider}`,
+                p: { xs: 2, sm: 3 },
+                // Styles für HTML Content aus Editor
+                '& .ql-align-center': { textAlign: 'center' },
+                '& .ql-align-right': { textAlign: 'right' },
+                '& .ql-align-justify': { textAlign: 'justify' },
+                '& strong': { fontWeight: 'bold', color: 'inherit' },
+                '& em': { fontStyle: 'italic', color: 'inherit' },
+                '& h1': { fontSize: '1.8em', fontFamily: 'Comfortaa', mt: 1, mb: 1, color: theme.palette.mode === 'dark' ? theme.palette.primary.main : `${theme.palette.common.black} !important`, backgroundColor: 'transparent !important' },
+                '& h2': { fontSize: '1.5em', fontFamily: 'Comfortaa', mt: 1, mb: 1, color: theme.palette.mode === 'dark' ? theme.palette.text.primary : `${theme.palette.common.black} !important`, backgroundColor: 'transparent !important' },
+                '& h3': { fontSize: '1.2em', fontFamily: 'Comfortaa', mt: 1, mb: 1, color: theme.palette.mode === 'dark' ? theme.palette.text.primary : `${theme.palette.common.black} !important`, backgroundColor: 'transparent !important' },
+                '& p': { fontSize: '1rem', lineHeight: 1.8, marginBottom: '0.8em', fontFamily: 'Comfortaa', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : `${theme.palette.common.black} !important`, backgroundColor: 'transparent !important' },
+                '& ul, & ol': { pl: 3, mb: 1, fontFamily: 'Comfortaa', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : `${theme.palette.common.black} !important`, backgroundColor: 'transparent !important' },
+                '& li': { mb: 0.5, color: 'inherit' },
+                '& span': { backgroundColor: 'transparent !important', color: 'inherit' },
+                '& a': { color: theme.palette.primary.main, textDecoration: 'underline' },
+                '& img': { maxWidth: '100%', height: 'auto' },
+                // Force all text to follow theme unless specifically colored by user (and even then, bg should be transp)
+                '& *': { backgroundColor: 'transparent !important', color: theme.palette.mode === 'dark' ? 'inherit' : `${theme.palette.common.black} !important` },
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word'
+              }}
+            >
+              {section.title && (
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.common.black,
+                    fontFamily: 'Comfortaa',
+                    fontWeight: 700,
+                    mb: 2,
+                    textAlign: 'center',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {section.title}
+                </Typography>
+              )}
+              <div dangerouslySetInnerHTML={{ __html: section.content }} />
+            </Paper>
+          ))}
+        </Box>
+      )}
 
       {/* Plätze in Grid (max 2 nebeneinander) */}
       <Typography

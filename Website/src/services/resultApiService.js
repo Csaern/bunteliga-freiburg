@@ -1,4 +1,4 @@
-import { apiClient, apiClientFormData, publicApiClient } from './apiClient';
+import { apiClient, publicApiClient } from './apiClient';
 
 export const adminCreateResult = async (resultData) => {
     return apiClient('/api/results/admin/create', 'POST', resultData);

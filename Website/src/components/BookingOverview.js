@@ -1,5 +1,5 @@
 // src/components/BookingOverview.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 // Frontend nutzt Backend-APIs; direkter Firestore-Zugriff entfällt für Aktionen
 import * as seasonApi from '../services/seasonApiService';
 import * as pitchApi from '../services/pitchApiService';
@@ -20,11 +20,9 @@ const BookingOverview = () => {
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [awayTeam, setAwayTeam] = useState('');
-  const [contactName, setContactName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
+
   const [currentSeason, setCurrentSeason] = useState(null);
-  const { currentUser, teamId, role } = useAuth();
+  const { currentUser, teamId } = useAuth();
   const [potentialOpponents, setPotentialOpponents] = useState([]);
   const [isOpponentLoading, setIsOpponentLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
@@ -47,6 +45,7 @@ const BookingOverview = () => {
   };
 
   // parseDate-Funktion wie im Admin
+  // parseDate-Funktion wie im Admin
   const parseDate = (dateObj) => {
     if (!dateObj) return new Date();
     if (dateObj.toDate) return dateObj.toDate();
@@ -54,7 +53,7 @@ const BookingOverview = () => {
     return new Date(dateObj);
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       // Verwende öffentliche APIs für alle User (auch ohne Admin-Rechte)
@@ -89,11 +88,11 @@ const BookingOverview = () => {
       setNotification({ open: true, message: 'Fehler beim Laden der Daten.', severity: 'error' });
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handleBookNow = (booking) => {
     const bookingDate = new Date(booking.date);
@@ -158,9 +157,7 @@ const BookingOverview = () => {
       setNotification({ open: true, message: "Buchung erfolgreich! Warte auf Bestätigung des Gegners.", severity: 'success' });
       setSelectedSlot(null);
       setAwayTeam('');
-      setContactName('');
-      setContactEmail('');
-      setContactPhone('');
+
       // Refresh data
       fetchData();
     } catch (error) {
@@ -359,11 +356,10 @@ const BookingOverview = () => {
 
                       // Check if booking is allowed for this user
                       let isBookable = isAvailable;
-                      let disabledReason = '';
 
                       if (isAvailable && leagueLimitReached && !booking.friendly) {
                         isBookable = false;
-                        disabledReason = 'Ligaspiel-Limit erreicht';
+                        // disabledReason = 'Ligaspiel-Limit erreicht';
                       }
 
                       return isMobile ? (

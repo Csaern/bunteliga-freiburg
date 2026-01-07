@@ -33,7 +33,6 @@ import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 import PublicIcon from '@mui/icons-material/Public';
 import EventIcon from '@mui/icons-material/Event';
-import SportsScoreIcon from '@mui/icons-material/SportsScore'; // Using SportsScore as "Goal/Tor" replacement if explicit Net icon isn't ideal
 import { API_BASE_URL } from '../services/apiClient';
 import * as teamApi from '../services/teamApiService';
 import * as seasonApi from '../services/seasonApiService';

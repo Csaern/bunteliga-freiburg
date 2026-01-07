@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, FormControl, InputLabel, Select, MenuItem, InputAdornment, Alert, useTheme, useMediaQuery, IconButton, Menu, Snackbar, CircularProgress, Avatar } from '@mui/material';
+import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, MenuItem, InputAdornment, Alert, useTheme, useMediaQuery, IconButton, Menu, Snackbar, CircularProgress, Avatar } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
@@ -91,7 +91,6 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
     const [selectedResult, setSelectedResult] = useState(null);
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [formData, setFormData] = useState({ homeTeamId: '', awayTeamId: '', homeScore: '', awayScore: '', bookingId: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [anchorEl, setAnchorEl] = useState(null);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
@@ -120,6 +119,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
 
     useEffect(() => {
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSeason?.id]);
 
     // NEU: Hilfsfunktion zur sicheren Umwandlung von Firestore-Timestamps in JS-Date-Objekte.
@@ -133,30 +133,11 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         return new Date(dateObj);
     };
 
-    useEffect(() => {
-        if (selectedResult) {
-            setFormData({
-                homeTeamId: selectedResult.homeTeamId || '',
-                awayTeamId: selectedResult.awayTeamId || '',
-                homeScore: selectedResult.homeScore ?? '',
-                awayScore: selectedResult.awayScore ?? '',
-                bookingId: selectedResult.bookingId || null,
-            });
-        } else if (selectedBooking) {
-            setFormData({
-                homeTeamId: selectedBooking.homeTeamId || '',
-                awayTeamId: selectedBooking.awayTeamId || '',
-                homeScore: '',
-                awayScore: '',
-                bookingId: selectedBooking.id,
-            });
-        }
-    }, [selectedResult, selectedBooking]);
+
 
     const handleOpenCreateModal = () => {
         setSelectedResult(null);
         setSelectedBooking(null);
-        setFormData({ homeTeamId: '', awayTeamId: '', homeScore: '', awayScore: '', bookingId: null });
         setModalMode('create');
         setIsModalOpen(true);
     };
@@ -183,25 +164,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         setAnchorEl(null);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!currentSeason) { setNotification({ open: true, message: 'Keine aktuelle Saison gefunden!', severity: 'error' }); return; }
-        if (formData.homeTeamId === formData.awayTeamId) { setNotification({ open: true, message: 'Heim- und Auswärtsmannschaft müssen unterschiedlich sein!', severity: 'error' }); return; }
 
-        try {
-            const resultData = { ...formData, homeScore: parseInt(formData.homeScore), awayScore: parseInt(formData.awayScore), seasonId: currentSeason?.id };
-
-            if (modalMode === 'edit' && selectedResult) {
-                await resultApiService.adminUpdateResult(selectedResult.id, { ...resultData, status: 'confirmed' });
-                setNotification({ open: true, message: 'Ergebnis erfolgreich aktualisiert.', severity: 'success' });
-            } else {
-                await resultApiService.adminCreateResult(resultData);
-                setNotification({ open: true, message: 'Ergebnis erfolgreich erstellt.', severity: 'success' });
-            }
-            handleCloseModal();
-            fetchData();
-        } catch (error) { setNotification({ open: true, message: error.message || 'Fehler beim Speichern.', severity: 'error' }); }
-    };
 
     const handleDelete = async () => {
         if (!selectedResult) return;
@@ -223,8 +186,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         } catch (error) { setNotification({ open: true, message: error.message || 'Fehler beim Bestätigen.', severity: 'error' }); }
     };
 
-    const isReadOnly = modalMode === 'view';
-    const isFromBooking = !!selectedBooking || (selectedResult && selectedResult.bookingId);
+
     const searchableFields = [{ key: 'homeTeamId', accessor: (result) => getTeamName(result.homeTeamId) }, { key: 'awayTeamId', accessor: (result) => getTeamName(result.awayTeamId) }];
     const filteredResults = filterData(results, searchTerm, searchableFields);
 

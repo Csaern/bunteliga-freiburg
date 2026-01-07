@@ -63,12 +63,11 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
 const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId, maxWidth, disableContainer = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { teamId } = useAuth();
+  const { teamId, isAdmin } = useAuth();
   const [fixtures, setFixtures] = useState([]);
   const [teams, setTeams] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedFixture, setSelectedFixture] = useState(null);
-  const [pitchName, setPitchName] = useState('');
   const [pitchesMap, setPitchesMap] = useState({});
   const [pitches, setPitches] = useState([]);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
@@ -105,11 +104,11 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
   const loadFixtures = useCallback(async () => {
     try {
-      // Lade Saison-Daten, um aktive Teams zu identifizieren
+      setLoading(true);
+      // 1. Season Data
       let activeTeamIds = [];
       if (seasonId) {
         try {
-          // Versuche zuerst die aktive Saison zu laden
           const activeSeason = await seasonApiService.getActiveSeasonPublic();
           if (activeSeason && activeSeason.id === seasonId && activeSeason.teams) {
             activeTeamIds = activeSeason.teams
@@ -117,11 +116,10 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
               .map(t => t.id || t.teamId)
               .filter(Boolean);
           } else {
-            // Falls nicht die aktive Saison, lade die Saison direkt aus Firestore
             const seasonDoc = await getDoc(doc(db, 'seasons', seasonId));
             if (seasonDoc.exists()) {
               const seasonData = seasonDoc.data();
-              if (seasonData.teams && Array.isArray(seasonData.teams)) {
+              if (seasonData.teams) {
                 activeTeamIds = seasonData.teams
                   .filter(t => t.status === 'active')
                   .map(t => t.id || t.teamId)
@@ -129,53 +127,33 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
               }
             }
           }
-        } catch (error) {
-          console.error('Fehler beim Laden der Saison-Daten:', error);
+        } catch (e) {
+          console.error('Season load error:', e);
         }
       }
 
-      // Teams laden
-      // Wenn Ergebnisse angezeigt werden, lade alle Teams aus Firestore (für vollständige Logo-Daten)
-      // Ansonsten nur Teams der aktiven Saison
+      // 2. Teams
       let teamsArr = [];
-      if (showType === 'results' || showType === 'all') {
-        // Lade alle Teams aus Firestore für vollständige Logo-Daten
-        try {
+      try {
+        if (showType === 'results' || showType === 'all') {
           const teamsSnap = await getDocs(collection(db, 'teams'));
           teamsArr = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        } catch (firestoreError) {
-          console.error('Fehler beim Laden aller Teams aus Firestore:', firestoreError);
-          // Fallback: Versuche API
+        } else {
           try {
             teamsArr = await teamApi.getTeamsForActiveSeason();
-          } catch (authError) {
-            try {
-              teamsArr = await teamApi.getTeamsForActiveSeasonPublic();
-            } catch (publicError) {
-              console.error('Teams konnten nicht geladen werden:', authError, publicError);
-              teamsArr = [];
-            }
-          }
-        }
-      } else {
-        // Für zukünftige Spiele: Nur Teams der aktiven Saison
-        try {
-          teamsArr = await teamApi.getTeamsForActiveSeason();
-        } catch (authError) {
-          try {
+          } catch {
             teamsArr = await teamApi.getTeamsForActiveSeasonPublic();
-          } catch (publicError) {
-            console.error('Teams konnten nicht geladen werden:', authError, publicError);
-            teamsArr = [];
           }
         }
+      } catch (e) {
+        console.error('Teams load error:', e);
       }
 
-      // Filtere nur aktive Teams, wenn Saison-Daten verfügbar sind
       if (seasonId && activeTeamIds.length > 0) {
         teamsArr = teamsArr.filter(team => activeTeamIds.includes(team.id));
       }
 
+      // ... (Initial filtering and team reduction)
       const teamsMap = teamsArr.reduce((acc, t) => {
         acc[t.id] = {
           name: t.name,
@@ -187,356 +165,194 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         };
         return acc;
       }, {});
-      setTeams(teamsMap);
+      // ALWAYS set initial teams
+      setTeams({ ...teamsMap });
 
-      // Ergebnisse (nur bestätigte) aus Backend
-      let resultsRaw = [];
-      if (seasonId) {
+      // 3. Results
+      let results = [];
+      if (showType === 'results' || showType === 'all' || seasonId) {
         try {
-          resultsRaw = await resultApi.getResultsForSeason(seasonId);
-        } catch (authError) {
+          let resultsRaw = [];
           try {
+            resultsRaw = await resultApi.getResultsForSeason(seasonId);
+          } catch {
             resultsRaw = await resultApi.getResultsForSeasonPublic(seasonId);
-          } catch (publicError) {
-            console.error('Ergebnisse konnten nicht geladen werden:', authError, publicError);
-            resultsRaw = [];
           }
+          results = resultsRaw
+            .filter(r => r.status === 'confirmed')
+            .filter(r => !userTeamId || r.homeTeamId === userTeamId || r.awayTeamId === userTeamId)
+            .sort((a, b) => {
+              const da = a.reportedAt ? new Date(a.reportedAt) : new Date(a.date);
+              const db = b.reportedAt ? new Date(b.reportedAt) : new Date(b.date);
+              return db - da;
+            });
+        } catch (e) {
+          console.error('Results load error:', e);
         }
       }
-      const results = resultsRaw
-        .filter(result => result.status === 'confirmed')
-        .filter(result => {
-          if (userTeamId) {
-            return result.homeTeamId === userTeamId || result.awayTeamId === userTeamId;
-          }
-          return true;
-        })
-        .sort((a, b) => {
-          const dateA = a.reportedAt ? new Date(a.reportedAt) : new Date(a.date);
-          const dateB = b.reportedAt ? new Date(b.reportedAt) : new Date(b.date);
-          return dateB - dateA;
-        });
 
-      // Zukünftige Spiele
+      // 4. Bookings (Upcoming)
       let bookings = [];
       if (showType === 'upcoming' || showType === 'all') {
-        if (userTeamId && seasonId) {
-          // Use explicit team endpoint; if call fails or is empty, fallback to local filtering
-          try {
-            bookings = await bookingApi.getUpcomingBookingsForTeam(seasonId, userTeamId);
-          } catch (e) {
-            bookings = [];
-          }
-          bookings = Array.isArray(bookings) ? bookings.filter(b => b.status === 'confirmed') : [];
-
-          if (!Array.isArray(bookings) || bookings.length === 0) {
+        try {
+          if (userTeamId && seasonId) {
+            try {
+              bookings = await bookingApi.getUpcomingBookingsForTeam(seasonId, userTeamId);
+            } catch {
+              bookings = [];
+            }
+            if (!Array.isArray(bookings) || bookings.length === 0) {
+              let allSeason = [];
+              try {
+                allSeason = await bookingApi.getBookingsForSeason(seasonId);
+              } catch {
+                allSeason = await bookingApi.getPublicBookingsForSeason(seasonId);
+              }
+              const now = new Date();
+              bookings = allSeason.filter(b => {
+                const d = normalizeToDate(b.date);
+                return (b.homeTeamId === userTeamId || b.awayTeamId === userTeamId) && d && d >= now && b.status === 'confirmed';
+              });
+            }
+          } else if (seasonId) {
             let allSeason = [];
             try {
               allSeason = await bookingApi.getBookingsForSeason(seasonId);
-            } catch (authError) {
-              try {
-                allSeason = await bookingApi.getPublicBookingsForSeason(seasonId);
-              } catch (publicError) {
-                console.error('Buchungen konnten nicht geladen werden:', authError, publicError);
-                allSeason = [];
-              }
+            } catch {
+              allSeason = await bookingApi.getPublicBookingsForSeason(seasonId);
             }
             const now = new Date();
             bookings = allSeason.filter(b => {
               const d = normalizeToDate(b.date);
-              const involvesTeam = b.homeTeamId === userTeamId || b.awayTeamId === userTeamId;
-              const isFuture = d && d >= now;
-              const statusOk = b.status === 'confirmed';
-              return involvesTeam && isFuture && statusOk;
-            });
-            bookings.sort((a, b) => {
-              const da = normalizeToDate(a.date) || new Date(0);
-              const db = normalizeToDate(b.date) || new Date(0);
-              return da - db;
+              return b.homeTeamId && b.awayTeamId && d && d >= now && b.status === 'confirmed';
             });
           }
-        } else if (seasonId) {
-          // Fallback: alle Saison-Buchungen und zukünftige, belegte filtern
-          let allSeason = [];
-          try {
-            allSeason = await bookingApi.getBookingsForSeason(seasonId);
-          } catch (authError) {
-            try {
-              allSeason = await bookingApi.getPublicBookingsForSeason(seasonId);
-            } catch (publicError) {
-              console.error('Buchungen konnten nicht geladen werden:', authError, publicError);
-              allSeason = [];
-            }
-          }
-          const now = new Date();
-          bookings = allSeason.filter(b => {
-            const d = normalizeToDate(b.date);
-            return b.homeTeamId && b.awayTeamId && d && d >= now && b.status === 'confirmed';
-          });
-          bookings.sort((a, b) => {
-            const da = normalizeToDate(a.date) || new Date(0);
-            const db = normalizeToDate(b.date) || new Date(0);
-            return da - db;
-          });
+          bookings.sort((a, b) => (normalizeToDate(a.date) || 0) - (normalizeToDate(b.date) || 0));
+        } catch (e) {
+          console.error('Bookings load error:', e);
         }
       }
 
-      // Kombiniere Ergebnisse und Buchungen basierend auf showType
       let allFixtures = [];
 
+      // 5. Map Results
       if (showType === 'results' || showType === 'all') {
-        // Prüfe, ob Teams aus Ergebnissen fehlen und lade sie nach
-        const missingTeamIds = new Set();
-        results.forEach(result => {
-          if (result.homeTeamId && !teamsMap[result.homeTeamId]) {
-            missingTeamIds.add(result.homeTeamId);
-          }
-          if (result.awayTeamId && !teamsMap[result.awayTeamId]) {
-            missingTeamIds.add(result.awayTeamId);
-          }
+        // Missing Teams for results (often older teams)
+        const missingIds = new Set();
+        results.forEach(r => {
+          if (r.homeTeamId && !teamsMap[r.homeTeamId]) missingIds.add(r.homeTeamId);
+          if (r.awayTeamId && !teamsMap[r.awayTeamId]) missingIds.add(r.awayTeamId);
         });
 
-        // Lade fehlende Teams aus Firestore
-        if (missingTeamIds.size > 0) {
-          try {
-            const missingIdsArray = Array.from(missingTeamIds);
-            const batchPromises = missingIdsArray.map(async (teamId) => {
-              try {
-                const teamDocRef = doc(db, 'teams', teamId);
-                const teamDoc = await getDoc(teamDocRef);
-                if (teamDoc.exists()) {
-                  const teamData = { id: teamDoc.id, ...teamDoc.data() };
-                  teamsMap[teamId] = {
-                    name: teamData.name || 'Unbekannt',
-                    logoColor: teamData.logoColor || '#666666',
-                    logoUrl: teamData.logoUrl,
-                    logoUrlLight: teamData.logoUrlLight,
-                    description: teamData.description,
-                    foundedYear: teamData.foundedYear,
-                  };
-                } else {
-                  // Fallback: Verwende Teamname aus Ergebnis
-                  const result = results.find(r => r.homeTeamId === teamId || r.awayTeamId === teamId);
-                  teamsMap[teamId] = {
-                    name: (result?.homeTeamId === teamId ? result.homeTeamName : result?.awayTeamName) || 'Unbekannt',
-                    logoColor: '#666666',
-                    logoUrl: null,
-                  };
-                }
-              } catch (error) {
-                console.error(`Fehler beim Laden von Team ${teamId}:`, error);
-                // Fallback: Verwende Teamname aus Ergebnis
-                const result = results.find(r => r.homeTeamId === teamId || r.awayTeamId === teamId);
-                teamsMap[teamId] = {
-                  name: (result?.homeTeamId === teamId ? result.homeTeamName : result?.awayTeamName) || 'Unbekannt',
-                  logoColor: '#666666',
-                  logoUrl: null,
-                  logoUrlLight: null,
+        if (missingIds.size > 0) {
+          await Promise.all(Array.from(missingIds).map(async id => {
+            try {
+              const docSnap = await getDoc(doc(db, 'teams', id));
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                teamsMap[id] = {
+                  name: data.name,
+                  logoColor: data.logoColor || '#666666',
+                  logoUrl: data.logoUrl,
+                  logoUrlLight: data.logoUrlLight
+                };
+              } else {
+                // Fallback name from results if possible
+                const r = results.find(res => res.homeTeamId === id || res.awayTeamId === id);
+                teamsMap[id] = {
+                  name: (r?.homeTeamId === id ? r.homeTeamName : r.awayTeamName) || 'Unbekannt',
+                  logoColor: '#666666'
                 };
               }
-            });
-            await Promise.all(batchPromises);
-          } catch (error) {
-            console.error('Fehler beim Nachladen fehlender Teams:', error);
-            // Fallback: Verwende Teamnamen aus Ergebnissen
-            results.forEach(result => {
-              if (result.homeTeamId && result.homeTeamName && !teamsMap[result.homeTeamId]) {
-                teamsMap[result.homeTeamId] = {
-                  name: result.homeTeamName,
-                  logoColor: '#666666',
-                  logoUrl: null,
-                };
-              }
-              if (result.awayTeamId && result.awayTeamName && !teamsMap[result.awayTeamId]) {
-                teamsMap[result.awayTeamId] = {
-                  name: result.awayTeamName,
-                  logoColor: '#666666',
-                  logoUrl: null,
-                  logoUrlLight: null,
-                };
-              }
-            });
-          }
+            } catch { }
+          }));
+          setTeams({ ...teamsMap });
         }
-        // Aktualisiere den State mit den erweiterten Teamdaten
-        setTeams(teamsMap);
 
-        // Lade Buchungen für Ergebnisse, die eine bookingId haben, um das Spieldatum zu bekommen
         const bookingIds = results.filter(r => r.bookingId).map(r => r.bookingId);
         const bookingsMap = {};
-        if (bookingIds.length > 0 && seasonId) {
+        if (bookingIds.length > 0) {
           try {
-            let allBookings = [];
-            try {
-              allBookings = await bookingApi.getBookingsForSeason(seasonId);
-            } catch (authError) {
-              try {
-                allBookings = await bookingApi.getPublicBookingsForSeason(seasonId);
-              } catch (publicError) {
-                console.error('Buchungen konnten nicht geladen werden:', publicError);
-              }
-            }
-            allBookings.forEach(booking => {
-              if (bookingIds.includes(booking.id)) {
-                bookingsMap[booking.id] = booking;
-              }
-            });
-          } catch (error) {
-            console.error('Fehler beim Laden der Buchungen für Ergebnisse:', error);
-          }
+            let bks = [];
+            try { bks = await bookingApi.getBookingsForSeason(seasonId); } catch { bks = await bookingApi.getPublicBookingsForSeason(seasonId); }
+            bks.forEach(b => { if (bookingIds.includes(b.id)) bookingsMap[b.id] = b; });
+          } catch { }
         }
 
-        allFixtures.push(...results.map(result => {
-          // Priorität 1: Datum/Ort direkt aus dem Ergebnis (neue Logik)
-          let resultDate = null;
-          let resultTime = '';
-          let resultLocation = null;
-          let resultPitchId = null;
-
-          if (result.date) {
-            const d = normalizeToDate(result.date);
-            if (d) {
-              resultDate = d.toISOString().split('T')[0];
-              resultTime = d.toTimeString().slice(0, 5);
-            }
-          }
-
-          if (result.location) {
-            resultLocation = result.location;
-          }
-
-          // Priorität 2: Fallback auf Buchung (alte Logik)
-          if (result.bookingId && bookingsMap[result.bookingId]) {
-            const booking = bookingsMap[result.bookingId];
-
-            if (!resultDate) {
-              const bookingDate = normalizeToDate(booking.date);
-              if (bookingDate) {
-                resultDate = bookingDate.toISOString().split('T')[0];
-                resultTime = bookingDate.toTimeString().slice(0, 5);
-              }
-            }
-
-            // Nur PitchId setzen, Location kommt idealerweise aus Result
-            if (!resultPitchId) resultPitchId = booking.pitchId;
-          }
-
-          // Priorität 3: Fallback auf reportedAt (ganz alt)
-          if (!resultDate) {
-            const reportedDate = normalizeToDate(result.reportedAt);
-            if (reportedDate) {
-              resultDate = reportedDate.toISOString().split('T')[0];
-              resultTime = reportedDate.toTimeString().slice(0, 5);
-            }
-          }
+        allFixtures.push(...results.map(r => {
+          const booking = r.bookingId ? bookingsMap[r.bookingId] : null;
+          const fullDate = r.date || (booking ? booking.date : r.reportedAt);
+          const d = normalizeToDate(fullDate);
 
           return {
-            id: `result-${result.id}`,
-            bookingId: result.bookingId, // WICHTIG: bookingId hinzufügen
-            date: resultDate || '',
-            time: resultTime,
-            homeTeamId: result.homeTeamId,
-            awayTeamId: result.awayTeamId,
-            homeScore: result.homeScore,
-            awayScore: result.awayScore,
+            id: `result-${r.id}`,
+            bookingId: r.bookingId,
+            date: fullDate,
+            time: d ? d.toTimeString().slice(0, 5) : '',
+            homeTeamId: r.homeTeamId,
+            awayTeamId: r.awayTeamId,
+            homeScore: r.homeScore,
+            awayScore: r.awayScore,
             isPast: true,
-            location: resultLocation, // Wird unten ggf. durch Pitch-Namen überschrieben wenn leer
-            pitchId: resultPitchId,
-            homeTeamName: result.homeTeamName,
-            awayTeamName: result.awayTeamName,
+            location: r.location || (booking && booking.pitchId ? null : 'Unbekannt'),
+            pitchId: booking ? booking.pitchId : null,
+            homeTeamName: r.homeTeamName,
+            awayTeamName: r.awayTeamName
           };
         }));
       }
 
-      // Sammle alle Pitch-IDs (aus Ergebnissen und zukünftigen Buchungen)
+      // 6. Pitch Names
       const pitchIds = new Set();
+      allFixtures.forEach(f => f.pitchId && pitchIds.add(f.pitchId));
+      bookings.forEach(b => b.pitchId && pitchIds.add(b.pitchId));
 
-      // IDs aus Ergebnissen
-      allFixtures.forEach(f => {
-        if (f.pitchId) pitchIds.add(f.pitchId);
-      });
-
-      // IDs aus zukünftigen Buchungen
-      if (showType === 'upcoming' || showType === 'all') {
-        bookings.forEach(b => {
-          if (b.pitchId) pitchIds.add(b.pitchId);
-        });
-      }
-
-      // Lade Pitch-Namen
-      const pitchesData = {};
+      const pitchesMapLocal = {};
       if (pitchIds.size > 0) {
         try {
-          // Optimierung: Wir könnten hier cachen oder nur fehlende laden, aber getPublicPitches lädt eh alle (meistens wenige)
-          const pitchesDataList = await pitchApi.getPublicPitches();
-          setPitches(pitchesDataList);
-          pitchesDataList.forEach(pitch => {
-            if (pitchIds.has(pitch.id)) {
-              pitchesData[pitch.id] = pitch.name;
-            }
-          });
-          setPitchesMap(pitchesData);
-        } catch (error) {
-          console.error('Fehler beim Laden der Plätze:', error);
-        }
+          const pts = await pitchApi.getPublicPitches();
+          setPitches(pts);
+          pts.forEach(p => { if (pitchIds.has(p.id)) pitchesMapLocal[p.id] = p.name; });
+          setPitchesMap(pitchesMapLocal);
+        } catch { }
       }
 
-      // Update Locations für Ergebnisse (nur wenn noch nicht gesetzt)
       allFixtures.forEach(f => {
-        if (!f.location && f.pitchId && pitchesData[f.pitchId]) {
-          f.location = pitchesData[f.pitchId];
-        } else if (!f.location) {
-          f.location = 'Unbekannt';
-        }
+        if (!f.location && f.pitchId) f.location = pitchesMapLocal[f.pitchId] || 'Unbekannt';
+        if (!f.location) f.location = 'Unbekannt';
       });
 
+      // 7. Map Upcoming
       if (showType === 'upcoming' || showType === 'all') {
-        allFixtures.push(...bookings.map(booking => ({
-          id: `booking-${booking.id}`,
-          bookingId: booking.id,
-          date: (() => { const d = normalizeToDate(booking.date); return d ? d.toISOString().split('T')[0] : ''; })(),
-          time: (() => { const d = normalizeToDate(booking.date); return d ? d.toTimeString().slice(0, 5) : ''; })(),
-          homeTeamId: booking.homeTeamId,
-          awayTeamId: booking.awayTeamId,
-          homeScore: null,
-          awayScore: null,
-          isPast: false,
-          pitchId: booking.pitchId,
-          location: pitchesData[booking.pitchId] || 'Unbekannt',
-        })));
+        allFixtures.push(...bookings.map(b => {
+          const d = normalizeToDate(b.date);
+          return {
+            id: `booking-${b.id}`,
+            bookingId: b.id,
+            date: b.date,
+            time: d ? d.toTimeString().slice(0, 5) : '',
+            homeTeamId: b.homeTeamId,
+            awayTeamId: b.awayTeamId,
+            homeTeamName: b.homeTeamName || teamsMap[b.homeTeamId]?.name,
+            awayTeamName: b.awayTeamName || teamsMap[b.awayTeamId]?.name,
+            homeScore: null,
+            awayScore: null,
+            isPast: false,
+            pitchId: b.pitchId,
+            location: pitchesMapLocal[b.pitchId] || 'Unbekannt'
+          };
+        }));
       }
 
-      // Limitiere die Anzahl nur für allgemeine Übersichten (ohne spezifisches Team)
+      // 8. Limits
       if (!userTeamId) {
-        if (showType === 'results') {
-          // Zeige nur die letzten 5 Ergebnisse
-          allFixtures = allFixtures.slice(0, 5);
-        } else if (showType === 'upcoming') {
-          // Zeige nur die nächsten 5 Spiele
-          allFixtures = allFixtures.slice(0, 5);
-        }
+        if (showType === 'results') allFixtures = allFixtures.slice(0, 5);
+        else if (showType === 'upcoming') allFixtures = allFixtures.slice(0, 5);
       }
-
-      // NEU: Lade Pitch-Namen auch für Ergebnisse, wenn sie angezeigt werden sollen
-
-
-      // Korrektur: Wir machen das direkter. Wir haben oben schon bookingsMap gefüllt.
-      // Wir iterieren über allFixtures und holen die Pitch-Namen.
-
-
-
-      // KORREKTUR: Die Logik oben war etwas verstreut. Wir machen es sauberer:
-      // Wir haben allFixtures fertig. Jetzt holen wir für ALLE Fixtures (auch Ergebnisse) die Pitch-Namen, falls noch nicht da.
-      // Dazu brauchen wir die pitchId. Bei Ergebnissen kommt die aus der verknüpften Buchung.
-
-      // Wir müssen sicherstellen, dass wir für Ergebnisse auch die pitchId haben.
-      // Das passiert oben im Mapping: 
-      // if (result.bookingId && bookingsMap[result.bookingId]) { ... }
-      // Dort sollten wir auch die pitchId ins Result-Objekt übernehmen.
 
       setFixtures(allFixtures);
     } catch (error) {
-      console.error('Fehler beim Laden der Spiele:', error);
+      console.error('loadFixtures overall error:', error);
     } finally {
       setLoading(false);
     }
@@ -578,11 +394,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     setSelectedFixture(fixture);
     if (fixture.pitchId) {
       try {
-        const pitches = await pitchApi.getPublicPitches();
-        const pitch = pitches.find(p => p.id === fixture.pitchId);
-        setPitchName(pitch ? pitch.name : 'Unbekannt');
+        // const pitches = await pitchApi.getPublicPitches();
+        // const pitch = pitches.find(p => p.id === fixture.pitchId);
       } catch (error) {
-        setPitchName('Unbekannt');
       }
     }
   };
@@ -708,6 +522,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     );
   }
 
+  const canReport = !!selectedFixture && selectedFixture.id.startsWith('booking-') && (isAdmin || (!!teamId && (String(teamId) === String(selectedFixture.homeTeamId) || String(teamId) === String(selectedFixture.awayTeamId))));
+  const canCancel = !!selectedFixture && selectedFixture.id.startsWith('booking-') && !selectedFixture.isPast && (isAdmin || (!!teamId && (String(teamId) === String(selectedFixture.homeTeamId) || String(teamId) === String(selectedFixture.awayTeamId))));
+
   return (
     <Wrapper {...wrapperProps}>
       <Typography
@@ -760,9 +577,6 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           </TableHead>
           <TableBody>
             {fixtures.map((fixture) => {
-              const isUpcoming = !fixture.isPast && fixture.bookingId && (userTeamId || teamId);
-              const isMyGame = isUpcoming && (fixture.homeTeamId === (userTeamId || teamId) || fixture.awayTeamId === (userTeamId || teamId));
-
               return (
                 <TableRow
                   key={fixture.id}
@@ -893,8 +707,8 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         fixture={selectedFixture}
         teams={teams}
         pitches={pitches}
-        handleReportResult={handleReportResult}
-        handleCancelBooking={handleCancelBooking}
+        handleReportResult={canReport ? handleReportResult : null}
+        handleCancelBooking={canCancel ? handleCancelBooking : null}
       />
 
       {/* Modal für Ergebnis melden */}

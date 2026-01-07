@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, TextField, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, Divider, Alert, CircularProgress, Typography, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Button, TextField, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, Divider, Alert, CircularProgress, Typography, useTheme } from '@mui/material';
 import * as bookingApiService from '../../../services/bookingApiService';
 import * as teamApiService from '../../../services/teamApiService';
 
@@ -15,7 +15,6 @@ const AdminBookingForm = ({
     mode = 'create' // 'create' | 'edit' | 'view'
 }) => {
     const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     const isReadOnly = mode === 'view';
 
@@ -47,7 +46,7 @@ const AdminBookingForm = ({
 
     const [collisionCheck, setCollisionCheck] = useState({ status: 'idle', message: '' });
     const [potentialOpponents, setPotentialOpponents] = useState([]);
-    const [isOpponentLoading, setIsOpponentLoading] = useState(false);
+
 
     // Initialize Data
     useEffect(() => {
@@ -153,6 +152,7 @@ const AdminBookingForm = ({
         }, 500);
 
         return () => clearTimeout(handler);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.date, formData.time, formData.pitchId, formData.duration, mode, allPitches, initialData]);
 
     // Fetch Opponents
@@ -167,15 +167,12 @@ const AdminBookingForm = ({
             // If we are in view mode, we might not need to fetch, but it doesn't hurt.
             // Importantly, we do NOT reset awayTeamId here anymore.
 
-            setIsOpponentLoading(true);
             try {
                 const opponents = await teamApiService.getPotentialOpponents(formData.homeTeamId);
                 setPotentialOpponents(opponents);
             } catch (error) {
                 console.error('Error fetching opponents', error);
                 setPotentialOpponents([]);
-            } finally {
-                setIsOpponentLoading(false);
             }
         };
 

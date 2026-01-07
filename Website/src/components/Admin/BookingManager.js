@@ -123,6 +123,7 @@ const BookingManager = ({ currentSeason }) => {
 
     useEffect(() => {
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSeason]);
 
     // Removed Effects for collision check and opponent fetch
@@ -314,7 +315,7 @@ const BookingManager = ({ currentSeason }) => {
         }
     };
 
-    const isReadOnly = modalMode === 'view';
+
     const displayTeamName = (teamId) => getTeamName(teamId) || '-';
 
     const searchableFields = [

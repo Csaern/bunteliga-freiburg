@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthProvider';
 import {
@@ -34,11 +34,9 @@ const TeamSettings = ({ onClose }) => {
     }
   });
 
-  useEffect(() => {
-    loadTeamData();
-  }, [teamId]);
 
-  const loadTeamData = async () => {
+
+  const loadTeamData = React.useCallback(async () => {
     try {
       setLoading(true);
       const teamData = await teamApi.getTeamByIdPublic(teamId).catch(async () => {
@@ -71,7 +69,11 @@ const TeamSettings = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [teamId]);
+
+  useEffect(() => {
+    loadTeamData();
+  }, [teamId, loadTeamData]);
 
   const handleSave = async () => {
     try {

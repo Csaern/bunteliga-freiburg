@@ -198,8 +198,21 @@ class BookingService {
     }
 
     /**
+     * NEU: Konsolidiertes "Lazy Sync" für eine Saison.
+     * Räumt abgelaufene Anfragen auf und gibt Slots für Freundschaftsspiele frei.
+     */
+    static async _runLazySync(seasonId) {
+        if (!seasonId) return;
+
+        // Versuche Expiry-Cleanup
+        await BookingService.cleanupExpiredRequests(seasonId);
+
+        // Versuche Friendly-Release
+        await BookingService._syncFriendlySlots(seasonId);
+    }
+
+    /**
      * NEU: Löscht abgelaufene Spielanfragen (pending_away_confirm).
-     * Wird "lazy" aufgerufen, wenn Buchungen für eine Saison abgefragt werden.
      * @private
      */
     static async cleanupExpiredRequests(seasonId) {
@@ -228,8 +241,12 @@ class BookingService {
             expiredSnapshot.forEach(doc => {
                 const data = doc.data();
                 const requestedAtMillis = getMillisFromDate(data.requestedAt);
+                const gameDateMillis = getMillisFromDate(data.date);
 
-                if (requestedAtMillis > 0 && (now - requestedAtMillis) > expiryMillis) {
+                const isTimedOut = requestedAtMillis > 0 && (now - requestedAtMillis) > expiryMillis;
+                const isPastGame = gameDateMillis > 0 && gameDateMillis < now;
+
+                if (isTimedOut || isPastGame) {
                     // Reset slot
                     const updateData = {
                         status: 'available',
@@ -238,7 +255,7 @@ class BookingService {
                         friendly: false,
                         isAvailable: true,
                         expiredAt: admin.firestore.FieldValue.serverTimestamp(),
-                        expiryReason: 'automated_timeout'
+                        expiryReason: isPastGame ? 'past_game_date' : 'automated_timeout'
                     };
 
                     // Individuelle Buchungen werden gelöscht statt resettet
@@ -269,13 +286,69 @@ class BookingService {
     }
 
     /**
+     * NEU: Gibt Slots für Freundschaftsspiele frei, wenn die Frist erreicht ist.
+     * @private
+     */
+    static async _syncFriendlySlots(seasonId) {
+        try {
+            const seasonDoc = await seasonsCollection.doc(seasonId).get();
+            if (!seasonDoc.exists) return;
+
+            const seasonData = seasonDoc.data();
+            const releaseHours = seasonData.friendlyGamesReleaseHours || 48;
+            const now = Date.now();
+            const releaseMillis = releaseHours * 60 * 60 * 1000;
+
+            // Finde verfügbare Slots in dieser Saison
+            const snapshot = await bookingsCollection
+                .where('seasonId', '==', seasonId)
+                .where('status', '==', 'available')
+                .get();
+
+            if (snapshot.empty) return;
+
+            const batch = db.batch();
+            let updateCount = 0;
+            let totalChecked = 0;
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+
+                // Überspringen, wenn bereits als friendly markiert
+                if (data.friendly === true) return;
+
+                totalChecked++;
+                const slotDateMillis = getMillisFromDate(data.date);
+                const diffMillis = slotDateMillis - now;
+                const hoursToGame = diffMillis / (60 * 60 * 1000);
+
+                // Wenn der Termin innerhalb der Release-Frist liegt
+                if (slotDateMillis > 0 && diffMillis <= releaseMillis) {
+                    batch.update(doc.ref, {
+                        friendly: true,
+                        friendlyReleasedAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    updateCount++;
+                }
+            });
+
+            if (updateCount > 0) {
+                await batch.commit();
+                console.log(`[_syncFriendlySlots] ${updateCount} Slots in Saison '${seasonData.name}' für Freundschaftsspiele freigegeben.`);
+            }
+        } catch (error) {
+            console.error('[_syncFriendlySlots] Fehler:', error);
+        }
+    }
+
+    /**
      * KORRIGIERT: Ruft alle Buchungen für eine Saison ab und behandelt alte/neue Datumsformate.
      */
     static async getBookingsForSeason(seasonId, teamId = null) {
         if (!seasonId) throw new Error("Eine Saison-ID ist erforderlich.");
 
-        // Automatisches Aufräumen abgelaufener Anfragen (Lazy Cleanup)
-        await BookingService.cleanupExpiredRequests(seasonId);
+        // Automatisches Aufräumen und Synchronisieren (Lazy Sync)
+        await BookingService._runLazySync(seasonId);
 
         let query = bookingsCollection.where('seasonId', '==', seasonId);
         if (teamId) {
@@ -323,7 +396,12 @@ class BookingService {
      * Berücksichtigt die Dauer und kann eine existierende Buchung ignorieren (für Updates).
      */
     static async checkSingleSlot(slotData) {
-        const { pitchId, date, duration, bookingIdToIgnore = null } = slotData;
+        const { pitchId, date, duration, bookingIdToIgnore = null, seasonId = null } = slotData;
+
+        // NEU: Vorab-Cleanup, falls seasonId bekannt ist
+        if (seasonId) {
+            await BookingService._runLazySync(seasonId);
+        }
 
         console.log(`[checkSingleSlot] Checking collision for Pitch: ${pitchId}, Date: ${date}, Duration: ${duration}, Ignore: ${bookingIdToIgnore}`);
 
@@ -357,6 +435,19 @@ class BookingService {
 
             // Die Kernlogik der Überlappungsprüfung: (StartA < EndeB) UND (EndeA > StartB)
             if (newBookingStart < existingBookingEnd && newBookingEnd > existingBookingStart) {
+                // FALLBACK: Falls Cleanup noch nicht lief, ignorieren wir abgelaufene pending_away_confirm Anfragen
+                if (existingBooking.status === 'pending_away_confirm') {
+                    const reqAt = getMillisFromDate(existingBooking.requestedAt);
+                    const gameAt = getMillisFromDate(existingBooking.date);
+                    const now = Date.now();
+                    // Annahme: 3 Tage Standard, falls Saison nicht greifbar (worst case)
+                    const expMs = 3 * 24 * 60 * 60 * 1000;
+                    if ((reqAt > 0 && (now - reqAt) > expMs) || (gameAt > 0 && gameAt < now)) {
+                        console.log(`[checkSingleSlot] Ignoring expired collision: ${doc.id}`);
+                        continue;
+                    }
+                }
+
                 console.log(`[checkSingleSlot] Collision found with: ${doc.id} (${existingBookingStart.toISOString()} - ${existingBookingEnd.toISOString()}) vs New (${newBookingStart.toISOString()} - ${newBookingEnd.toISOString()})`);
                 collidingBookingInfo = {
                     homeTeamId: existingBooking.homeTeamId || null,
@@ -378,7 +469,10 @@ class BookingService {
      */
     static async adminCreateBooking(bookingData, user) {
         // 1. Kollisionsprüfung für den Zeitslot
-        const collisionCheck = await BookingService.checkSingleSlot(bookingData);
+        const collisionCheck = await BookingService.checkSingleSlot({
+            ...bookingData,
+            seasonId: bookingData.seasonId
+        });
         if (!collisionCheck.isAvailable) {
             throw new Error('Der Termin ist bereits belegt und kann nicht gebucht werden.');
         }
@@ -416,7 +510,8 @@ class BookingService {
         // 1. Kollisionsprüfung für den Zeitslot
         const collisionCheck = await BookingService.checkSingleSlot({
             ...updateData,
-            bookingIdToIgnore: bookingId // Wichtig, damit der Termin nicht mit sich selbst kollidiert
+            bookingIdToIgnore: bookingId, // Wichtig, damit der Termin nicht mit sich selbst kollidiert
+            seasonId: updateData.seasonId
         });
         if (!collisionCheck.isAvailable) {
             throw new Error('Der neue Termin ist bereits belegt und kann nicht gebucht werden.');
@@ -518,6 +613,11 @@ class BookingService {
     static async bulkCheckSlots(data) {
         const { seasonId, pitchIds, startDate, endDate, days, times, timeInterval } = data;
 
+        // NEU: Cleanup trigger
+        if (seasonId) {
+            await BookingService._runLazySync(seasonId);
+        }
+
         const potentialSlots = [];
         const start = new Date(startDate);
         const end = new Date(endDate);
@@ -594,6 +694,7 @@ class BookingService {
                 status: 'available',
                 homeTeamId: null,
                 awayTeamId: null,
+                friendly: false, // NEU: Explizit false setzen für Sync-Query
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 createdBy: user.uid,
             };
@@ -617,8 +718,17 @@ class BookingService {
         }
         const bookingData = bookingDoc.data();
 
-        // Prüfe, ob der Slot verfügbar ist
-        const isAvailable = bookingData.status === 'available' || (bookingData.isAvailable === true && !bookingData.homeTeamId && !bookingData.awayTeamId);
+        // NEU:Cleanup trigger vor der Verfügbarkeitsprüfung
+        if (bookingData.seasonId) {
+            await BookingService._runLazySync(bookingData.seasonId);
+        }
+
+        // Prüfe, ob der Slot verfügbar ist (nach potentiellem Cleanup)
+        // Wir müssen das Dokument evtl. neu laden, falls es gerade bereinigt wurde.
+        const currentDoc = await bookingRef.get();
+        const currentData = currentDoc.data();
+
+        const isAvailable = currentData.status === 'available' || (currentData.isAvailable === true && !currentData.homeTeamId && !currentData.awayTeamId);
         if (!isAvailable) {
             throw new Error('Dieser Termin ist nicht mehr verfügbar.');
         }
@@ -673,6 +783,29 @@ class BookingService {
             throw new Error('Buchung nicht gefunden.');
         }
         const bookingData = bookingDoc.data();
+
+        // NEU: Prüfen, ob die Anfrage bereits abgelaufen ist
+        const reqAt = getMillisFromDate(bookingData.requestedAt);
+        const gameAt = getMillisFromDate(bookingData.date);
+        const now = Date.now();
+
+        // Wir holen die Expiry-Days aus der Saison
+        let expiryDays = 3;
+        try {
+            const seasonDoc = await seasonsCollection.doc(bookingData.seasonId).get();
+            if (seasonDoc.exists) {
+                expiryDays = seasonDoc.data().requestExpiryDays || 3;
+            }
+        } catch (e) {
+            console.error('Error fetching season for expiry check:', e);
+        }
+        const expiryMillis = expiryDays * 24 * 60 * 60 * 1000;
+
+        if ((reqAt > 0 && (now - reqAt) > expiryMillis) || (gameAt > 0 && gameAt < now)) {
+            // Trigger Cleanup für die ganze Saison, wenn wir schon dabei sind
+            await BookingService._runLazySync(bookingData.seasonId);
+            throw new Error('Diese Anfrage ist bereits abgelaufen und kann nicht mehr beantwortet werden.');
+        }
 
         if (bookingData.status !== 'pending_away_confirm') {
             throw new Error('Es liegt keine offene Anfrage für dieses Spiel vor.');
@@ -1066,7 +1199,8 @@ class BookingService {
             // KORREKTUR: Robuste Prüfung, ob .toDate() existiert. Falls nicht, wird das Datum als String behandelt.
             if (!booking.date) return false; // Sicherheitsprüfung für den Fall, dass das Datum fehlt.
             const bookingDate = booking.date.toDate ? booking.date.toDate() : new Date(booking.date);
-            return booking.status === 'confirmed' && bookingDate < now;
+            // NEU: Prüfe auch auf Vorhandensein beider Teams
+            return booking.status === 'confirmed' && bookingDate < now && booking.homeTeamId && booking.awayTeamId;
         });
 
         if (pastBookings.length === 0) {
@@ -1107,8 +1241,8 @@ class BookingService {
             throw new Error('Saison-ID und Team-ID sind erforderlich.');
         }
 
-        // Automatisches Aufräumen abgelaufener Anfragen (Lazy Cleanup)
-        await BookingService.cleanupExpiredRequests(seasonId);
+        // Automatisches Aufräumen und Synchronisieren (Lazy Sync)
+        await BookingService._runLazySync(seasonId);
 
         // Erstelle Datum für "jetzt" - setze Zeit auf Anfang des aktuellen Tages, 
         // um auch Spiele des heutigen Tages einzubeziehen

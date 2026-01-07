@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -15,10 +15,8 @@ import {
     Select,
     MenuItem,
     TextField,
-    Grid,
     CircularProgress,
     Alert,
-    Autocomplete,
     useTheme,
     useMediaQuery,
     Divider
@@ -32,7 +30,7 @@ import * as seasonApi from '../../services/seasonApiService';
 const steps = ['Spielart', 'Platzwahl', 'Details & Buchung'];
 
 const CreateGameModal = ({ open, onClose, onGameCreated }) => {
-    const { currentUser, teamId } = useAuth();
+    const { teamId } = useAuth();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -67,14 +65,8 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
     const [selectedSlotId, setSelectedSlotId] = useState(''); // For official
     const [opponentId, setOpponentId] = useState('');
 
-    useEffect(() => {
-        if (open) {
-            loadInitialData();
-            resetForm();
-        }
-    }, [open]);
 
-    const resetForm = () => {
+    const resetForm = useCallback(() => {
         setActiveStep(0);
         setGameType('league'); // Default: league
         setPitchSelection('');
@@ -86,9 +78,9 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
         setOpponentId('');
         setError('');
         setSuccess('');
-    };
+    }, []);
 
-    const loadInitialData = async () => {
+    const loadInitialData = useCallback(async () => {
         setLoading(true);
         try {
             const [season, teamsData, pitchesData] = await Promise.all([
@@ -112,23 +104,31 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [teamId]);
 
-    // Fetch available slots when official pitch is selected (or just fetch all once)
     useEffect(() => {
-        if (activeSeason) {
-            fetchAvailableSlots();
+        if (open) {
+            loadInitialData();
+            resetForm();
         }
-    }, [activeSeason]);
+    }, [open, loadInitialData, resetForm]);
 
-    const fetchAvailableSlots = async () => {
+    const fetchAvailableSlots = useCallback(async () => {
+        if (!activeSeason) return;
         try {
             const slots = await bookingApi.getAvailableBookings(activeSeason.id);
             setAvailableSlots(slots);
         } catch (err) {
             console.error("Error fetching slots:", err);
         }
-    };
+    }, [activeSeason]);
+
+    // Fetch available slots when official pitch is selected (or just fetch all once)
+    useEffect(() => {
+        if (activeSeason) {
+            fetchAvailableSlots();
+        }
+    }, [activeSeason, fetchAvailableSlots]);
 
     // Update available dates based on game type and selected pitch (if official)
     useEffect(() => {
@@ -138,10 +138,14 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
                 // Must match selected pitch
                 if (s.pitchId !== pitchSelection) return false;
 
-                // Friendly filter: If friendly game, slot must be friendly OR released for friendly games by time.
-                // If league game, slot must NOT be friendly.
                 const slotDateMillis = s.date._seconds * 1000;
                 const now = Date.now();
+
+                // NEU: Nur zukünftige Termine
+                if (slotDateMillis <= now) return false;
+
+                // Friendly filter: If friendly game, slot must be friendly OR released for friendly games by time.
+                // If league game, slot must NOT be friendly.
                 const releaseHours = activeSeason?.friendlyGamesReleaseHours || 48;
                 const releaseMillis = releaseHours * 60 * 60 * 1000;
                 const isReleasedByTime = (slotDateMillis - now) < releaseMillis;
@@ -165,7 +169,7 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
                 setSelectedSlotId('');
             }
         }
-    }, [pitchSelection, pitchSourceType, gameType, availableSlots]);
+    }, [pitchSelection, pitchSourceType, gameType, availableSlots, activeSeason?.friendlyGamesReleaseHours, selectedDate]);
 
     const handlePitchChange = (e) => {
         const value = e.target.value;
@@ -551,20 +555,32 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
                             >
                                 {availableSlots
                                     .filter(s => {
-                                        const d = new Date(s.date._seconds * 1000);
+                                        const slotDateMillis = s.date._seconds * 1000;
+                                        const d = new Date(slotDateMillis);
+                                        const now = Date.now();
+
                                         // Date match
                                         if (d.toLocaleDateString('de-DE') !== selectedDate) return false;
                                         // Pitch match
                                         if (s.pitchId !== pitchSelection) return false;
+                                        // Future match
+                                        if (slotDateMillis <= now) return false;
+
                                         // Friendly match
-                                        if (gameType === 'friendly') return s.friendly === true;
+                                        const releaseHours = activeSeason?.friendlyGamesReleaseHours || 48;
+                                        const releaseMillis = releaseHours * 60 * 60 * 1000;
+                                        const isReleasedByTime = (slotDateMillis - now) < releaseMillis;
+
+                                        if (gameType === 'friendly') {
+                                            return s.friendly === true || isReleasedByTime;
+                                        }
                                         return !s.friendly;
                                     })
                                     .map(s => {
                                         const d = new Date(s.date._seconds * 1000);
                                         const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
                                         // Resolve pitch name from pitches list
-                                        const pName = pitches.find(p => p.id === s.pitchId)?.name || 'Unbekannter Platz';
+                                        // const pName = pitches.find(p => p.id === s.pitchId)?.name || 'Unbekannter Platz';
                                         return (
                                             <MenuItem key={s.id} value={s.id}>
                                                 {time} Uhr

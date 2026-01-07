@@ -24,6 +24,7 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const resultRoutes = require('./routes/resultRoutes');
 const userRoutes = require('./routes/userRoutes');
 const newsRoutes = require('./routes/newsRoutes');
+const websiteRoutes = require('./routes/websiteRoutes');
 
 
 const db = getFirestore();
@@ -33,7 +34,7 @@ const app = express();
 const port = process.env.PORT || 3001; // KORREKTUR: Diese Zeile fehlte.
 
 app.use(cors({
-  origin: 'http://localhost:3000' 
+  origin: 'http://localhost:3000'
 }));
 
 app.use(express.json());
@@ -58,6 +59,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/users', userRoutes); // NEU: Benutzer-Routen registrieren
 app.use('/api/news', newsRoutes); // NEU: News-Routen registrieren
+app.use('/api/website', websiteRoutes); // NEU: Website-Routen registrieren
 
 
 // 5. Den Server starten
