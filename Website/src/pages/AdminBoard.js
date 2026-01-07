@@ -91,7 +91,7 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
         }
     };
 
-    const getTeamName = (teamId) => teams.find(t => t.id === teamId)?.name || 'Unbekannt';
+    const getTeamName = (teamId) => teams.find(t => String(t.id) === String(teamId))?.name || 'Unbekannt';
     // HINWEIS: getPitchName wird hier nicht mehr benötigt, da BookingManager das selbst lösen muss.
 
     if (!isAdmin) {

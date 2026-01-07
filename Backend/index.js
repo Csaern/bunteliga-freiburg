@@ -66,3 +66,5 @@ app.use('/api/website', websiteRoutes); // NEU: Website-Routen registrieren
 app.listen(port, () => {
   console.log(`Bunte Liga Freiburg Backend läuft auf http://localhost:${port}`);
 });
+
+// Force restart trigger

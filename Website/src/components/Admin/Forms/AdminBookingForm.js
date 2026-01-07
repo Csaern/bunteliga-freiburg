@@ -254,7 +254,15 @@ const AdminBookingForm = ({
                     <Select
                         value={formData.homeTeamId}
                         label="Heim"
-                        onChange={(e) => setFormData({ ...formData, homeTeamId: e.target.value, awayTeamId: '' })} // Reset away team on change
+                        onChange={(e) => {
+                            const newHomeId = e.target.value;
+                            setFormData(prev => ({
+                                ...prev,
+                                homeTeamId: newHomeId,
+                                awayTeamId: '', // Reset away team on change
+                                status: !newHomeId ? 'available' : prev.status
+                            }));
+                        }}
                         MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}
                     >
                         <MenuItem value=""><em>-</em></MenuItem>
@@ -269,7 +277,17 @@ const AdminBookingForm = ({
                     <Select
                         value={formData.awayTeamId}
                         label="Auswärts"
-                        onChange={(e) => setFormData({ ...formData, awayTeamId: e.target.value })}
+                        onChange={(e) => {
+                            const newAwayId = e.target.value;
+                            setFormData(prev => ({
+                                ...prev,
+                                awayTeamId: newAwayId,
+                                // Auto-set status to confirmed if we have both teams and status was available
+                                status: (prev.homeTeamId && newAwayId && prev.status === 'available')
+                                    ? 'confirmed'
+                                    : prev.status
+                            }));
+                        }}
                         MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}
                     >
                         <MenuItem value=""><em>-</em></MenuItem>

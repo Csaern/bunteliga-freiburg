@@ -67,13 +67,11 @@ const AdminDashboard = () => {
       setCurrentSeason(activeSeason);
 
       // Lade Statistiken und Daten für Aktionen
-      const [teamsArr, bookingsArr, resultsArr, pitchesArr, pendingResultsBookings] = await Promise.all([
+      const [teamsArr, bookingsArr, resultsArr, usersArr, pitchesArr, pendingResultsBookings] = await Promise.all([
         teamApi.getAllTeams().catch(() => []),
         activeSeason?.id ? bookingApi.getBookingsForSeason(activeSeason.id).catch(() => []) : Promise.resolve([]),
         activeSeason?.id ? resultApi.getResultsForSeason(activeSeason.id).catch(() => []) : Promise.resolve([]),
-        userApiService.getAllUsers().catch(() => {
-          return [];
-        }),
+        userApiService.getAllUsers().catch(() => []),
         pitchApi.getAllPitches().catch(() => []),
         activeSeason?.id ? bookingApi.getBookingsNeedingResult(activeSeason.id).catch(() => []) : Promise.resolve([]),
       ]);
@@ -158,7 +156,7 @@ const AdminDashboard = () => {
   }, [currentUser, isAdmin, navigate, fetchData]);
 
   const getTeamName = (id, teams) => {
-    const t = teams.find(team => team.id === id);
+    const t = teams.find(team => String(team.id) === String(id));
     return t ? t.name : 'Unbekannt';
   };
 
