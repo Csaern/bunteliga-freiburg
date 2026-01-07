@@ -67,7 +67,7 @@ const AdminDashboard = () => {
       setCurrentSeason(activeSeason);
 
       // Lade Statistiken und Daten für Aktionen
-      const [teamsArr, bookingsArr, resultsArr, pitchesArr, pendingResultsBookings] = await Promise.all([
+      const [teamsArr, bookingsArr, resultsArr, usersArr, pitchesArr, pendingResultsBookings] = await Promise.all([
         teamApi.getAllTeams().catch(() => []),
         activeSeason?.id ? bookingApi.getBookingsForSeason(activeSeason.id).catch(() => []) : Promise.resolve([]),
         activeSeason?.id ? resultApi.getResultsForSeason(activeSeason.id).catch(() => []) : Promise.resolve([]),
