@@ -74,6 +74,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportForm, setReportForm] = useState({ homeScore: '', awayScore: '' });
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [hoveredFixtureId, setHoveredFixtureId] = useState(null);
 
   // Robust date normalization for Firestore Timestamp, {_seconds, _nanoseconds}, or ISO string
   // Firestore Timestamps werden als {_seconds, _nanoseconds} serialisiert, wenn sie über JSON gesendet werden
@@ -296,8 +297,8 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             isPast: true,
             location: r.location || (booking && booking.pitchId ? null : 'Unbekannt'),
             pitchId: booking ? booking.pitchId : null,
-            homeTeamName: r.homeTeamName,
-            awayTeamName: r.awayTeamName
+            awayTeamName: r.awayTeamName,
+            friendly: booking ? booking.friendly : false
           };
         }));
       }
@@ -339,7 +340,8 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
             awayScore: null,
             isPast: false,
             pitchId: b.pitchId,
-            location: pitchesMapLocal[b.pitchId] || 'Unbekannt'
+            location: pitchesMapLocal[b.pitchId] || 'Unbekannt',
+            friendly: b.friendly // Ensure friendly flag is passed
           };
         }));
       }
@@ -385,9 +387,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       if (isNaN(parsed.getTime())) {
         return '';
       }
-      return parsed.toLocaleDateString('de-DE', { weekday: 'short' });
+      return parsed.toLocaleDateString('de-DE', { weekday: 'long' });
     }
-    return date.toLocaleDateString('de-DE', { weekday: 'short' });
+    return date.toLocaleDateString('de-DE', { weekday: 'long' });
   };
 
   const handleFixtureClick = async (fixture) => {
@@ -528,7 +530,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   return (
     <Wrapper {...wrapperProps}>
       <Typography
-        variant={isMobile ? 'h4' : 'h3'}
+        variant={isMobile ? 'h5' : 'h3'}
         sx={{
           mb: isMobile ? 1.5 : 3,
           mt: 2,
@@ -548,153 +550,200 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
           border: `1px solid ${theme.palette.divider}`,
+          overflowX: 'auto',
         }}
       >
-        <Table aria-label="Spielplan Tabelle" size="small">
+        <Table aria-label="Spielplan Tabelle" size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.action.hover, height: rowHeight / 1.5 }}>
               {details && (
-                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '25%' : '15%' }}>
+                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '25%' : '12%' }}>
                   {isMobile ? 'Datum/Zeit' : 'Datum'}
                 </StyledTableCell>
               )}
               {details && (
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '10%' }} hideOnMobile={true}>
+                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '11%' }} hideOnMobile={true}>
                   Uhrzeit
                 </StyledTableCell>
               )}
+              {details && (
+                <StyledTableCell sx={{ width: '2%', p: 0 }} hideOnMobile={true}></StyledTableCell>
+              )}
 
               <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Heim</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '15%' }}>Erg.</StyledTableCell>
+              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '15%' }}></StyledTableCell>
               <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Auswärts</StyledTableCell>
 
-              {details && (
-                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '15%' }} hideOnMobile={showType !== 'upcoming'}>
-                  Ort
-                </StyledTableCell>
-              )}
             </TableRow>
           </TableHead>
           <TableBody>
             {fixtures.map((fixture) => {
               return (
-                <TableRow
-                  key={fixture.id}
-                  onClick={() => handleFixtureClick(fixture)}
-                  sx={{
-                    '&:hover': { backgroundColor: theme.palette.action.hover },
-                    opacity: 1, // Full opacity for readability
-                    height: rowHeight,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {details && (
-                    <StyledTableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'center' : 'flex-start', textAlign: isMobile ? 'center' : 'left' }}>
-                        {!isMobile && (
-                          <Typography variant="caption" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, fontSize: '0.7rem', lineHeight: 1.2 }}>
-                            {getWeekday(fixture.date)}
-                          </Typography>
+
+                <React.Fragment key={fixture.id}>
+                  <TableRow
+                    onClick={() => handleFixtureClick(fixture)}
+                    onMouseEnter={() => setHoveredFixtureId(fixture.id)}
+                    onMouseLeave={() => setHoveredFixtureId(null)}
+                    sx={{
+                      backgroundColor: hoveredFixtureId === fixture.id ? theme.palette.action.hover : 'inherit',
+                      opacity: 1, // Full opacity for readability
+                      height: rowHeight,
+                      cursor: 'pointer',
+                      // borderBottom: (details) ? 'none' : undefined // Removed to allow border on spanning cells
+                    }}
+                  >
+                    {details && (
+                      <StyledTableCell sx={{ pl: isMobile ? 0.2 : 3, verticalAlign: 'middle', borderBottom: isMobile ? undefined : 'none' }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'center' : 'flex-start', textAlign: isMobile ? 'center' : 'left' }}>
+                          {!isMobile && (
+                            <React.Fragment>
+                              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: '1rem', fontWeight: 'bold', lineHeight: 1.2 }}>
+                                {formatDate(fixture.date)}
+                              </Typography>
+                            </React.Fragment>
+                          )}
+
+                          {isMobile && (
+                            <React.Fragment>
+                              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: '0.75rem', fontWeight: 'bold', lineHeight: 1.2 }}>
+                                {formatDate(fixture.date)}
+                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mt: 0.5 }}>
+                                <Typography variant="caption" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, fontSize: '0.7rem', lineHeight: 1.2 }}>
+                                  {fixture.time} Uhr
+                                </Typography>
+                                {fixture.friendly && (
+                                  <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.7rem', lineHeight: 1 }}>F</Typography>
+                                )}
+                              </Box>
+                            </React.Fragment>
+                          )}
+                        </Box>
+                      </StyledTableCell>
+                    )}
+                    {details && (
+                      <StyledTableCell align="center" hideOnMobile={true} sx={{ verticalAlign: 'middle', borderBottom: 'none' }}>
+                        {/* Removed manual pt/mt manipulations for better alignment */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography sx={{ fontSize: '1rem', fontFamily: 'Comfortaa' }}>{fixture.time} Uhr</Typography>
+                        </Box>
+                      </StyledTableCell>
+                    )}
+                    {details && (
+                      <StyledTableCell
+                        rowSpan={(!isMobile && details) ? 2 : 1}
+                        align="left"
+                        hideOnMobile={true}
+                        sx={{ verticalAlign: 'middle', pl: 0, pr: 0 }}
+                      >
+                        {fixture.friendly && (
+                          <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '1rem' }}>F</Typography>
                         )}
-                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: isMobile ? '0.6rem' : '0.8rem', lineHeight: 1.2 }}>
-                          {formatDate(fixture.date)}
+                      </StyledTableCell>
+                    )}
+
+                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} sx={{}}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
+                        <Avatar
+                          variant="rounded"
+                          alt={`${teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'} Logo`}
+                          src={getLogoUrl(teams[fixture.homeTeamId])}
+                          sx={{
+                            width: isMobile ? 28 : 32, // Etwas größer für bessere Sichtbarkeit
+                            height: isMobile ? 28 : 32,
+                            mb: 0.5,
+                            fontSize: isMobile ? '0.7rem' : '0.7rem',
+                            color: theme.palette.getContrastText(teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]),
+                            backgroundColor: 'transparent', // Kein Hintergrund für freigestellte Logos
+                            // border: teams[fixture.homeTeamId]?.logoUrl ? `1px solid ${teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none',
+                            '& img': {
+                              objectFit: 'contain',
+                              width: '100%',
+                              height: '100%',
+                            }
+                          }}
+                        >
+                          {!teams[fixture.homeTeamId]?.logoUrl && (teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'U').substring(0, 1).toUpperCase()}
+                        </Avatar>
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.75rem' : '0.95rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                          {teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'}
                         </Typography>
-                        {isMobile && (
-                          <Typography variant="caption" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, fontSize: '0.55rem', mt: 0.25, lineHeight: 1.2 }}>
-                            {fixture.time} Uhr
-                          </Typography>
-                        )}
                       </Box>
                     </StyledTableCell>
-                  )}
-                  {details && (
-                    <StyledTableCell align="center" hideOnMobile={true}>{fixture.time}</StyledTableCell>
-                  )}
-
-                  <StyledTableCell>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
-                      <Avatar
-                        variant="rounded"
-                        alt={`${teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'} Logo`}
-                        src={getLogoUrl(teams[fixture.homeTeamId])}
-                        sx={{
-                          width: isMobile ? 28 : 32, // Etwas größer für bessere Sichtbarkeit
-                          height: isMobile ? 28 : 32,
-                          mb: 0.5,
-                          fontSize: isMobile ? '0.7rem' : '0.7rem',
-                          color: theme.palette.getContrastText(teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: 'transparent', // Kein Hintergrund für freigestellte Logos
-                          // border: teams[fixture.homeTeamId]?.logoUrl ? `1px solid ${teams[fixture.homeTeamId]?.logoColor || theme.palette.grey[700]}` : 'none',
-                          '& img': {
-                            objectFit: 'contain',
-                            width: '100%',
-                            height: '100%',
-                          }
-                        }}
-                      >
-                        {!teams[fixture.homeTeamId]?.logoUrl && (teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'U').substring(0, 1).toUpperCase()}
-                      </Avatar>
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.75rem' : '0.95rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
-                        {teams[fixture.homeTeamId]?.name || fixture.homeTeamName || 'Unbekannt'}
-                      </Typography>
-                    </Box>
-                  </StyledTableCell>
-                  <StyledTableCell align="center" sx={{ fontWeight: 'bold' }}>
-                    {fixture.isPast ? (
-                      <Chip
-                        label={`${fixture.homeScore} : ${fixture.awayScore}`}
-                        size="small"
-                        sx={{
-                          fontFamily: 'Comfortaa',
-                          fontWeight: 'bold',
-                          backgroundColor: theme.palette.action.selected,
-                          color: theme.palette.text.primary,
-                          fontSize: isMobile ? '0.6rem' : '0.8rem',
-                          height: isMobile ? '16px' : '22px',
-                          lineHeight: isMobile ? '16px' : '22px',
-                          px: isMobile ? 0.5 : 1
-                        }}
-                      />
-                    ) : (
-                      <Typography variant="caption" sx={{ color: theme.palette.text.disabled, fontSize: isMobile ? '0.65rem' : 'inherit' }}>vs.</Typography>
-                    )}
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
-                      <Avatar
-                        variant="rounded"
-                        alt={`${teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'} Logo`}
-                        src={getLogoUrl(teams[fixture.awayTeamId])}
-                        sx={{
-                          width: isMobile ? 28 : 32,
-                          height: isMobile ? 28 : 32,
-                          mb: 0.5,
-                          fontSize: isMobile ? '0.7rem' : '0.7rem',
-                          color: theme.palette.getContrastText(teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]),
-                          backgroundColor: 'transparent',
-                          // border: teams[fixture.awayTeamId]?.logoUrl ? `1px solid ${teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none',
-                          '& img': {
-                            objectFit: 'contain',
-                            width: '100%',
-                            height: '100%',
-                          }
-                        }}
-                      >
-                        {!teams[fixture.awayTeamId]?.logoUrl && (teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'U').substring(0, 1).toUpperCase()}
-                      </Avatar>
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.75rem' : '0.95rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
-                        {teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'}
-                      </Typography>
-                    </Box>
-                  </StyledTableCell>
-
-                  {details && (
-                    <StyledTableCell hideOnMobile={showType !== 'upcoming'}>
-                      {fixture.location || (fixture.pitchId && pitchesMap[fixture.pitchId]) || 'Unbekannt'}
+                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} align="center" sx={{ fontWeight: 'bold' }}>
+                      {fixture.isPast ? (
+                        <Chip
+                          label={`${fixture.homeScore} : ${fixture.awayScore}`}
+                          size="small"
+                          sx={{
+                            fontFamily: 'Comfortaa',
+                            fontWeight: 'bold',
+                            backgroundColor: theme.palette.action.selected,
+                            color: theme.palette.text.primary,
+                            fontSize: isMobile ? '0.6rem' : '0.8rem',
+                            height: isMobile ? '16px' : '22px',
+                            lineHeight: isMobile ? '16px' : '22px',
+                            px: isMobile ? 0.5 : 1
+                          }}
+                        />
+                      ) : (
+                        <Typography variant="caption" sx={{ color: theme.palette.text.disabled, fontSize: isMobile ? '0.65rem' : 'inherit' }}>vs.</Typography>
+                      )}
                     </StyledTableCell>
+                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} sx={{}}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
+                        <Avatar
+                          variant="rounded"
+                          alt={`${teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'} Logo`}
+                          src={getLogoUrl(teams[fixture.awayTeamId])}
+                          sx={{
+                            width: isMobile ? 28 : 32,
+                            height: isMobile ? 28 : 32,
+                            mb: 0.5,
+                            fontSize: isMobile ? '0.7rem' : '0.7rem',
+                            color: theme.palette.getContrastText(teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]),
+                            backgroundColor: 'transparent',
+                            // border: teams[fixture.awayTeamId]?.logoUrl ? `1px solid ${teams[fixture.awayTeamId]?.logoColor || theme.palette.grey[700]}` : 'none',
+                            '& img': {
+                              objectFit: 'contain',
+                              width: '100%',
+                              height: '100%',
+                            }
+                          }}
+                        >
+                          {!teams[fixture.awayTeamId]?.logoUrl && (teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'U').substring(0, 1).toUpperCase()}
+                        </Avatar>
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: isMobile ? '0.75rem' : '0.95rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                          {teams[fixture.awayTeamId]?.name || fixture.awayTeamName || 'Unbekannt'}
+                        </Typography>
+                      </Box>
+                    </StyledTableCell>
+
+                    {/* <StyledTableCell> removed for Layout change */}
+                  </TableRow>
+                  {/* Location Row - Visible on Mobile AND Desktop now */}
+                  {details && (
+                    <TableRow
+                      onClick={() => handleFixtureClick(fixture)}
+                      onMouseEnter={() => setHoveredFixtureId(fixture.id)}
+                      onMouseLeave={() => setHoveredFixtureId(null)}
+                      sx={{
+                        cursor: 'pointer',
+                        backgroundColor: hoveredFixtureId === fixture.id ? theme.palette.action.hover : 'inherit',
+                      }}
+                    >
+                      {/* Left align on Desktop, Center on Mobile */}
+                      <StyledTableCell colSpan={isMobile ? 4 : 2} align="center" sx={{ pt: 0, pb: 1, borderBottom: `1px solid ${theme.palette.divider}`, borderTop: 'none' }}>
+                        <Typography variant="caption" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, fontSize: isMobile ? '0.7rem' : '0.85rem' }}>
+                          {fixture.location || (fixture.pitchId && pitchesMap[fixture.pitchId]) || 'Unbekannt'}
+                        </Typography>
+                      </StyledTableCell>
+                    </TableRow>
                   )}
-                </TableRow>
+                </React.Fragment>
               );
+
             })}
           </TableBody>
         </Table>

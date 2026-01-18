@@ -34,6 +34,7 @@ const DashboardPage = () => {
   const [pendingMyRequests, setPendingMyRequests] = useState([]);
   const [pendingResults, setPendingResults] = useState([]);
   const [pendingMyResults, setPendingMyResults] = useState([]);
+  const [notificationBookings, setNotificationBookings] = useState([]); // NEU: Fehlende Ergebnisse
   const [teamsMap, setTeamsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentSeason, setCurrentSeason] = useState(null);
@@ -134,7 +135,7 @@ const DashboardPage = () => {
         const myRequests = upcoming.filter(b => b.status === 'pending_away_confirm' && b.homeTeamId === teamId);
         setPendingMyRequests(myRequests);
 
-        // Pending results
+        // Pending results (confirmed by me vs reported by me)
         const pendingRes = await resultApi.getPendingResultsForMyTeam().catch(() => []);
         const filteredPendingRes = pendingRes.filter(r => r.seasonId === activeSeason.id && (r.homeTeamId === teamId || r.awayTeamId === teamId));
 
@@ -143,6 +144,10 @@ const DashboardPage = () => {
 
         setPendingResults(toConfirm);
         setPendingMyResults(myReports);
+
+        // NEU: Spiele, für die noch kein Ergebnis gemeldet wurde (Vergangene, bestätigte Spiele)
+        const needingResult = await bookingApi.getBookingsNeedingResultForMyTeam(activeSeason.id).catch(() => []);
+        setNotificationBookings(needingResult);
       }
     } catch (error) {
       console.error("Fehler beim Laden der Dashboard-Daten:", error);
@@ -215,7 +220,7 @@ const DashboardPage = () => {
     });
   };
 
-  const loadReportOptions = useCallback(async () => {
+  const loadReportOptions = useCallback(async (preSelectedBookingId = null) => {
     if (!currentSeason?.id || !teamId) {
       setReportOptions([]);
       setReportForm(prev => ({ ...prev, bookingId: '' }));
@@ -257,9 +262,18 @@ const DashboardPage = () => {
         });
 
       setReportOptions(normalized);
+
+      // Select logic: Pre-selection > existing selection > first option
+      let initialId = '';
+      if (preSelectedBookingId && uniqueById.has(preSelectedBookingId)) {
+        initialId = preSelectedBookingId;
+      } else if (normalized.length > 0) {
+        initialId = normalized[0].id;
+      }
+
       setReportForm(prev => ({
         ...prev,
-        bookingId: normalized.length > 0 ? normalized[0].id : '',
+        bookingId: initialId,
       }));
     } catch (error) {
       console.error('Fehler beim Laden der Spiele für die Ergebnismeldung:', error);
@@ -269,9 +283,10 @@ const DashboardPage = () => {
     }
   }, [currentSeason, teamId]);
 
-  const handleOpenReportModal = () => {
+  const handleOpenReportModal = (preSelectedBookingId = null) => {
     setIsReportModalOpen(true);
-    loadReportOptions();
+    // Wir laden die Optionen und setzen DANN die ID
+    loadReportOptions(preSelectedBookingId);
   };
 
   const handleCloseReportModal = () => {
@@ -510,14 +525,14 @@ const DashboardPage = () => {
             <Grid container spacing={1} justifyContent="space-around" alignItems="center">
               {renderIconButton('Platz buchen', <EventIcon />, '/platzreservierung', '#4CAF50', null)}
               {renderIconButton('Neues Spiel', <AddCircleOutlineIcon />, null, '#2196F3', () => setIsCreateGameModalOpen(true))}
-              {renderIconButton('Ergebnis melden', <PostAddIcon />, null, '#FFB74D', handleOpenReportModal)}
+              {renderIconButton('Ergebnis melden', <PostAddIcon />, null, '#FFB74D', () => handleOpenReportModal())}
               {teamId && renderIconButton('Team-Einstellungen', <SettingsIcon />, null, '#9C27B0', () => setShowTeamSettings(true))}
             </Grid>
           </Paper>
         </Grid>
 
         {/* Pending Requests */}
-        {(pendingResults.length > 0 || pendingGameRequests.length > 0 || pendingMyRequests.length > 0 || pendingMyResults.length > 0) && (
+        {(notificationBookings.length > 0 || pendingResults.length > 0 || pendingGameRequests.length > 0 || pendingMyRequests.length > 0 || pendingMyResults.length > 0) && (
           <Grid>
             <Typography
               variant="h5"
@@ -533,6 +548,64 @@ const DashboardPage = () => {
               Ausstehende Aktionen
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              {/* NEU: Wichtigste Notification zuerst - Ergebnis melden */}
+              {notificationBookings.map(booking => (
+                <Paper key={booking.id} sx={{ ...sectionCardSx, borderColor: theme.palette.warning.main, borderWidth: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
+                      Ergebnis melden
+                    </Typography>
+                    <Chip
+                      label="Ergebnis"
+                      color="warning"
+                      size="small"
+                      sx={{
+                        fontFamily: 'Comfortaa',
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                      {renderTeamLogo(booking.homeTeamId)}
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                        {teamsMap[booking.homeTeamId]?.name}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ minWidth: '60px', display: 'flex', justifyContent: 'center' }}>
+                      <Typography variant="body1" sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.secondary }}>
+                        vs.
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                      {renderTeamLogo(booking.awayTeamId)}
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                        {teamsMap[booking.awayTeamId]?.name}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', mb: 1 }}>
+                    Das Spiel fand am {normalizeDate(booking.date)?.toLocaleDateString('de-DE') || '-'} statt.
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="warning" // Changed to warning to match the icon
+                      startIcon={<PostAddIcon />}
+                      onClick={() => handleOpenReportModal(booking.id)}
+                    >
+                      Melden
+                    </Button>
+                  </Box>
+                </Paper>
+              ))}
+
               {pendingResults.map(result => (
                 <Paper key={result.id} sx={sectionCardSx}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -540,7 +613,7 @@ const DashboardPage = () => {
                       Ergebnisbestätigung
                     </Typography>
                     <Chip
-                      label="Bestätigung ausstehend"
+                      label="Warten"
                       color="warning"
                       size="small"
                       sx={{
@@ -552,16 +625,37 @@ const DashboardPage = () => {
                       }}
                     />
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    {renderTeamLogo(result.homeTeamId)}
-                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
-                      {teamsMap[result.homeTeamId]?.name} vs. {teamsMap[result.awayTeamId]?.name}
-                    </Typography>
-                    {renderTeamLogo(result.awayTeamId)}
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                      {renderTeamLogo(result.homeTeamId)}
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                        {teamsMap[result.homeTeamId]?.name}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ minWidth: '80px', display: 'flex', justifyContent: 'center' }}>
+                      <Chip
+                        label={`${result.homeScore} : ${result.awayScore}`}
+                        sx={{
+                          fontFamily: 'Comfortaa',
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          height: 'auto',
+                          py: 0.5,
+                          backgroundColor: theme.palette.action.selected
+                        }}
+                      />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                      {renderTeamLogo(result.awayTeamId)}
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                        {teamsMap[result.awayTeamId]?.name}
+                      </Typography>
+                    </Box>
                   </Box>
-                  <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 700 }}>
-                    {result.homeScore} : {result.awayScore}
-                  </Typography>
+
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleConfirmPendingResult(result)}>
                       Bestätigen
@@ -579,7 +673,7 @@ const DashboardPage = () => {
                       Ergebnis gemeldet
                     </Typography>
                     <Chip
-                      label="Warte auf Bestätigung"
+                      label="Warten"
                       size="small"
                       sx={{
                         fontFamily: 'Comfortaa',
@@ -590,16 +684,37 @@ const DashboardPage = () => {
                       }}
                     />
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    {renderTeamLogo(result.homeTeamId)}
-                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
-                      {teamsMap[result.homeTeamId]?.name} vs. {teamsMap[result.awayTeamId]?.name}
-                    </Typography>
-                    {renderTeamLogo(result.awayTeamId)}
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                      {renderTeamLogo(result.homeTeamId)}
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                        {teamsMap[result.homeTeamId]?.name}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ minWidth: '80px', display: 'flex', justifyContent: 'center' }}>
+                      <Chip
+                        label={`${result.homeScore} : ${result.awayScore}`}
+                        sx={{
+                          fontFamily: 'Comfortaa',
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          height: 'auto',
+                          py: 0.5,
+                          backgroundColor: theme.palette.action.selected
+                        }}
+                      />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                      {renderTeamLogo(result.awayTeamId)}
+                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                        {teamsMap[result.awayTeamId]?.name}
+                      </Typography>
+                    </Box>
                   </Box>
-                  <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 700 }}>
-                    {result.homeScore} : {result.awayScore}
-                  </Typography>
+
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelReport(result.id)}>
                       Stornieren
@@ -633,7 +748,7 @@ const DashboardPage = () => {
                           />
                         )}
                         <Chip
-                          label="Antwort erforderlich"
+                          label="Antworten"
                           size="small"
                           sx={{
                             fontFamily: 'Comfortaa',
@@ -645,17 +760,33 @@ const DashboardPage = () => {
                         />
                       </Box>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      {renderTeamLogo(booking.homeTeamId)}
-                      <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
-                        {teamsMap[booking.homeTeamId]?.name} vs. {teamsMap[booking.awayTeamId]?.name}
-                      </Typography>
-                      {renderTeamLogo(booking.awayTeamId)}
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                        {renderTeamLogo(booking.homeTeamId)}
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                          {teamsMap[booking.homeTeamId]?.name}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ minWidth: '60px', display: 'flex', justifyContent: 'center' }}>
+                        <Typography variant="body1" sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.secondary }}>
+                          vs.
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                        {renderTeamLogo(booking.awayTeamId)}
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                          {teamsMap[booking.awayTeamId]?.name}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
+
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 1 }}>
                       {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
                     </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1 }}>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                         <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleAcceptBookingRequest(booking.id)}>
                           Annehmen
@@ -702,7 +833,7 @@ const DashboardPage = () => {
                           />
                         )}
                         <Chip
-                          label="Anfrage ausstehend"
+                          label="Anfrage"
                           size="small"
                           sx={{
                             fontFamily: 'Comfortaa',
@@ -714,17 +845,33 @@ const DashboardPage = () => {
                         />
                       </Box>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      {renderTeamLogo(booking.homeTeamId)}
-                      <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', fontSize: '0.9rem' }}>
-                        {teamsMap[booking.homeTeamId]?.name} vs. {teamsMap[booking.awayTeamId]?.name}
-                      </Typography>
-                      {renderTeamLogo(booking.awayTeamId)}
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                        {renderTeamLogo(booking.homeTeamId)}
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                          {teamsMap[booking.homeTeamId]?.name}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ minWidth: '60px', display: 'flex', justifyContent: 'center' }}>
+                        <Typography variant="body1" sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.secondary }}>
+                          vs.
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
+                        {renderTeamLogo(booking.awayTeamId)}
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
+                          {teamsMap[booking.awayTeamId]?.name}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>
+
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 1 }}>
                       {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
                     </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1 }}>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                         <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelMyRequest(booking.id)}>
                           Stornieren
@@ -748,17 +895,17 @@ const DashboardPage = () => {
 
         {/* Upcoming Games using DynamicFixtureList */}
         <Grid>
-          <DynamicFixtureList title="BEVORSTEHENDE SPIELE" details={true} seasonId={currentSeason?.id} showType="upcoming" userTeamId={teamId} />
+          <DynamicFixtureList title="BEVORSTEHENDE SPIELE" details={true} seasonId={currentSeason?.id} showType="upcoming" userTeamId={teamId} disableContainer={true} />
         </Grid>
 
         {/* League Table */}
         <Grid>
-          <DynamicLeagueTable title="AKTUELLE TABELLE" form={false} seasonId={currentSeason?.id} userTeamId={teamId} />
+          <DynamicLeagueTable title="AKTUELLE TABELLE" form={false} seasonId={currentSeason?.id} userTeamId={teamId} disableContainer={true} />
         </Grid>
 
         {/* Past Games */}
         <Grid>
-          <DynamicFixtureList title="VERGANGENE SPIELE" details={false} seasonId={currentSeason?.id} showType="results" userTeamId={teamId} />
+          <DynamicFixtureList title="VERGANGENE SPIELE" details={false} seasonId={currentSeason?.id} showType="results" userTeamId={teamId} disableContainer={true} />
         </Grid>
       </Grid>
 

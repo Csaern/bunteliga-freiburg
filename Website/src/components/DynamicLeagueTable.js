@@ -413,7 +413,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
   return (
     <Wrapper {...wrapperProps}>
       <Typography
-        variant={isMobile ? 'h4' : 'h3'}
+        variant={isMobile ? 'h5' : 'h3'}
         sx={{
           mb: 2,
           mt: 2,
@@ -433,6 +433,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
           backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
           border: `1px solid ${theme.palette.divider}`,
+          overflowX: 'auto',
         }}
       >
         <Table aria-label="Fußballtabelle" size="small">

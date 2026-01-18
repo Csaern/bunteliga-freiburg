@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, useTheme, useMediaQuery, Typography, TextField, InputAdornment, Select, MenuItem, FormControl, InputLabel, Checkbox, FormControlLabel, Divider, Alert, Snackbar, CircularProgress, ListItemText } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { ReusableModal } from '../Helpers/modalUtils';
-import { formatGermanDate, formatDateForSearch } from '../Helpers/dateUtils';
+import { formatGermanDate, formatDateForSearch, formatTime, createBerlinDate } from '../Helpers/dateUtils';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import * as bookingApiService from '../../services/bookingApiService';
 import * as pitchApiService from '../../services/pitchApiService';
@@ -163,7 +163,7 @@ const BookingManager = ({ currentSeason }) => {
             return;
         }
         try {
-            const combinedDate = new Date(`${data.date}T${data.time}`);
+            const combinedDate = createBerlinDate(data.date, data.time);
             const bookingData = {
                 seasonId: currentSeason.id,
                 pitchId: data.pitchId,
@@ -652,8 +652,8 @@ const BookingManager = ({ currentSeason }) => {
                             </TableHead>
                             <TableBody>
                                 {filteredBookings.sort((a, b) => new Date(a.date) - new Date(b.date)).map(booking => {
-                                    const startTime = new Date(booking.date).toTimeString().slice(0, 5);
-                                    const endTime = booking.duration ? new Date(new Date(booking.date).getTime() + booking.duration * 60000).toTimeString().slice(0, 5) : '-';
+                                    const startTime = formatTime(booking.date);
+                                    const endTime = booking.duration ? formatTime(new Date(new Date(booking.date).getTime() + booking.duration * 60000)) : '-';
                                     const timeRange = `${startTime} - ${endTime}`;
 
                                     return isMobile ? (

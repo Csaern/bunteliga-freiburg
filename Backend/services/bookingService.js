@@ -76,29 +76,82 @@ class BookingService {
         const resultsQuery1 = resultsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', homeTeamId).where('awayTeamId', '==', awayTeamId).get();
         const resultsQuery2 = resultsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', awayTeamId).where('awayTeamId', '==', homeTeamId).get();
 
-        // 2. Zähle bereits geplante, bestätigte Buchungen
-        const bookingsQuery1 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', homeTeamId).where('awayTeamId', '==', awayTeamId).where('status', 'in', ['confirmed', 'pending_away_confirm']).get();
-        const bookingsQuery2 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', awayTeamId).where('awayTeamId', '==', homeTeamId).where('status', 'in', ['confirmed', 'pending_away_confirm']).get();
+        // 2. Hole ALLE Buchungen für diese Paarung (Status & Friendly klären wir im Code)
+        const bookingsQuery1 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', homeTeamId).where('awayTeamId', '==', awayTeamId).get();
+        const bookingsQuery2 = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', awayTeamId).where('awayTeamId', '==', homeTeamId).get();
 
         const [results1, results2, bookings1, bookings2] = await Promise.all([resultsQuery1, resultsQuery2, bookingsQuery1, bookingsQuery2]);
 
         const allBookings = [...bookings1.docs, ...bookings2.docs];
-        const uniqueBookings = new Map();
-        allBookings.forEach(doc => uniqueBookings.set(doc.id, doc.data()));
+        const bookingMap = new Map();
+        allBookings.forEach(doc => bookingMap.set(doc.id, doc.data()));
+
+        let countedResults = 0;
+        const countResult = (resDoc) => {
+            const resData = resDoc.data();
+            // Check if related booking is friendly
+            if (resData.bookingId && bookingMap.has(resData.bookingId)) {
+                const b = bookingMap.get(resData.bookingId);
+                if (b.friendly) return; // Ignore friendly result
+            }
+            countedResults++;
+        };
+        results1.forEach(countResult);
+        results2.forEach(countResult);
 
         let plannedGames = 0;
-        for (const id of uniqueBookings.keys()) {
+        for (const [id, data] of bookingMap.entries()) {
             // Zähle die Buchung nur, wenn es nicht die ist, die wir ignorieren sollen.
-            if (id !== bookingIdToIgnore) {
+            if (id === bookingIdToIgnore) continue;
+
+            // Ignoriere Freundschaftsspiele
+            if (data.friendly) continue;
+
+            // Zähle nur relevante Stati für zukünftige/geplante Spiele
+            // ('played' wird über Results abgedeckt, 'cancelled'/'blocked' interessiert nicht)
+            if (['confirmed', 'pending_away_confirm'].includes(data.status)) {
                 plannedGames++;
             }
         }
 
-        const totalEncounters = results1.size + results2.size + plannedGames;
+        const totalEncounters = countedResults + plannedGames;
 
         if (totalEncounters >= allowedGames) {
             throw new Error(`Regelverletzung: Das Spiellimit von ${allowedGames} für diese Paarung in der Saison ist bereits erreicht.`);
         }
+    }
+
+    /**
+     * NEU: Erstellt ein Date-Objekt für Berlin, unabhängig von der Server-Zeitzone.
+     * @private
+     */
+    static _createBerlinDate(dateStr, timeStr) {
+        // Basis: Wir interpretieren die Eingabe als UTC
+        const utcBase = new Date(`${dateStr}T${timeStr}:00.000Z`);
+
+        // Prüffunktion: Was ist die Zeit dieses Timestamps in Berlin?
+        // Wir nutzen 'de-DE' mit options, da Node.js Intl supportet.
+        const checkBerlinTime = (d) => {
+            return new Intl.DateTimeFormat('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Europe/Berlin',
+                hour12: false
+            }).format(d);
+        };
+
+        const berlinStr = checkBerlinTime(utcBase);
+        const [berlinH, berlinM] = berlinStr.split(':').map(Number);
+        const [targetH, targetM] = timeStr.split(':').map(Number);
+
+        const targetMinutes = targetH * 60 + targetM;
+        const berlinMinutes = berlinH * 60 + berlinM;
+
+        let diffMinutes = targetMinutes - berlinMinutes;
+        if (diffMinutes > 720) diffMinutes -= 1440;
+        if (diffMinutes < -720) diffMinutes += 1440;
+
+        return new Date(utcBase.getTime() + diffMinutes * 60000);
     }
 
     /**
@@ -198,6 +251,57 @@ class BookingService {
     }
 
     /**
+     * NEU: Löscht ungenutzte Slots, die in der Vergangenheit liegen und "unberührt" sind.
+     * Absolut sicher: Status available, keine Teams, keine Freundschaftsmarkierung, Datum vorbei.
+     * @private
+     */
+    static async _cleanupUnusedPastSlots(seasonId) {
+        try {
+            const now = Date.now();
+
+            // Wir suchen Slots, die 'available' sind.
+            // Index-Hinweis: Wir filtern das Datum im Code, um Index-Probleme zu vermeiden,
+            // da 'available' Slots für eine Saison überschaubar sein sollten (oder wir limitieren).
+            const snapshot = await bookingsCollection
+                .where('seasonId', '==', seasonId)
+                .where('status', '==', 'available')
+                .get();
+
+            if (snapshot.empty) return;
+
+            const batch = db.batch();
+            let deleteCount = 0;
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const slotDateMillis = getMillisFromDate(data.date);
+
+                // 1. Datum muss in der Vergangenheit liegen
+                if (slotDateMillis === 0 || slotDateMillis >= now) return;
+
+                // 2. ABSOLUTE SICHERHEIT: Darf keinem Team zugeordnet sein
+                if (data.homeTeamId || data.awayTeamId) return;
+
+                // 3. (Entfernt) Auch Freundschaftsspiel-Slots sollen gelöscht werden, wenn sie vergangen sind.
+                // if (data.friendly === true) return;
+
+                // 4. Status muss zwingend 'available' sein (bereits durch Query abgedeckt, aber sicherheitshalber)
+                if (data.status !== 'available') return;
+
+                batch.delete(doc.ref);
+                deleteCount++;
+            });
+
+            if (deleteCount > 0) {
+                await batch.commit();
+                console.log(`[_cleanupUnusedPastSlots] ${deleteCount} ungenutzte, vergangene Slots in Saison ${seasonId} sicher gelöscht.`);
+            }
+        } catch (error) {
+            console.error('[_cleanupUnusedPastSlots] Fehler:', error);
+        }
+    }
+
+    /**
      * NEU: Konsolidiertes "Lazy Sync" für eine Saison.
      * Räumt abgelaufene Anfragen auf und gibt Slots für Freundschaftsspiele frei.
      */
@@ -206,6 +310,9 @@ class BookingService {
 
         // Versuche Expiry-Cleanup
         await BookingService.cleanupExpiredRequests(seasonId);
+
+        // NEU: Bereinige ungenutzte vergangene Slots
+        await BookingService._cleanupUnusedPastSlots(seasonId);
 
         // Versuche Friendly-Release
         await BookingService._syncFriendlySlots(seasonId);
@@ -314,8 +421,8 @@ class BookingService {
             snapshot.forEach(doc => {
                 const data = doc.data();
 
-                // Überspringen, wenn bereits als friendly markiert
-                if (data.friendly === true) return;
+                // Überspringen, wenn bereits als friendly markiert oder Auto-Sync deaktiviert ist
+                if (data.friendly === true || data.friendlyAutoSync === false) return;
 
                 totalChecked++;
                 const slotDateMillis = getMillisFromDate(data.date);
@@ -545,6 +652,20 @@ class BookingService {
         let finalAwayTeamId = updateData.awayTeamId;
         let finalFriendly = isFriendly;
 
+        // NEU: Wenn Admin explizit friendly setzt (oder ändert), steuern wir den Auto-Sync.
+        // Wenn Admin friendly=false setzt, wollen wir nicht, dass der Sync es wieder auf true setzt -> friendlyAutoSync = false.
+        // Wenn Admin friendly=true setzt, ist friendlyAutoSync egal (es ist ja schon friendly).
+        let finalFriendlyAutoSync = originalBooking.friendlyAutoSync; // Standard: Beibehalten
+
+        if (updateData.friendly !== undefined) {
+            // Der Admin hat explizit eine Entscheidung getroffen.
+            if (updateData.friendly === false) {
+                finalFriendlyAutoSync = false; // "Bitte nicht automatisch überschreiben"
+            } else {
+                finalFriendlyAutoSync = true; // Reset, falls man es doch wieder freigeben will (optional, aber sauberer)
+            }
+        }
+
         if (status === 'cancelled' || status === 'blocked') {
             // NEU: Wenn es eine individuelle Buchung ist, wird sie komplett gelöscht.
             if (originalBooking.isCustom) {
@@ -570,6 +691,7 @@ class BookingService {
             awayTeamId: finalAwayTeamId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             friendly: finalFriendly, // NEU
+            friendlyAutoSync: finalFriendlyAutoSync !== undefined ? finalFriendlyAutoSync : true // Default true
         };
 
         await bookingRef.update(dataToUpdate);
@@ -626,9 +748,8 @@ class BookingService {
             if (days[d.getDay()]) {
                 for (const pitchId of pitchIds) {
                     for (const time of times) {
-                        const [hour, minute] = time.split(':');
-                        const bookingDate = new Date(d);
-                        bookingDate.setHours(hour, minute, 0, 0);
+                        const bookingDate = BookingService._createBerlinDate(d.toISOString().split('T')[0], time);
+
                         potentialSlots.push({
                             pitchId,
                             date: admin.firestore.Timestamp.fromDate(bookingDate),
@@ -1219,13 +1340,71 @@ class BookingService {
 
     /**
      * NEU: Holt vergangene bestätigte Buchungen ohne Ergebnis für ein bestimmtes Team in einer Saison.
+     * Refactored: Holt Daten spezifisch für das Team und filtert robust.
      */
     static async getBookingsNeedingResultForTeam(seasonId, teamId) {
         if (!seasonId || !teamId) {
             throw new Error('Saison-ID und Team-ID sind erforderlich.');
         }
-        const all = await BookingService.getBookingsNeedingResult(seasonId);
-        return all.filter(b => b.homeTeamId === teamId || b.awayTeamId === teamId);
+
+        const now = new Date();
+        const nowMillis = now.getTime();
+
+        // 1. Hole alle relevanten Buchungen für das Team
+        const homeGamesQuery = bookingsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', teamId);
+        const awayGamesQuery = bookingsCollection.where('seasonId', '==', seasonId).where('awayTeamId', '==', teamId);
+
+        const [homeSnap, awaySnap] = await Promise.all([homeGamesQuery.get(), awayGamesQuery.get()]);
+
+        const bookingsMap = new Map();
+        [...homeSnap.docs, ...awaySnap.docs].forEach(doc => {
+            if (!bookingsMap.has(doc.id)) {
+                bookingsMap.set(doc.id, { id: doc.id, ...doc.data() });
+            }
+        });
+
+        const candidates = Array.from(bookingsMap.values()).filter(b => {
+            // Wichtig: Date Handling
+            const d = getMillisFromDate(b.date);
+            const isConfirmed = b.status === 'confirmed';
+            const isPast = d < nowMillis;
+            const hasTeams = b.homeTeamId && b.awayTeamId;
+
+            return isConfirmed && isPast && hasTeams;
+        });
+
+        if (candidates.length === 0) return [];
+
+        // 2. Prüfe, für welche dieser Buchungen bereits ein Ergebnis vorliegt
+        // Wir suchen Ergebnisse, die mit diesen Buchungs-IDs verknüpft sind.
+        // Da 'in'-Queries limitiert sind (max 10), machen wir den Reverse-Check:
+        // Wir holen alle Ergebnisse des Teams für diese Saison und prüfen lokal.
+        const resultsHomeQuery = resultsCollection.where('seasonId', '==', seasonId).where('homeTeamId', '==', teamId);
+        const resultsAwayQuery = resultsCollection.where('seasonId', '==', seasonId).where('awayTeamId', '==', teamId);
+
+        const [resHomeSnap, resAwaySnap] = await Promise.all([resultsHomeQuery.get(), resultsAwayQuery.get()]);
+
+        const existingResultBookingIds = new Set();
+        resHomeSnap.forEach(doc => {
+            const bid = doc.data().bookingId;
+            if (bid) {
+                existingResultBookingIds.add(bid);
+            }
+        });
+        resAwaySnap.forEach(doc => {
+            const bid = doc.data().bookingId;
+            if (bid) {
+                existingResultBookingIds.add(bid);
+            }
+        });
+
+        // 3. Filtere Kandidaten, die schon ein Ergebnis haben
+        const final = candidates.filter(b => !existingResultBookingIds.has(b.id));
+
+        // Sortiere: Älteste zuerst
+        final.sort((a, b) => getMillisFromDate(a.date) - getMillisFromDate(b.date));
+
+        return final;
     }
 
     /**

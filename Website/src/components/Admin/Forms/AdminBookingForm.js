@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, Divider, Alert, CircularProgress, Typography, useTheme } from '@mui/material';
 import * as bookingApiService from '../../../services/bookingApiService';
 import * as teamApiService from '../../../services/teamApiService';
+import { formatTime, createBerlinDate } from '../../Helpers/dateUtils';
 
 const AdminBookingForm = ({
     initialData,
@@ -63,7 +64,7 @@ const AdminBookingForm = ({
             const isValidDate = !isNaN(dateObj.getTime());
 
             const dateStr = isValidDate ? dateObj.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-            const timeStr = isValidDate ? dateObj.toTimeString().slice(0, 5) : (initialData.time || '10:00');
+            const timeStr = isValidDate ? formatTime(dateObj) : (initialData.time || '10:00');
 
             setFormData({
                 date: dateStr,
@@ -122,7 +123,7 @@ const AdminBookingForm = ({
             setCollisionCheck({ status: 'checking', message: 'Prüfe Verfügbarkeit...' });
 
             try {
-                const combinedDate = new Date(`${date}T${time}`);
+                const combinedDate = createBerlinDate(date, time);
                 if (isNaN(combinedDate.getTime())) {
                     setCollisionCheck({ status: 'idle', message: '' });
                     return;

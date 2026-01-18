@@ -323,19 +323,7 @@ const DynamicTeamList = ({ title }) => {
                       {team.name}
                     </Typography>
 
-                    {team.description && (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: 'Comfortaa',
-                          color: theme.palette.text.secondary,
-                          fontSize: isMobile ? '0.7rem' : '0.9rem',
-                          mt: 0.5,
-                        }}
-                      >
-                        {team.description}
-                      </Typography>
-                    )}
+
                   </Box>
 
                   {/* Gegründet entfernt */}

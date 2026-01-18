@@ -7,8 +7,12 @@ import * as bookingApi from '../services/bookingApiService';
 import * as teamApi from '../services/teamApiService';
 import { useAuth } from '../context/AuthProvider';
 import { ReusableModal } from './Helpers/modalUtils';
-import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel, InputAdornment } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel, InputAdornment, Tooltip, IconButton } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
+import BlockIcon from '@mui/icons-material/Block';
+import BuildIcon from '@mui/icons-material/Build';
 import { StyledTableCell, filterData } from './Helpers/tableUtils';
 import { formatDateForSearch } from './Helpers/dateUtils';
 
@@ -203,22 +207,22 @@ const BookingOverview = () => {
 
   // Helper for status labels and colors
   const getStatusConfig = (status, isAvailable) => {
-    if (isAvailable) return { label: 'Frei', color: theme.palette.success.main, buttonColor: 'success', buttonText: 'Platz buchen' };
+    if (isAvailable) return { label: 'Frei', color: theme.palette.success.main, icon: <EventAvailableIcon />, iconColor: 'success' };
 
     // Status mapping for colors and labels
     switch (status) {
       case 'booked':
       case 'confirmed':
-        return { label: 'Belegt', color: theme.palette.error.main, buttonColor: 'warning', buttonText: 'Belegt' };
+        return { label: 'Belegt', color: theme.palette.error.main, icon: <EventBusyIcon />, iconColor: 'error' };
       case 'pending_home_confirm':
       case 'pending_away_confirm':
-        return { label: 'Bestätigung ausstehend', color: theme.palette.warning.main, buttonColor: 'warning', buttonText: 'Belegt' };
+        return { label: 'Bestätigung ausstehend', color: theme.palette.warning.main, icon: <EventBusyIcon />, iconColor: 'warning' };
       case 'blocked':
-        return { label: 'Gesperrt', color: theme.palette.grey[500], buttonColor: 'inherit', buttonText: 'Gesperrt' };
+        return { label: 'Gesperrt', color: theme.palette.grey[500], icon: <BlockIcon />, iconColor: 'default' };
       case 'maintenance':
-        return { label: 'Wartung', color: theme.palette.warning.main, buttonColor: 'inherit', buttonText: 'Gesperrt' };
+        return { label: 'Wartung', color: theme.palette.warning.main, icon: <BuildIcon />, iconColor: 'warning' };
       default:
-        return { label: 'Belegt', color: theme.palette.grey[500], buttonColor: 'inherit', buttonText: 'Belegt' };
+        return { label: 'Belegt', color: theme.palette.grey[500], icon: <EventBusyIcon />, iconColor: 'default' };
     }
   };
 
@@ -373,7 +377,7 @@ const BookingOverview = () => {
                                     <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                       <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
-                                      {booking.friendly && <Typography sx={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.8rem' }}>F</Typography>}
+                                      <Typography sx={{ color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', fontSize: '0.8rem', userSelect: 'none' }}>F</Typography>
                                     </Box>
                                   </Box>
                                   <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
@@ -381,21 +385,27 @@ const BookingOverview = () => {
                                       <Typography sx={{ fontSize: '0.8rem', color: theme.palette.success.main }}>Frei</Typography>
                                     ) : (
                                       <>
-                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.homeTeamId)}</Typography>
+                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary, textAlign: 'center' }}>{displayTeamName(booking.homeTeamId)}</Typography>
                                         <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
-                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary }}>{displayTeamName(booking.awayTeamId)}</Typography>
+                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary, textAlign: 'center' }}>{displayTeamName(booking.awayTeamId)}</Typography>
                                       </>
                                     )}
                                   </Box>
                                   <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
                                     {isBookable ? (
-                                      <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
-                                        Platz buchen
-                                      </Button>
+                                      <Tooltip title="Platz buchen">
+                                        <IconButton size="small" color="success" onClick={() => handleBookNow(booking)}>
+                                          <EventAvailableIcon />
+                                        </IconButton>
+                                      </Tooltip>
                                     ) : (
-                                      <Button size="small" variant="contained" color={statusConfig.buttonColor} disabled>
-                                        {statusConfig.buttonText}
-                                      </Button>
+                                      <Tooltip title={statusConfig.label}>
+                                        <span>
+                                          <IconButton size="small" color={statusConfig.iconColor} disabled>
+                                            {statusConfig.icon}
+                                          </IconButton>
+                                        </span>
+                                      </Tooltip>
                                     )}
                                   </Box>
                                 </Box>
@@ -411,19 +421,25 @@ const BookingOverview = () => {
                           <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE')}</StyledTableCell>
                           <StyledTableCell>
                             {timeRange}
-                            {booking.friendly && <Typography component="span" sx={{ ml: 1, color: '#FFD700', fontWeight: 'bold' }}>F</Typography>}
+                            <Typography component="span" sx={{ ml: 1, color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', userSelect: 'none' }}>F</Typography>
                           </StyledTableCell>
                           <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.homeTeamId)}</StyledTableCell>
                           <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.awayTeamId)}</StyledTableCell>
                           <StyledTableCell align="center">
                             {isBookable ? (
-                              <Button size="small" variant="contained" color="success" onClick={() => handleBookNow(booking)}>
-                                Platz buchen
-                              </Button>
+                              <Tooltip title="Platz buchen">
+                                <IconButton size="small" color="success" onClick={() => handleBookNow(booking)}>
+                                  <EventAvailableIcon />
+                                </IconButton>
+                              </Tooltip>
                             ) : (
-                              <Button size="small" variant="contained" color={statusConfig.buttonColor} disabled>
-                                {statusConfig.buttonText}
-                              </Button>
+                              <Tooltip title={statusConfig.label}>
+                                <span>
+                                  <IconButton size="small" color={statusConfig.iconColor === 'default' ? 'inherit' : statusConfig.iconColor} disabled>
+                                    {statusConfig.icon}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
                             )}
                           </StyledTableCell>
                         </TableRow>

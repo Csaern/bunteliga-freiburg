@@ -70,6 +70,20 @@ router.delete('/admin/:bookingId', checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
+// Buchungen, für die mein Team ein Ergebnis melden muss (vergangene, bestätigte Spiele ohne Ergebnis)
+router.get('/needs-result/my-team', checkAuth, async (req, res) => {
+    try {
+        const { seasonId } = req.query;
+        const teamId = req.user.teamId;
+        if (!seasonId) return res.status(400).json({ message: 'seasonId ist erforderlich.' });
+        if (!teamId) return res.status(200).json([]);
+        const bookings = await BookingService.getBookingsNeedingResultForTeam(seasonId, teamId);
+        res.status(200).json(bookings);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
 // NEU: Holt Buchungen, für die ein Ergebnis eingetragen werden muss
 router.get('/needs-result/:seasonId', checkAuth, checkAdmin, async (req, res) => {
     try {
@@ -166,19 +180,7 @@ router.post('/:bookingId/action', checkAuth, async (req, res) => {
     }
 });
 
-// Buchungen, für die mein Team ein Ergebnis melden muss (vergangene, bestätigte Spiele ohne Ergebnis)
-router.get('/needs-result/my-team', checkAuth, async (req, res) => {
-    try {
-        const { seasonId } = req.query;
-        const teamId = req.user.teamId;
-        if (!seasonId) return res.status(400).json({ message: 'seasonId ist erforderlich.' });
-        if (!teamId) return res.status(200).json([]);
-        const bookings = await BookingService.getBookingsNeedingResultForTeam(seasonId, teamId);
-        res.status(200).json(bookings);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
+
 
 // Bevorstehende Spiele (kommende Buchungen) für mein Team
 router.get('/upcoming/my-team', checkAuth, async (req, res) => {

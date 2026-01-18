@@ -82,13 +82,14 @@ const UserManager = ({ teams, getTeamName }) => {
                 password: '',
                 teamId: selectedUser.teamId || '',
                 isAdmin: selectedUser.isAdmin || false,
+                role: selectedUser.isAdmin ? 'admin' : 'user',
             });
         }
     }, [selectedUser]);
 
     const handleOpenCreateModal = () => {
         setSelectedUser(null);
-        setFormData({ email: '', password: '', teamId: '', isAdmin: false, displayName: '' });
+        setFormData({ email: '', password: '', teamId: '', isAdmin: false, displayName: '', role: 'user' });
         setModalMode('create');
         setIsModalOpen(true);
     };
@@ -209,7 +210,7 @@ const UserManager = ({ teams, getTeamName }) => {
                         </FormControl>
                         <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
                             <InputLabel>Rolle</InputLabel>
-                            <Select value={formData.role} label="Rolle" onChange={(e) => setFormData({ ...formData, role: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
+                            <Select value={formData.role} label="Rolle" onChange={(e) => setFormData({ ...formData, role: e.target.value, isAdmin: e.target.value === 'admin' })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
                                 <MenuItem value="user">User</MenuItem>
                                 <MenuItem value="admin">Admin</MenuItem>
                             </Select>
