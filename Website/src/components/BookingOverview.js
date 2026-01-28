@@ -367,7 +367,15 @@ const BookingOverview = () => {
                       }
 
                       return isMobile ? (
-                        <TableRow key={booking.id} sx={{ backgroundColor: theme.palette.background.default, cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
+                        <TableRow
+                          key={booking.id}
+                          onClick={() => isBookable && handleBookNow(booking)}
+                          sx={{
+                            backgroundColor: theme.palette.background.default,
+                            cursor: isBookable ? 'pointer' : 'default',
+                            '&:hover': { backgroundColor: isBookable ? theme.palette.action.hover : 'inherit' }
+                          }}
+                        >
                           <TableCell colSpan={7} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.divider}` }}>
                             <Box sx={{ display: 'flex', alignItems: 'stretch', minHeight: '70px' }}>
                               <Box sx={{ width: '4px', bgcolor: statusConfig.color }} />
@@ -394,7 +402,7 @@ const BookingOverview = () => {
                                   <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
                                     {isBookable ? (
                                       <Tooltip title="Platz buchen">
-                                        <IconButton size="small" color="success" onClick={() => handleBookNow(booking)}>
+                                        <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); handleBookNow(booking); }}>
                                           <EventAvailableIcon />
                                         </IconButton>
                                       </Tooltip>
@@ -414,7 +422,14 @@ const BookingOverview = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        <TableRow key={booking.id} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
+                        <TableRow
+                          key={booking.id}
+                          onClick={() => isBookable && handleBookNow(booking)}
+                          sx={{
+                            cursor: isBookable ? 'pointer' : 'default',
+                            '&:hover': { backgroundColor: isBookable ? theme.palette.action.hover : 'inherit' }
+                          }}
+                        >
                           <StyledTableCell align="center">
                             <Box sx={{ width: '10px', height: '10px', bgcolor: statusConfig.color, borderRadius: '50%', boxShadow: `0 0 8px ${statusConfig.color}` }} title={statusConfig.label} />
                           </StyledTableCell>
@@ -428,7 +443,7 @@ const BookingOverview = () => {
                           <StyledTableCell align="center">
                             {isBookable ? (
                               <Tooltip title="Platz buchen">
-                                <IconButton size="small" color="success" onClick={() => handleBookNow(booking)}>
+                                <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); handleBookNow(booking); }}>
                                   <EventAvailableIcon />
                                 </IconButton>
                               </Tooltip>

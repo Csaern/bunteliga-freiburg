@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthProvider';
@@ -8,17 +8,58 @@ import {
   Box,
   Typography,
   CircularProgress,
-  useTheme
+  useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  useMediaQuery,
+  IconButton,
+  Grid,
+  InputAdornment,
+  Tabs,
+  Tab,
+  Snackbar,
+  Alert
 } from '@mui/material';
-import { ReusableModal } from './Helpers/modalUtils';
+import CloseIcon from '@mui/icons-material/Close';
+import LanguageIcon from '@mui/icons-material/Language';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import InfoIcon from '@mui/icons-material/Info';
+import ContactMailIcon from '@mui/icons-material/ContactMail';
+import ShareIcon from '@mui/icons-material/Share';
 import * as teamApi from '../services/teamApiService';
+import AppModal from './Modals/AppModal';
+
 
 const TeamSettings = ({ onClose }) => {
   const { teamId } = useAuth();
   const theme = useTheme();
+  // fullScreen handled by AppModal
+
   const [team, setTeam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+
+  // ... (rest of state)
+
+  // ... (loadTeamData)
+
+  // ... (useEffect, snackbar, save, tab handlers)
+
+
+
+  // Feedback state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  // Data State
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -34,13 +75,10 @@ const TeamSettings = ({ onClose }) => {
     }
   });
 
-
-
-  const loadTeamData = React.useCallback(async () => {
+  const loadTeamData = useCallback(async () => {
     try {
       setLoading(true);
       const teamData = await teamApi.getTeamByIdPublic(teamId).catch(async () => {
-        // Fallback zu Firestore
         const teamDoc = await getDoc(doc(db, 'teams', teamId));
         if (teamDoc.exists()) {
           return { id: teamDoc.id, ...teamDoc.data() };
@@ -51,6 +89,7 @@ const TeamSettings = ({ onClose }) => {
       if (teamData) {
         setTeam(teamData);
         setFormData({
+          name: teamData.name || '',
           description: teamData.description || '',
           foundedYear: teamData.foundedYear || '',
           contactEmail: teamData.contactEmail || '',
@@ -66,206 +105,265 @@ const TeamSettings = ({ onClose }) => {
       }
     } catch (error) {
       console.error('Fehler beim Laden der Team-Daten:', error);
+      showSnackbar('Fehler beim Laden der Daten', 'error');
     } finally {
       setLoading(false);
     }
   }, [teamId]);
 
   useEffect(() => {
-    loadTeamData();
+    if (teamId) {
+      loadTeamData();
+    }
   }, [teamId, loadTeamData]);
+
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   const handleSave = async () => {
     try {
       setSaving(true);
       await teamApi.updateTeam(teamId, formData);
       setTeam({ ...team, ...formData });
-      alert('Team-Einstellungen erfolgreich gespeichert!');
-      onClose();
+
+      showSnackbar('Einstellungen erfolgreich gespeichert!', 'success');
+
+      // Close modal after short delay to let user see success message
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+
     } catch (error) {
       console.error('Fehler beim Speichern:', error);
-      alert('Fehler beim Speichern der Einstellungen!');
+      showSnackbar('Fehler beim Speichern der Einstellungen.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
+  const handleSocialChange = (platform, value) => {
+    setFormData(prev => ({
+      ...prev,
+      socialMedia: {
+        ...prev.socialMedia,
+        [platform]: value
+      }
+    }));
+  };
+
   const inputStyle = {
-    '& label.Mui-focused': { color: theme.palette.primary.main },
     '& .MuiOutlinedInput-root': {
-      '& fieldset': { borderColor: theme.palette.divider },
-      '&:hover fieldset': { borderColor: theme.palette.text.secondary },
-      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
+      '&.Mui-focused fieldset': {
+        borderColor: theme.palette.primary.main,
+      },
     },
-    '& .MuiInputBase-input': { color: theme.palette.text.primary },
-    '& label': { color: theme.palette.text.secondary },
+    '& .MuiInputLabel-root.Mui-focused': {
+      color: theme.palette.primary.main,
+    }
   };
 
   if (loading) {
     return (
-      <ReusableModal open={true} onClose={onClose} title="Team-Einstellungen">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
-          <CircularProgress sx={{ color: theme.palette.primary.main }} />
+      <AppModal open={true} onClose={onClose} title="Lade Einstellungen..." loading={true}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+          <CircularProgress />
         </Box>
-      </ReusableModal>
+      </AppModal>
     );
   }
 
+  const actionButtons = (
+    <>
+      <Button onClick={onClose} color="inherit">
+        Abbrechen
+      </Button>
+      <Box sx={{ flex: '1 1 auto' }} />
+      <Button
+        onClick={handleSave}
+        variant="contained"
+        disabled={saving}
+        sx={{ fontWeight: 'bold', px: 4 }}
+      >
+        {saving ? 'Speichern...' : 'Speichern'}
+      </Button>
+    </>
+  );
+
   return (
-    <ReusableModal open={true} onClose={onClose} title="Team-Einstellungen">
-      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-        <Box sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 3,
-          maxHeight: '70vh',
-          overflowY: 'auto',
-          pr: 1,
-          '&::-webkit-scrollbar': { width: '8px' },
-          '&::-webkit-scrollbar-track': { background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px' },
-          '&::-webkit-scrollbar-thumb': { background: theme.palette.primary.main, borderRadius: '4px' },
-          '&::-webkit-scrollbar-thumb:hover': { background: theme.palette.primary.dark }
-        }}>
-          <TextField
-            label="Beschreibung"
-            multiline
-            rows={4}
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            fullWidth
-            sx={inputStyle}
-            placeholder="Beschreiben Sie Ihr Team..."
-          />
-
-          <TextField
-            label="Gründungsjahr"
-            type="number"
-            value={formData.foundedYear}
-            onChange={(e) => setFormData({ ...formData, foundedYear: e.target.value })}
-            fullWidth
-            sx={inputStyle}
-            placeholder="z.B. 2020"
-          />
-
-          <Box sx={{ borderTop: '1px solid', borderColor: theme.palette.divider, pt: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: theme.palette.text.secondary, mb: 2, fontFamily: 'Comfortaa', fontWeight: 600 }}>
-              Kontaktinformationen
-            </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="Ansprechpartner"
-                value={formData.contactPerson}
-                onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                fullWidth
-                sx={inputStyle}
-                placeholder="Name des Ansprechpartners"
-              />
-
-              <TextField
-                label="E-Mail"
-                type="email"
-                value={formData.contactEmail}
-                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                fullWidth
-                sx={inputStyle}
-                placeholder="team@example.com"
-              />
-
-              <TextField
-                label="Telefon"
-                type="tel"
-                value={formData.contactPhone}
-                onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                fullWidth
-                sx={inputStyle}
-                placeholder="+49 123 456789"
-              />
-
-              <TextField
-                label="Website"
-                type="url"
-                value={formData.website}
-                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                fullWidth
-                sx={inputStyle}
-                placeholder="https://www.team-website.com"
-              />
-            </Box>
-          </Box>
-
-          <Box sx={{ borderTop: '1px solid', borderColor: theme.palette.divider, pt: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: theme.palette.text.secondary, mb: 2, fontFamily: 'Comfortaa', fontWeight: 600 }}>
-              Social Media
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="Facebook"
-                type="url"
-                value={formData.socialMedia.facebook}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  socialMedia: { ...formData.socialMedia, facebook: e.target.value }
-                })}
-                fullWidth
-                sx={inputStyle}
-                placeholder="https://facebook.com/team"
-              />
-              <TextField
-                label="Instagram"
-                type="url"
-                value={formData.socialMedia.instagram}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  socialMedia: { ...formData.socialMedia, instagram: e.target.value }
-                })}
-                fullWidth
-                sx={inputStyle}
-                placeholder="https://instagram.com/team"
-              />
-              <TextField
-                label="Twitter"
-                type="url"
-                value={formData.socialMedia.twitter}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  socialMedia: { ...formData.socialMedia, twitter: e.target.value }
-                })}
-                fullWidth
-                sx={inputStyle}
-                placeholder="https://twitter.com/team"
-              />
-            </Box>
-          </Box>
+    <>
+      <AppModal
+        open={true}
+        onClose={onClose}
+        title="Team-Einstellungen"
+        actions={actionButtons}
+        minHeight="300px"
+      >
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, mx: -3, mb: 2 }}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="fullWidth"
+            textColor="primary"
+            indicatorColor="primary"
+            aria-label="settings tabs"
+          >
+            <Tab icon={<InfoIcon />} iconPosition="start" label="Allgemein" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
+            <Tab icon={<ContactMailIcon />} iconPosition="start" label="Kontakt" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
+            <Tab icon={<ShareIcon />} iconPosition="start" label="Social" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
+          </Tabs>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', pt: 2, mt: 2, borderTop: '1px solid', borderColor: theme.palette.divider }}>
-          <Button
-            type="button"
-            onClick={onClose}
-            variant="outlined"
-            sx={{
-              color: theme.palette.text.secondary,
-              borderColor: theme.palette.divider,
-              '&:hover': { borderColor: theme.palette.text.primary, backgroundColor: theme.palette.action.hover }
-            }}
-          >
-            Abbrechen
-          </Button>
-          <Button
-            type="submit"
-            disabled={saving}
-            variant="contained"
-            sx={{
-              backgroundColor: saving ? theme.palette.action.disabledBackground : theme.palette.primary.main,
-              '&:hover': { backgroundColor: saving ? theme.palette.action.disabledBackground : theme.palette.primary.dark }
-            }}
-          >
-            {saving ? 'Speichern...' : 'Speichern'}
-          </Button>
+        <Box component="form" noValidate autoComplete="off">
+
+          {/* Tab 0: Allgemeines */}
+          <Box role="tabpanel" hidden={activeTab !== 0}>
+            {activeTab === 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Hier kannst du die Basisdaten deines Teams bearbeiten.
+                </Typography>
+
+                {/* Name und Jahr in einer Zeile */}
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField
+                    label="Team Name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    sx={{ flex: 3, ...inputStyle }}
+                  />
+                  <TextField
+                    label="Gründungsjahr"
+                    type="number"
+                    value={formData.foundedYear}
+                    onChange={(e) => setFormData({ ...formData, foundedYear: e.target.value })}
+                    sx={{ flex: 1, ...inputStyle }}
+                  />
+                </Box>
+
+                {/* Beschreibung volle Breite */}
+                <TextField
+                  label="Beschreibung"
+                  multiline
+                  rows={6}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  fullWidth
+                  sx={inputStyle}
+                  placeholder="Erzähl uns etwas über dein Team..."
+                />
+              </Box>
+            )}
+          </Box>
+
+          {/* Tab 1: Kontakt */}
+          <Box role="tabpanel" hidden={activeTab !== 1}>
+            {activeTab === 1 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Wie können andere Teams oder Interessierte euch erreichen?
+                </Typography>
+
+                {/* Ansprechpartner und Telefon in einer Zeile */}
+                <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                  <TextField
+                    label="Ansprechpartner"
+                    value={formData.contactPerson}
+                    onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                    fullWidth
+                    sx={inputStyle}
+                  />
+                  <TextField
+                    label="Telefon"
+                    type="tel"
+                    value={formData.contactPhone}
+                    onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
+                    fullWidth
+                    sx={inputStyle}
+                  />
+                </Box>
+
+                {/* Email und Website untereinander */}
+                <TextField
+                  label="E-Mail Kontaktadresse"
+                  type="email"
+                  value={formData.contactEmail}
+                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                  fullWidth
+                  sx={inputStyle}
+                  helperText="Wird öffentlich angezeigt"
+                />
+
+                <TextField
+                  label="Website"
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  fullWidth
+                  sx={inputStyle}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LanguageIcon color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  placeholder="https://..."
+                />
+              </Box>
+            )}
+          </Box>
+
+          {/* Tab 2: Social Media */}
+          <Box role="tabpanel" hidden={activeTab !== 2}>
+            {activeTab === 2 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Verlinke dein Instagram Profil.
+                  </Typography>
+                </Box>
+                <TextField
+                  label="Instagram"
+                  value={formData.socialMedia.instagram}
+                  onChange={(e) => handleSocialChange('instagram', e.target.value)}
+                  fullWidth
+                  sx={inputStyle}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <InstagramIcon color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  placeholder="Link zum Profil"
+                />
+              </Box>
+            )}
+          </Box>
+
         </Box>
-      </form>
-    </ReusableModal>
+      </AppModal>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

@@ -199,6 +199,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           if (userTeamId && seasonId) {
             try {
               bookings = await bookingApi.getUpcomingBookingsForTeam(seasonId, userTeamId);
+              if (Array.isArray(bookings)) {
+                bookings = bookings.filter(b => b.status === 'confirmed');
+              }
             } catch {
               bookings = [];
             }
@@ -409,9 +412,6 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       return;
     }
 
-    const confirmed = window.confirm('Möchten Sie diese Buchung wirklich absagen?');
-    if (!confirmed) return;
-
     try {
       await bookingApi.cancelBooking(selectedFixture.bookingId);
       setNotification({ open: true, message: "Buchung erfolgreich abgesagt.", severity: 'success' });
@@ -423,39 +423,25 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     }
   };
 
-  const handleReportResult = () => {
-    if (!selectedFixture?.bookingId) return;
-    setShowReportModal(true);
-  };
-
-  const handleReportSubmit = async (e) => {
-    e.preventDefault();
+  const handleResultSubmission = async (scores) => {
     if (!selectedFixture?.bookingId || !teamId) {
       setNotification({ open: true, message: "Keinem Team zugeordnet oder keine Buchung gefunden.", severity: 'error' });
       return;
     }
-    if (reportForm.homeScore === '' || reportForm.awayScore === '') {
-      setNotification({ open: true, message: "Bitte gib beide Ergebnisse ein.", severity: 'error' });
-      return;
-    }
 
-    setReportSubmitting(true);
     try {
       await resultApi.reportResult(selectedFixture.bookingId, {
-        homeScore: parseInt(reportForm.homeScore, 10),
-        awayScore: parseInt(reportForm.awayScore, 10),
+        homeScore: parseInt(scores.homeScore, 10),
+        awayScore: parseInt(scores.awayScore, 10),
         reportedByTeamId: teamId,
       });
       setNotification({ open: true, message: "Ergebnis erfolgreich gemeldet!", severity: 'success' });
-      setShowReportModal(false);
       setSelectedFixture(null);
-      setReportForm({ homeScore: '', awayScore: '' });
       loadFixtures();
     } catch (error) {
       console.error('Fehler beim Melden des Ergebnisses:', error);
       setNotification({ open: true, message: error.message || 'Fehler beim Melden des Ergebnisses.', severity: 'error' });
-    } finally {
-      setReportSubmitting(false);
+      throw error; // Re-throw to let modal know
     }
   };
 
@@ -524,7 +510,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     );
   }
 
-  const canReport = !!selectedFixture && selectedFixture.id.startsWith('booking-') && (isAdmin || (!!teamId && (String(teamId) === String(selectedFixture.homeTeamId) || String(teamId) === String(selectedFixture.awayTeamId))));
+  const canReport = !!selectedFixture && selectedFixture.id.startsWith('booking-') && !selectedFixture.friendly && (isAdmin || (!!teamId && (String(teamId) === String(selectedFixture.homeTeamId) || String(teamId) === String(selectedFixture.awayTeamId))));
   const canCancel = !!selectedFixture && selectedFixture.id.startsWith('booking-') && !selectedFixture.isPast && (isAdmin || (!!teamId && (String(teamId) === String(selectedFixture.homeTeamId) || String(teamId) === String(selectedFixture.awayTeamId))));
 
   return (
@@ -751,93 +737,18 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
       {/* Modal für Spiel-Details */}
       <GameDetailsModal
-        open={!!selectedFixture && !showReportModal}
+        open={!!selectedFixture}
         onClose={() => setSelectedFixture(null)}
         fixture={selectedFixture}
         teams={teams}
         pitches={pitches}
-        handleReportResult={canReport ? handleReportResult : null}
+        handleReportResult={canReport ? handleResultSubmission : null}
         handleCancelBooking={canCancel ? handleCancelBooking : null}
       />
 
-      {/* Modal für Ergebnis melden */}
-      {showReportModal && selectedFixture && (
-        <ReusableModal
-          open={showReportModal}
-          onClose={() => {
-            setShowReportModal(false);
-            setReportForm({ homeScore: '', awayScore: '' });
-          }}
-          title="Ergebnis melden"
-        >
-          <Box component="form" onSubmit={handleReportSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', mb: 1 }}>
-              {teams[selectedFixture.homeTeamId]?.name || selectedFixture.homeTeamName || 'Unbekannt'} vs. {teams[selectedFixture.awayTeamId]?.name || selectedFixture.awayTeamName || 'Unbekannt'}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <TextField
-                type="number"
-                size="small"
-                label={`Tore ${teams[selectedFixture.homeTeamId]?.name || selectedFixture.homeTeamName || 'Heim'}`}
-                value={reportForm.homeScore}
-                onChange={(e) => setReportForm({ ...reportForm, homeScore: e.target.value })}
-                fullWidth
-                required
-                sx={{
-                  '& label.Mui-focused': { color: theme.palette.primary.main },
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: theme.palette.divider },
-                    '&:hover fieldset': { borderColor: theme.palette.text.secondary },
-                    '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
-                  },
-                  '& .MuiInputBase-input': { color: theme.palette.text.primary },
-                  '& label': { color: theme.palette.text.secondary },
-                }}
-              />
-              <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa' }}>:</Typography>
-              <TextField
-                type="number"
-                size="small"
-                label={`Tore ${teams[selectedFixture.awayTeamId]?.name || selectedFixture.awayTeamName || 'Auswärts'}`}
-                value={reportForm.awayScore}
-                onChange={(e) => setReportForm({ ...reportForm, awayScore: e.target.value })}
-                fullWidth
-                required
-                sx={{
-                  '& label.Mui-focused': { color: theme.palette.primary.main },
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: theme.palette.divider },
-                    '&:hover fieldset': { borderColor: theme.palette.text.secondary },
-                    '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
-                  },
-                  '& .MuiInputBase-input': { color: theme.palette.text.primary },
-                  '& label': { color: theme.palette.text.secondary },
-                }}
-              />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setShowReportModal(false);
-                  setReportForm({ homeScore: '', awayScore: '' });
-                }}
-                sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}
-              >
-                Abbrechen
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={reportSubmitting || reportForm.homeScore === '' || reportForm.awayScore === ''}
-                sx={{ bgcolor: theme.palette.primary.main }}
-              >
-                {reportSubmitting ? 'Wird gespeichert...' : 'Ergebnis melden'}
-              </Button>
-            </Box>
-          </Box>
-        </ReusableModal>
-      )}
+
+
+
 
       <Snackbar
         open={notification.open}

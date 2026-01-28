@@ -196,8 +196,14 @@ async function getResultsForTeam(teamId) {
   const [homeSnapshot, awaySnapshot] = await Promise.all([homeGamesQuery, awayGamesQuery]);
 
   const results = [];
-  homeSnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-  awaySnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+  homeSnapshot.forEach(doc => {
+    const data = doc.data();
+    if (!data.friendly) results.push({ id: doc.id, ...data });
+  });
+  awaySnapshot.forEach(doc => {
+    const data = doc.data();
+    if (!data.friendly) results.push({ id: doc.id, ...data });
+  });
 
   return results;
 }
@@ -209,13 +215,18 @@ async function getRecentResults(limitNum = 5) {
   const snapshot = await resultsCollection
     .where('status', '==', 'confirmed')
     .orderBy('confirmedAt', 'desc')
-    .limit(limitNum)
+    .where('status', '==', 'confirmed')
+    .orderBy('confirmedAt', 'desc')
+    .limit(limitNum * 3) // Fetch more to allow for filtering friendly games
     .get();
 
   if (snapshot.empty) {
     return [];
   }
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(r => !r.friendly)
+    .slice(0, limitNum);
 }
 
 /**
@@ -230,7 +241,9 @@ async function getResultsForSeason(seasonId) {
     return [];
   }
 
-  const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const results = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(r => !r.friendly);
 
   results.sort((a, b) => {
     const dateA = a.reportedAt?.toDate ? a.reportedAt.toDate() : new Date(0);
@@ -495,8 +508,14 @@ async function getHeadToHeadResults(teamAId, teamBId, excludeId = null, limitNum
   const [snap1, snap2] = await Promise.all([query1, query2]);
 
   let results = [];
-  snap1.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-  snap2.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+  snap1.forEach(doc => {
+    const data = doc.data();
+    if (!data.friendly) results.push({ id: doc.id, ...data });
+  });
+  snap2.forEach(doc => {
+    const data = doc.data();
+    if (!data.friendly) results.push({ id: doc.id, ...data });
+  });
 
   // Filter out the excluded ID if provided
   if (excludeId) {

@@ -1320,8 +1320,8 @@ class BookingService {
             // KORREKTUR: Robuste Prüfung, ob .toDate() existiert. Falls nicht, wird das Datum als String behandelt.
             if (!booking.date) return false; // Sicherheitsprüfung für den Fall, dass das Datum fehlt.
             const bookingDate = booking.date.toDate ? booking.date.toDate() : new Date(booking.date);
-            // NEU: Prüfe auch auf Vorhandensein beider Teams
-            return booking.status === 'confirmed' && bookingDate < now && booking.homeTeamId && booking.awayTeamId;
+            // NEU: Prüfe auch auf Vorhandensein beider Teams und schließe Freundschaftsspiele aus
+            return booking.status === 'confirmed' && bookingDate < now && booking.homeTeamId && booking.awayTeamId && !booking.friendly;
         });
 
         if (pastBookings.length === 0) {
@@ -1369,8 +1369,9 @@ class BookingService {
             const isConfirmed = b.status === 'confirmed';
             const isPast = d < nowMillis;
             const hasTeams = b.homeTeamId && b.awayTeamId;
+            const isNotFriendly = !b.friendly;
 
-            return isConfirmed && isPast && hasTeams;
+            return isConfirmed && isPast && hasTeams && isNotFriendly;
         });
 
         if (candidates.length === 0) return [];

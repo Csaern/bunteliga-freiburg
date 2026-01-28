@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Avatar, Link, Divider, useTheme, Chip, List, ListItem, CircularProgress, Button } from '@mui/material';
+import { Box, Typography, Avatar, Link, Divider, useTheme, Chip, List, ListItem, CircularProgress, Button, useMediaQuery } from '@mui/material';
 import { ReusableModal } from '../Helpers/modalUtils';
+import ScoreInput from '../ScoreInput';
 import { getHeadToHeadResults } from '../../services/resultApiService';
 import { API_BASE_URL } from '../../services/apiClient';
 
@@ -87,9 +88,14 @@ const formatH2HDate = (dateString) => {
 
 const GameDetailsModal = ({ open, onClose, fixture, teams, pitches, handleReportResult, handleCancelBooking }) => {
     const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const navigate = useNavigate();
     const [h2hResults, setH2HResults] = useState([]);
     const [loadingH2H, setLoadingH2H] = useState(false);
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [reportMode, setReportMode] = useState(false);
+    const [score, setScore] = useState({ home: '0', away: '0' });
+    const [submitting, setSubmitting] = useState(false);
 
     const homeTeam = teams[fixture?.homeTeamId] || { name: fixture?.homeTeamName || 'Unbekannt' };
     const awayTeam = teams[fixture?.awayTeamId] || { name: fixture?.awayTeamName || 'Unbekannt' };
@@ -133,6 +139,16 @@ const GameDetailsModal = ({ open, onClose, fixture, teams, pitches, handleReport
                 .finally(() => setLoadingH2H(false));
         } else {
             setH2HResults([]);
+        }
+    }, [open, fixture]);
+
+    // Reset confirm state when modal opens/closes or fixture changes
+    useEffect(() => {
+        if (!open) {
+            setConfirmCancel(false);
+            setReportMode(false);
+            setScore({ home: '0', away: '0' });
+            setSubmitting(false);
         }
     }, [open, fixture]);
 
@@ -221,149 +237,227 @@ const GameDetailsModal = ({ open, onClose, fixture, teams, pitches, handleReport
 
                 <Divider />
 
-                {/* H2H Section */}
-                <Box>
-                    <Typography variant="subtitle2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, mb: 1 }}>
-                        Letzte Begegnungen
-                    </Typography>
-
-                    {loadingH2H ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-                            <CircularProgress size={24} />
-                        </Box>
-                    ) : h2hResults.length > 0 ? (
-                        <List dense disablePadding>
-                            {h2hResults.map(res => {
-                                // Try to match with the main fixture teams first (to ensure we have logos)
-                                let hTeam = teams[res.homeTeamId];
-                                if (!hTeam && res.homeTeamId === fixture.homeTeamId) hTeam = homeTeam;
-                                if (!hTeam && res.homeTeamId === fixture.awayTeamId) hTeam = awayTeam;
-                                if (!hTeam) hTeam = { name: res.homeTeamName };
-
-                                let aTeam = teams[res.awayTeamId];
-                                if (!aTeam && res.awayTeamId === fixture.homeTeamId) aTeam = homeTeam;
-                                if (!aTeam && res.awayTeamId === fixture.awayTeamId) aTeam = awayTeam;
-                                if (!aTeam) aTeam = { name: res.awayTeamName };
-
-                                const isFriendly = res.isFriendly === true; // Check friendly status
-
-                                const homeWin = parseInt(res.homeScore) > parseInt(res.awayScore);
-                                const awayWin = parseInt(res.awayScore) > parseInt(res.homeScore);
-
-                                return (
-                                    <ListItem key={res.id} sx={{
-                                        px: 0,
-                                        py: 1,
-                                        display: 'grid',
-                                        gridTemplateColumns: '80px 1fr auto 1fr', // Date | Home | Score | Away
-                                        alignItems: 'center',
-                                        fontSize: '0.85rem',
-                                        gap: 1
-                                    }}>
-                                        {/* Date */}
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                                {formatH2HDate(res.date || res.createdAt)}
-                                            </Typography>
-                                            {isFriendly && (
-                                                <Chip
-                                                    label="F"
-                                                    size="small"
-                                                    sx={{
-                                                        height: '16px',
-                                                        fontSize: '0.65rem',
-                                                        bgcolor: '#FFD700',
-                                                        color: '#000',
-                                                        fontWeight: 'bold',
-                                                        mt: 0.5
-                                                    }}
-                                                />
-                                            )}
-                                        </Box>
-
-                                        {/* Home Team (Right Aligned) */}
-                                        <Box
-                                            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, overflow: 'hidden', cursor: 'pointer' }}
-                                            onClick={() => { onClose(); navigate(`/team/${res.homeTeamId}`); }}
-                                        >
-                                            <Typography sx={{
-                                                fontWeight: homeWin ? 'bold' : 'normal',
-                                                color: res.homeTeamId === fixture.homeTeamId ? theme.palette.text.primary : theme.palette.text.secondary,
-                                                textAlign: 'right',
-                                                fontSize: '0.8rem',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}>
-                                                {hTeam.name}
-                                            </Typography>
-                                            <TeamLogo team={hTeam} size={28} />
-                                        </Box>
-
-                                        {/* Score (Center) */}
-                                        <Box sx={{
-                                            bgcolor: theme.palette.action.hover,
-                                            px: 1.5,
-                                            borderRadius: 2,
-                                            fontWeight: 'bold',
-                                            minWidth: '50px',
-                                            textAlign: 'center',
-                                            fontSize: '0.9rem',
-                                            py: 0.5
-                                        }}>
-                                            {res.homeScore}:{res.awayScore}
-                                        </Box>
-
-                                        {/* Away Team (Left Aligned) */}
-                                        <Box
-                                            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 1, overflow: 'hidden', cursor: 'pointer' }}
-                                            onClick={() => { onClose(); navigate(`/team/${res.awayTeamId}`); }}
-                                        >
-                                            <TeamLogo team={aTeam} size={28} />
-                                            <Typography sx={{
-                                                fontWeight: awayWin ? 'bold' : 'normal',
-                                                color: res.awayTeamId === fixture.homeTeamId ? theme.palette.text.primary : theme.palette.text.secondary,
-                                                textAlign: 'left',
-                                                fontSize: '0.8rem',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}>
-                                                {aTeam.name}
-                                            </Typography>
-                                        </Box>
-                                    </ListItem>
-                                );
-                            })}
-                        </List>
-                    ) : (
-                        <Typography variant="body2" sx={{ color: theme.palette.text.disabled, textAlign: 'center', py: 2 }}>
-                            Keine vorherigen Begegnungen gefunden.
+                {/* Content Section: H2H or Cancellation Confirmation */}
+                {confirmCancel ? (
+                    <Box sx={{ py: 2, textAlign: 'center' }}>
+                        <Typography sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, mb: 1, fontWeight: 'bold' }}>
+                            Spiel wirklich absagen?
                         </Typography>
-                    )}
-                </Box>
+                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary }}>
+                            Der Termin wird dadurch für andere Teams freigegeben.
+                        </Typography>
+                    </Box>
+                ) : reportMode ? (
+                    <Box sx={{ py: 2 }}>
+                        <ScoreInput
+                            homeTeam={homeTeam}
+                            awayTeam={awayTeam}
+                            score={score}
+                            setScore={setScore}
+                            hideTeamInfo={true}
+                        />
+                    </Box>
+                ) : (
+                    /* H2H Section */
+                    <Box>
+                        <Typography variant="subtitle2" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.secondary, mb: 1 }}>
+                            Letzte Begegnungen
+                        </Typography>
+
+
+                        {loadingH2H ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        ) : h2hResults.length > 0 ? (
+                            <List dense disablePadding>
+                                {h2hResults.map(res => {
+                                    // Try to match with the main fixture teams first (to ensure we have logos)
+                                    let hTeam = teams[res.homeTeamId];
+                                    if (!hTeam && res.homeTeamId === fixture.homeTeamId) hTeam = homeTeam;
+                                    if (!hTeam && res.homeTeamId === fixture.awayTeamId) hTeam = awayTeam;
+                                    if (!hTeam) hTeam = { name: res.homeTeamName };
+
+                                    let aTeam = teams[res.awayTeamId];
+                                    if (!aTeam && res.awayTeamId === fixture.homeTeamId) aTeam = homeTeam;
+                                    if (!aTeam && res.awayTeamId === fixture.awayTeamId) aTeam = awayTeam;
+                                    if (!aTeam) aTeam = { name: res.awayTeamName };
+
+                                    const isFriendly = res.isFriendly === true; // Check friendly status
+
+                                    const homeWin = parseInt(res.homeScore) > parseInt(res.awayScore);
+                                    const awayWin = parseInt(res.awayScore) > parseInt(res.homeScore);
+
+                                    return (
+                                        <ListItem key={res.id} sx={{
+                                            px: 0,
+                                            py: 1,
+                                            display: 'grid',
+                                            gridTemplateColumns: '80px 1fr auto 1fr', // Date | Home | Score | Away
+                                            alignItems: 'center',
+                                            fontSize: '0.85rem',
+                                            gap: 1
+                                        }}>
+                                            {/* Date */}
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                                                    {formatH2HDate(res.date || res.createdAt)}
+                                                </Typography>
+                                                {isFriendly && (
+                                                    <Chip
+                                                        label="F"
+                                                        size="small"
+                                                        sx={{
+                                                            height: '16px',
+                                                            fontSize: '0.65rem',
+                                                            bgcolor: '#FFD700',
+                                                            color: '#000',
+                                                            fontWeight: 'bold',
+                                                            mt: 0.5
+                                                        }}
+                                                    />
+                                                )}
+                                            </Box>
+
+                                            {/* Home Team (Right Aligned) */}
+                                            <Box
+                                                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, overflow: 'hidden', cursor: 'pointer' }}
+                                                onClick={() => { onClose(); navigate(`/team/${res.homeTeamId}`); }}
+                                            >
+                                                <Typography sx={{
+                                                    fontWeight: homeWin ? 'bold' : 'normal',
+                                                    color: res.homeTeamId === fixture.homeTeamId ? theme.palette.text.primary : theme.palette.text.secondary,
+                                                    textAlign: 'right',
+                                                    fontSize: '0.8rem',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }}>
+                                                    {hTeam.name}
+                                                </Typography>
+                                                <TeamLogo team={hTeam} size={28} />
+                                            </Box>
+
+                                            {/* Score (Center) */}
+                                            <Box sx={{
+                                                bgcolor: theme.palette.action.hover,
+                                                px: 1.5,
+                                                borderRadius: 2,
+                                                fontWeight: 'bold',
+                                                minWidth: '50px',
+                                                textAlign: 'center',
+                                                fontSize: '0.9rem',
+                                                py: 0.5
+                                            }}>
+                                                {res.homeScore}:{res.awayScore}
+                                            </Box>
+
+                                            {/* Away Team (Left Aligned) */}
+                                            <Box
+                                                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 1, overflow: 'hidden', cursor: 'pointer' }}
+                                                onClick={() => { onClose(); navigate(`/team/${res.awayTeamId}`); }}
+                                            >
+                                                <TeamLogo team={aTeam} size={28} />
+                                                <Typography sx={{
+                                                    fontWeight: awayWin ? 'bold' : 'normal',
+                                                    color: res.awayTeamId === fixture.homeTeamId ? theme.palette.text.primary : theme.palette.text.secondary,
+                                                    textAlign: 'left',
+                                                    fontSize: '0.8rem',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }}>
+                                                    {aTeam.name}
+                                                </Typography>
+                                            </Box>
+                                        </ListItem>
+                                    );
+                                })}
+                            </List>
+                        ) : (
+                            <Typography variant="body2" sx={{ color: theme.palette.text.disabled, textAlign: 'center', py: 2 }}>
+                                Keine vorherigen Begegnungen gefunden.
+                            </Typography>
+                        )}
+                        {/* H2H closing tags */}
+                    </Box>
+                )}
 
                 {/* Action Buttons */}
                 {(fixture.bookingId && (handleReportResult || handleCancelBooking)) && (
                     <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1, pt: 2, borderTop: '1px solid', borderColor: theme.palette.divider }}>
-                        {handleReportResult && (
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleReportResult}
-                                sx={{ bgcolor: theme.palette.primary.main }}
-                            >
-                                Ergebnis melden
-                            </Button>
+                        {handleReportResult && !confirmCancel && (
+                            reportMode ? (
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        color="inherit"
+                                        onClick={() => setReportMode(false)}
+                                        disabled={submitting}
+                                        sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}
+                                    >
+                                        Zurück
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={async () => {
+                                            setSubmitting(true);
+                                            try {
+                                                await handleReportResult({ homeScore: score.home, awayScore: score.away });
+                                                // Close or reset is handled by parent or reset effect, but strictly we might want to wait
+                                            } catch (e) {
+                                                setSubmitting(false);
+                                            }
+                                        }}
+                                        disabled={submitting || score.home === '' || score.away === ''}
+                                        sx={{ bgcolor: theme.palette.primary.main }}
+                                    >
+                                        {submitting ? '...' : 'Melden'}
+                                    </Button>
+                                </>
+                            ) : (
+                                !confirmCancel && (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={() => setReportMode(true)}
+                                        sx={{ bgcolor: theme.palette.primary.main }}
+                                    >
+                                        Erg. melden
+                                    </Button>
+                                )
+                            )
                         )}
-                        {handleCancelBooking && (
-                            <Button
-                                variant="outlined"
-                                color="error"
-                                onClick={handleCancelBooking}
-                            >
-                                Spiel absagen
-                            </Button>
+
+                        {handleCancelBooking && !reportMode && (
+                            confirmCancel ? (
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        color="inherit"
+                                        onClick={() => setConfirmCancel(false)}
+                                        sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}
+                                    >
+                                        Zurück
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        onClick={handleCancelBooking}
+                                    >
+                                        Absagen
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={() => setConfirmCancel(true)}
+                                >
+                                    Absagen
+                                </Button>
+                            )
                         )}
                     </Box>
                 )}

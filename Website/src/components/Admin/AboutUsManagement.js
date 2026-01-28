@@ -25,6 +25,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import * as websiteApi from '../../services/websiteApiService';
 import { ReusableModal } from '../Helpers/modalUtils';
+import AboutUsSection from '../AboutUsSection';
 
 const AboutUsManagement = () => {
     const theme = useTheme();
@@ -191,26 +192,10 @@ const AboutUsManagement = () => {
                                 </AccordionSummary>
                                 <AccordionDetails sx={{ borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', p: 3 }}>
                                     <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 1 }}>Vorschau:</Typography>
-                                    <Box sx={{
-                                        // Apply similar styles as frontend for consistency
-                                        '& .ql-align-center': { textAlign: 'center' },
-                                        '& .ql-align-right': { textAlign: 'right' },
-                                        '& .ql-align-justify': { textAlign: 'justify' },
-                                        '& strong': { fontWeight: 'bold', color: 'inherit' },
-                                        '& em': { fontStyle: 'italic', color: 'inherit' },
-                                        '& h1': { fontSize: '1.5em', fontFamily: 'Comfortaa', mt: 1, mb: 1, color: theme.palette.text.primary, backgroundColor: 'transparent' },
-                                        '& h2': { fontSize: '1.25em', fontFamily: 'Comfortaa', mt: 1, mb: 1, color: theme.palette.text.primary, backgroundColor: 'transparent' },
-                                        '& h3': { fontSize: '1.1em', fontFamily: 'Comfortaa', mt: 1, mb: 1, color: theme.palette.text.primary, backgroundColor: 'transparent' },
-                                        '& p': { marginBottom: '0.5em', fontFamily: 'Comfortaa', color: theme.palette.text.primary, backgroundColor: 'transparent' }, // Force primary color
-                                        '& ul, & ol': { pl: 3, mb: 1, fontFamily: 'Comfortaa', color: theme.palette.text.primary, backgroundColor: 'transparent' },
-                                        '& li': { mb: 0.5, color: 'inherit' },
-                                        '& span': { backgroundColor: 'transparent' },
-                                        '& img': { maxWidth: '100%', height: 'auto' },
-                                        overflowWrap: 'anywhere',
-                                        wordBreak: 'break-word'
-                                    }}>
-                                        <div dangerouslySetInnerHTML={{ __html: section.content }} />
-                                    </Box>
+                                    <AboutUsSection
+                                        title={section.title}
+                                        content={section.content}
+                                    />
                                 </AccordionDetails>
                             </Accordion>
                         ))}

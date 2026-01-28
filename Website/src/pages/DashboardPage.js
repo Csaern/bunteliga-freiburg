@@ -5,14 +5,15 @@ import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import TeamSettings from '../components/TeamSettings';
 import CreateGameModal from '../components/Modals/CreateGameModal';
-import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, Snackbar, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Alert } from '@mui/material';
+import ReportResultModal from '../components/Modals/ReportResultModal';
+import { Box, Typography, Button, Container, CircularProgress, Avatar, Grid, TextField, Paper, IconButton, Tooltip, useTheme, useMediaQuery, Chip, Snackbar, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Alert, Table, TableBody, TableContainer, TableHead, TableRow } from '@mui/material';
 import { API_BASE_URL } from '../services/apiClient';
-import { ReusableModal } from '../components/Helpers/modalUtils';
 import * as seasonApi from '../services/seasonApiService';
 import * as teamApi from '../services/teamApiService';
 import * as bookingApi from '../services/bookingApiService';
 import * as resultApi from '../services/resultApiService';
 import { getRequestExpiryInfo } from '../components/Helpers/dateUtils';
+import { StyledTableCell } from '../components/Helpers/tableUtils';
 
 // Icons
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -22,12 +23,16 @@ import PostAddIcon from '@mui/icons-material/PostAdd';
 import SettingsIcon from '@mui/icons-material/Settings';
 import EventIcon from '@mui/icons-material/Event';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import InsightsIcon from '@mui/icons-material/Insights'; // Added for result icon
+import HandshakeIcon from '@mui/icons-material/Handshake'; // Added for friendly match
+// Removed CheckIcon/CloseIcon -> Standardized on CheckCircleIcon/CancelIcon as per request
 
 const DashboardPage = () => {
   const { currentUser, teamId, isAdmin } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Added isMobile check
 
   const [team, setTeam] = useState(null);
   const [pendingGameRequests, setPendingGameRequests] = useState([]);
@@ -43,10 +48,7 @@ const DashboardPage = () => {
 
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [reportForm, setReportForm] = useState({ bookingId: '', homeScore: '', awayScore: '' });
-  const [reportOptions, setReportOptions] = useState([]);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [selectedReportBookingId, setSelectedReportBookingId] = useState(null); // Added state for pre-selection
 
   // UI State for Notifications and Dialogs
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -179,7 +181,8 @@ const DashboardPage = () => {
     }
   }, [location]);
 
-  const handleAcceptBookingRequest = async (bookingId) => {
+  const handleAcceptBookingRequest = async (bookingId, e) => {
+    if (e) e.stopPropagation();
     try {
       const response = await bookingApi.respondToBookingRequest(bookingId, 'confirm');
       showSnackbar(response.message || 'Spiel bestätigt!', 'success');
@@ -190,7 +193,8 @@ const DashboardPage = () => {
     }
   };
 
-  const handleDeclineBookingRequest = async (bookingId) => {
+  const handleDeclineBookingRequest = async (bookingId, e) => {
+    if (e) e.stopPropagation();
     try {
       openPromptDialog('Spielanfrage ablehnen', 'Grund für die Ablehnung (optional)', async (reason) => {
         try {
@@ -207,7 +211,8 @@ const DashboardPage = () => {
     }
   };
 
-  const handleCancelMyRequest = async (bookingId) => {
+  const handleCancelMyRequest = async (bookingId, e) => {
+    if (e) e.stopPropagation();
     openConfirmDialog('Stornierung bestätigen', 'Möchten Sie diese Spielanfrage wirklich stornieren?', async () => {
       try {
         await bookingApi.cancelBooking(bookingId);
@@ -220,114 +225,20 @@ const DashboardPage = () => {
     });
   };
 
-  const loadReportOptions = useCallback(async (preSelectedBookingId = null) => {
-    if (!currentSeason?.id || !teamId) {
-      setReportOptions([]);
-      setReportForm(prev => ({ ...prev, bookingId: '' }));
-      return;
+  const handleOpenReportModal = (bookingId = null) => { // Updated to accept ID
+    if (bookingId) {
+      setSelectedReportBookingId(bookingId);
     }
-    setReportLoading(true);
-    try {
-      const [pastNeedingResult, upcomingBookings] = await Promise.all([
-        bookingApi.getBookingsNeedingResultForMyTeam(currentSeason.id),
-        bookingApi.getUpcomingBookingsForTeam(currentSeason.id, teamId).catch(() => []),
-      ]);
-
-      const confirmedUpcoming = Array.isArray(upcomingBookings)
-        ? upcomingBookings.filter(booking => booking.status === 'confirmed')
-        : [];
-
-      const combined = [...pastNeedingResult, ...confirmedUpcoming];
-
-      const uniqueById = new Map();
-      combined.forEach(booking => {
-        if (!booking || !booking.id) return;
-        uniqueById.set(booking.id, booking);
-      });
-
-      const normalized = Array.from(uniqueById.values())
-        .map(booking => {
-          const dateObj = normalizeDate(booking.date);
-          return {
-            ...booking,
-            _dateObj: dateObj,
-            formattedDate: dateObj ? dateObj.toLocaleDateString('de-DE') : '-',
-            formattedTime: dateObj ? dateObj.toTimeString().slice(0, 5) : '',
-          };
-        })
-        .sort((a, b) => {
-          const timeA = a._dateObj ? a._dateObj.getTime() : 0;
-          const timeB = b._dateObj ? b._dateObj.getTime() : 0;
-          return timeB - timeA;
-        });
-
-      setReportOptions(normalized);
-
-      // Select logic: Pre-selection > existing selection > first option
-      let initialId = '';
-      if (preSelectedBookingId && uniqueById.has(preSelectedBookingId)) {
-        initialId = preSelectedBookingId;
-      } else if (normalized.length > 0) {
-        initialId = normalized[0].id;
-      }
-
-      setReportForm(prev => ({
-        ...prev,
-        bookingId: initialId,
-      }));
-    } catch (error) {
-      console.error('Fehler beim Laden der Spiele für die Ergebnismeldung:', error);
-      showSnackbar(error.message || 'Fehler beim Laden der Spiele für die Ergebnismeldung.', 'error');
-    } finally {
-      setReportLoading(false);
-    }
-  }, [currentSeason, teamId]);
-
-  const handleOpenReportModal = (preSelectedBookingId = null) => {
     setIsReportModalOpen(true);
-    // Wir laden die Optionen und setzen DANN die ID
-    loadReportOptions(preSelectedBookingId);
   };
 
   const handleCloseReportModal = () => {
     setIsReportModalOpen(false);
-    setReportForm({ bookingId: '', homeScore: '', awayScore: '' });
+    setSelectedReportBookingId(null); // Reset
   };
 
-  const handleReportSubmit = async (e) => {
-    e.preventDefault();
-    if (!reportForm.bookingId) {
-      showSnackbar('Bitte wähle ein Spiel aus.', 'warning');
-      return;
-    }
-    if (reportForm.homeScore === '' || reportForm.awayScore === '') {
-      showSnackbar('Bitte gib beide Ergebnisse ein.', 'warning');
-      return;
-    }
-    if (!teamId) {
-      showSnackbar('Keinem Team zugeordnet.', 'error');
-      return;
-    }
-
-    setReportSubmitting(true);
-    try {
-      await resultApi.reportResult(reportForm.bookingId, {
-        homeScore: parseInt(reportForm.homeScore, 10),
-        awayScore: parseInt(reportForm.awayScore, 10),
-        reportedByTeamId: teamId,
-      });
-      showSnackbar('Ergebnis erfolgreich gemeldet!', 'success');
-      handleCloseReportModal();
-      fetchData();
-    } catch (error) {
-      console.error('Fehler beim Melden des Ergebnisses:', error);
-      showSnackbar(error.message || 'Fehler beim Melden des Ergebnisses.', 'error');
-    } finally {
-      setReportSubmitting(false);
-    }
-  };
-
-  const handleConfirmPendingResult = async (result) => {
+  const handleConfirmPendingResult = async (result, e) => {
+    if (e) e.stopPropagation();
     if (!teamId) {
       showSnackbar('Keinem Team zugeordnet.', 'error');
       return;
@@ -343,7 +254,8 @@ const DashboardPage = () => {
     }
   };
 
-  const handleRejectPendingResult = async (result) => {
+  const handleRejectPendingResult = async (result, e) => {
+    if (e) e.stopPropagation();
     if (!teamId) {
       showSnackbar('Keinem Team zugeordnet.', 'error');
       return;
@@ -361,7 +273,8 @@ const DashboardPage = () => {
     });
   };
 
-  const handleCancelReport = async (resultId) => {
+  const handleCancelReport = async (resultId, e) => {
+    if (e) e.stopPropagation();
     openConfirmDialog('Meldung zurückziehen', 'Möchtest du diese Ergebnismeldung wirklich zurückziehen?', async () => {
       try {
         await resultApi.cancelReport(resultId, teamId);
@@ -388,6 +301,117 @@ const DashboardPage = () => {
     const d = new Date(maybeDate);
     return isNaN(d.getTime()) ? null : d;
   };
+
+  // --- Unified Pending Actions Logic ---
+  const allPendingActions = React.useMemo(() => {
+    const actions = [];
+
+    // Helper to determine win/loss color
+    const getResultColor = (homeScore, awayScore, isHome) => {
+      if (homeScore === awayScore) return 'default'; // Draw (or orange/grey)
+      if (isHome) {
+        return homeScore > awayScore ? 'success' : 'error';
+      } else {
+        return awayScore > homeScore ? 'success' : 'error';
+      }
+    };
+
+    // 1. Notification Bookings (Past games needing results)
+    notificationBookings.forEach(booking => {
+      const isHome = booking.homeTeamId === teamId;
+      actions.push({
+        id: `notify-${booking.id}`,
+        type: 'report_needed',
+        date: normalizeDate(booking.date),
+        data: booking,
+        priority: 1, // Highest priority
+        opponentId: isHome ? booking.awayTeamId : booking.homeTeamId,
+        isHome: isHome,
+        label: 'Ergebnis melden',
+        icon: <PostAddIcon sx={{ color: theme.palette.warning.main }} />,
+        friendly: booking.friendly
+      });
+    });
+
+    // 2. Pending Game Requests (Incoming)
+    pendingGameRequests.forEach(booking => {
+      const isHome = booking.homeTeamId === teamId;
+      actions.push({
+        id: `req-in-${booking.id}`,
+        type: 'booking_request',
+        date: normalizeDate(booking.date),
+        data: booking,
+        priority: 2,
+        opponentId: isHome ? booking.awayTeamId : booking.homeTeamId,
+        isHome: isHome,
+        label: 'Spielanfrage',
+        icon: <EventIcon sx={{ color: theme.palette.primary.main }} />,
+        expiry: getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays),
+        friendly: booking.friendly
+      });
+    });
+
+    // 3. Pending Results (To be confirmed by me)
+    pendingResults.forEach(result => {
+      const isHome = result.homeTeamId === teamId;
+      actions.push({
+        id: `res-confirm-${result.id}`,
+        type: 'confirm_result',
+        date: normalizeDate(result.date) || new Date(),
+        data: result,
+        priority: 3,
+        opponentId: isHome ? result.awayTeamId : result.homeTeamId,
+        isHome: isHome,
+        label: 'Ergebnis bestätigen',
+        icon: <InsightsIcon sx={{ color: theme.palette.secondary.main }} />,
+        score: `${result.homeScore} : ${result.awayScore}`,
+        resultColor: getResultColor(result.homeScore, result.awayScore, isHome) // Win/Loss color
+      });
+    });
+
+    // 4. Pending My Requests (Sent by me)
+    pendingMyRequests.forEach(booking => {
+      const isHome = booking.homeTeamId === teamId;
+      actions.push({
+        id: `req-out-${booking.id}`,
+        type: 'my_request',
+        date: normalizeDate(booking.date),
+        data: booking,
+        priority: 4,
+        opponentId: isHome ? booking.awayTeamId : booking.homeTeamId,
+        isHome: isHome,
+        label: 'Gesendet',
+        icon: <AccessTimeIcon sx={{ color: theme.palette.text.secondary }} />,
+        expiry: getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays),
+        friendly: booking.friendly
+      });
+    });
+
+    // 5. Pending My Results (Reported by me, waiting for confirmation)
+    pendingMyResults.forEach(result => {
+      const isHome = result.homeTeamId === teamId;
+      actions.push({
+        id: `res-wait-${result.id}`,
+        type: 'waiting_result',
+        date: normalizeDate(result.date) || new Date(),
+        data: result,
+        priority: 5,
+        opponentId: isHome ? result.awayTeamId : result.homeTeamId,
+        isHome: isHome,
+        label: 'Wartend',
+        icon: <AccessTimeIcon sx={{ color: theme.palette.info.main }} />,
+        score: `${result.homeScore} : ${result.awayScore}`,
+        resultColor: getResultColor(result.homeScore, result.awayScore, isHome)
+      });
+    });
+
+    // Sort by Priority then Date
+    return actions.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return (a.date || 0) - (b.date || 0);
+    });
+
+  }, [notificationBookings, pendingGameRequests, pendingResults, pendingMyRequests, pendingMyResults, currentSeason, theme, teamsMap, teamId]);
 
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
@@ -531,8 +555,8 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* Pending Requests */}
-        {(notificationBookings.length > 0 || pendingResults.length > 0 || pendingGameRequests.length > 0 || pendingMyRequests.length > 0 || pendingMyResults.length > 0) && (
+        {/* Pending Actions Table */}
+        {allPendingActions.length > 0 && (
           <Grid>
             <Typography
               variant="h5"
@@ -547,349 +571,123 @@ const DashboardPage = () => {
             >
               Ausstehende Aktionen
             </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              {/* NEU: Wichtigste Notification zuerst - Ergebnis melden */}
-              {notificationBookings.map(booking => (
-                <Paper key={booking.id} sx={{ ...sectionCardSx, borderColor: theme.palette.warning.main, borderWidth: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
-                      Ergebnis melden
-                    </Typography>
-                    <Chip
-                      label="Ergebnis"
-                      color="warning"
-                      size="small"
+
+            <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid', borderColor: theme.palette.divider, boxShadow: 'none' }}>
+              <Table size={isMobile ? 'small' : 'medium'}>
+                {/* Table Header - Simplified/Hidden on Mobile if preferred, but usually nice to have. */}
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+                    <StyledTableCell width="10%" sx={{ color: theme.palette.text.primary, fontWeight: 'bold', textAlign: 'center' }}>{/* Icon */}</StyledTableCell>
+                    <StyledTableCell width="60%" sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Gegner</StyledTableCell>
+                    {/* Score Column REMOVED */}
+                    <StyledTableCell width="30%" align="right" sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Aktion</StyledTableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {allPendingActions.map((action) => (
+                    <TableRow
+                      key={action.id}
+                      hover
                       sx={{
-                        fontFamily: 'Comfortaa',
-                        fontWeight: 600,
-                        letterSpacing: '0.04em',
+                        '& td': { py: 1.5 },
+                        cursor: action.type === 'report_needed' ? 'pointer' : 'default',
+                        '&:hover': action.type === 'report_needed' ? { backgroundColor: theme.palette.action.selected } : {}
                       }}
-                    />
-                  </Box>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                      {renderTeamLogo(booking.homeTeamId)}
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                        {teamsMap[booking.homeTeamId]?.name}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ minWidth: '60px', display: 'flex', justifyContent: 'center' }}>
-                      <Typography variant="body1" sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.secondary }}>
-                        vs.
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                      {renderTeamLogo(booking.awayTeamId)}
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                        {teamsMap[booking.awayTeamId]?.name}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', mb: 1 }}>
-                    Das Spiel fand am {normalizeDate(booking.date)?.toLocaleDateString('de-DE') || '-'} statt.
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="warning" // Changed to warning to match the icon
-                      startIcon={<PostAddIcon />}
-                      onClick={() => handleOpenReportModal(booking.id)}
+                      onClick={() => action.type === 'report_needed' ? handleOpenReportModal(action.data.id) : null}
                     >
-                      Melden
-                    </Button>
-                  </Box>
-                </Paper>
-              ))}
-
-              {pendingResults.map(result => (
-                <Paper key={result.id} sx={sectionCardSx}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
-                      Ergebnisbestätigung
-                    </Typography>
-                    <Chip
-                      label="Warten"
-                      color="warning"
-                      size="small"
-                      sx={{
-                        fontFamily: 'Comfortaa',
-                        fontWeight: 600,
-                        letterSpacing: '0.04em',
-                        backgroundColor: `${theme.palette.secondary.main}33`,
-                        color: theme.palette.secondary.main,
-                      }}
-                    />
-                  </Box>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                      {renderTeamLogo(result.homeTeamId)}
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                        {teamsMap[result.homeTeamId]?.name}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ minWidth: '80px', display: 'flex', justifyContent: 'center' }}>
-                      <Chip
-                        label={`${result.homeScore} : ${result.awayScore}`}
-                        sx={{
-                          fontFamily: 'Comfortaa',
-                          fontWeight: 'bold',
-                          fontSize: '1rem',
-                          height: 'auto',
-                          py: 0.5,
-                          backgroundColor: theme.palette.action.selected
-                        }}
-                      />
-                    </Box>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                      {renderTeamLogo(result.awayTeamId)}
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                        {teamsMap[result.awayTeamId]?.name}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleConfirmPendingResult(result)}>
-                      Bestätigen
-                    </Button>
-                    <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleRejectPendingResult(result)}>
-                      Ablehnen
-                    </Button>
-                  </Box>
-                </Paper>
-              ))}
-              {pendingMyResults.map(result => (
-                <Paper key={result.id} sx={sectionCardSx}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
-                      Ergebnis gemeldet
-                    </Typography>
-                    <Chip
-                      label="Warten"
-                      size="small"
-                      sx={{
-                        fontFamily: 'Comfortaa',
-                        fontWeight: 600,
-                        letterSpacing: '0.04em',
-                        backgroundColor: `${theme.palette.info.main}33`,
-                        color: theme.palette.info.main,
-                      }}
-                    />
-                  </Box>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                      {renderTeamLogo(result.homeTeamId)}
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                        {teamsMap[result.homeTeamId]?.name}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ minWidth: '80px', display: 'flex', justifyContent: 'center' }}>
-                      <Chip
-                        label={`${result.homeScore} : ${result.awayScore}`}
-                        sx={{
-                          fontFamily: 'Comfortaa',
-                          fontWeight: 'bold',
-                          fontSize: '1rem',
-                          height: 'auto',
-                          py: 0.5,
-                          backgroundColor: theme.palette.action.selected
-                        }}
-                      />
-                    </Box>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                      {renderTeamLogo(result.awayTeamId)}
-                      <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                        {teamsMap[result.awayTeamId]?.name}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelReport(result.id)}>
-                      Stornieren
-                    </Button>
-                  </Box>
-                </Paper>
-              ))}
-              {pendingGameRequests.map(booking => {
-                const d = normalizeDate(booking.date);
-                const dateStr = d ? d.toLocaleDateString('de-DE') : '-';
-                const timeStr = d ? d.toTimeString().slice(0, 5) : '-';
-
-                return (
-                  <Paper key={booking.id} sx={sectionCardSx}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
-                        Spielanfrage
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        {booking.friendly && (
-                          <Chip
-                            label="Freundschaftsspiel"
-                            size="small"
-                            sx={{
-                              fontFamily: 'Comfortaa',
-                              fontWeight: 600,
-                              letterSpacing: '0.04em',
-                              backgroundColor: `${theme.palette.warning.main}2E`,
-                              color: theme.palette.warning.main,
-                            }}
-                          />
-                        )}
-                        <Chip
-                          label="Antworten"
-                          size="small"
-                          sx={{
-                            fontFamily: 'Comfortaa',
-                            fontWeight: 600,
-                            letterSpacing: '0.04em',
-                            backgroundColor: `${theme.palette.primary.main}2E`,
-                            color: theme.palette.primary.main,
-                          }}
-                        />
-                      </Box>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                        {renderTeamLogo(booking.homeTeamId)}
-                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                          {teamsMap[booking.homeTeamId]?.name}
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{ minWidth: '60px', display: 'flex', justifyContent: 'center' }}>
-                        <Typography variant="body1" sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.secondary }}>
-                          vs.
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                        {renderTeamLogo(booking.awayTeamId)}
-                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                          {teamsMap[booking.awayTeamId]?.name}
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 1 }}>
-                      {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
-                    </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1 }}>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleAcceptBookingRequest(booking.id)}>
-                          Annehmen
-                        </Button>
-                        <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleDeclineBookingRequest(booking.id)}>
-                          Ablehnen
-                        </Button>
-                      </Box>
-                      {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays) && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
-                          <AccessTimeIcon sx={{ fontSize: '1rem', color: theme.palette.text.secondary }} />
-                          <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 600, display: 'block', lineHeight: 1 }}>
-                            {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays)}
-                          </Typography>
+                      {/* Type Column - Compact Icon Only */}
+                      <StyledTableCell align="center">
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Tooltip title={action.label} placement="right">
+                            {action.icon}
+                          </Tooltip>
+                          {/* Priority/Friendly Icon Badge */}
+                          {action.friendly && (
+                            <Tooltip title="Freundschaftsspiel">
+                              <HandshakeIcon sx={{ fontSize: '1rem', color: theme.palette.warning.main, mt: 0.5 }} />
+                            </Tooltip>
+                          )}
                         </Box>
-                      )}
-                    </Box>
-                  </Paper>
-                );
-              })}
-              {pendingMyRequests.map(booking => {
-                const d = normalizeDate(booking.date);
-                const dateStr = d ? d.toLocaleDateString('de-DE') : '-';
-                const timeStr = d ? d.toTimeString().slice(0, 5) : '-';
+                      </StyledTableCell>
 
-                return (
-                  <Paper key={booking.id} sx={sectionCardSx}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, textTransform: 'uppercase' }}>
-                        Spielanfrage
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        {booking.friendly && (
-                          <Chip
-                            label="Freundschaftsspiel"
-                            size="small"
-                            sx={{
-                              fontFamily: 'Comfortaa',
-                              fontWeight: 600,
-                              letterSpacing: '0.04em',
-                              backgroundColor: `${theme.palette.warning.main}2E`,
-                              color: theme.palette.warning.main,
-                            }}
-                          />
-                        )}
-                        <Chip
-                          label="Anfrage"
-                          size="small"
-                          sx={{
-                            fontFamily: 'Comfortaa',
-                            fontWeight: 600,
-                            letterSpacing: '0.04em',
-                            backgroundColor: `${theme.palette.secondary.main}2E`,
-                            color: theme.palette.secondary.main,
-                          }}
-                        />
-                      </Box>
-                    </Box>
+                      {/* Opponent & Match Details Column (Mobile Optimized) */}
+                      <StyledTableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          {/* Opponent Line: Link Logo + Name */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {renderTeamLogo(action.opponentId)}
+                            <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, fontSize: isMobile ? '0.75rem' : '1rem' }}>
+                              {teamsMap[action.opponentId]?.name || 'Unbekannt'}
+                              <Box component="span" sx={{ color: theme.palette.text.secondary, ml: 0.5, fontSize: '0.7rem' }}>
+                                {action.isHome ? '(A)' : '(H)'} {/* Opponent status: If I am Home, they are Away */}
+                              </Box>
+                            </Typography>
+                          </Box>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, my: 2, width: '100%' }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                        {renderTeamLogo(booking.homeTeamId)}
-                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                          {teamsMap[booking.homeTeamId]?.name}
-                        </Typography>
-                      </Box>
+                          {/* Info Line: Date & Time - AND SCORE IF AVAILABLE */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem' }}>
+                              {action.date ? action.date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                              {action.date && ` ${action.date.toTimeString().slice(0, 5)}`}
+                            </Typography>
 
-                      <Box sx={{ minWidth: '60px', display: 'flex', justifyContent: 'center' }}>
-                        <Typography variant="body1" sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.secondary }}>
-                          vs.
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flex: 1, textAlign: 'center' }}>
-                        {renderTeamLogo(booking.awayTeamId)}
-                        <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 600, lineHeight: 1.2 }}>
-                          {teamsMap[booking.awayTeamId]?.name}
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', mb: 1 }}>
-                      {dateStr} • {timeStr} Uhr • {booking.pitchName || 'Unbekannter Platz'}
-                    </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 1 }}>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => handleCancelMyRequest(booking.id)}>
-                          Stornieren
-                        </Button>
-                      </Box>
-                      {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays) && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
-                          <AccessTimeIcon sx={{ fontSize: '1rem', color: theme.palette.error.main }} />
-                          <Typography variant="caption" sx={{ color: theme.palette.error.main, fontWeight: 700, display: 'block', lineHeight: 1 }}>
-                            {getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays)}
-                          </Typography>
+                            {action.score && (
+                              <>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>•</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 800, color: action.resultColor === 'default' ? theme.palette.text.primary : theme.palette[action.resultColor].main }}>
+                                  {action.score}
+                                </Typography>
+                              </>
+                            )}
+                          </Box>
                         </Box>
-                      )}
-                    </Box>
-                  </Paper>
-                );
-              })}
-            </Box>
+                      </StyledTableCell>
+
+                      {/* Score Column REMOVED */}
+
+                      {/* Actions Column (Right Aligned, Icons Only) */}
+                      <StyledTableCell align="right">
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                          {action.type === 'report_needed' && (
+                            // No Button, Row Click handles it. Maybe a chevron or small icon to indicate clickability?
+                            // For now leaving empty as per "no button" request
+                            null
+                          )}
+
+                          {action.type === 'booking_request' && (
+                            <>
+                              <IconButton size="medium" color="success" onClick={(e) => handleAcceptBookingRequest(action.data.id, e)} title="Annehmen">
+                                <CheckCircleIcon fontSize="inherit" />
+                              </IconButton>
+                              <IconButton size="medium" color="error" onClick={(e) => handleDeclineBookingRequest(action.data.id, e)} title="Ablehnen">
+                                <CancelIcon fontSize="inherit" />
+                              </IconButton>
+                            </>
+                          )}
+
+                          {action.type === 'confirm_result' && (
+                            <>
+                              <IconButton size="medium" color="success" onClick={(e) => handleConfirmPendingResult(action.data, e)} title="Bestätigen">
+                                <CheckCircleIcon fontSize="inherit" />
+                              </IconButton>
+                              <IconButton size="medium" color="error" onClick={(e) => handleRejectPendingResult(action.data, e)} title="Ablehnen">
+                                <CancelIcon fontSize="inherit" />
+                              </IconButton>
+                            </>
+                          )}
+
+                          {(action.type === 'my_request' || action.type === 'waiting_result') && (
+                            <IconButton size="medium" color="error" onClick={(e) => action.type === 'my_request' ? handleCancelMyRequest(action.data.id, e) : handleCancelReport(action.data.id, e)}>
+                              <CancelIcon fontSize="inherit" />
+                            </IconButton>
+                          )}
+                        </Box>
+                      </StyledTableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Grid>
         )}
 
@@ -917,112 +715,14 @@ const DashboardPage = () => {
         onGameCreated={fetchData}
       />
 
-      <ReusableModal open={isReportModalOpen} onClose={handleCloseReportModal} title="Ergebnis melden">
-        <Box component="form" onSubmit={handleReportSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {reportLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-              <CircularProgress size={32} sx={{ color: theme.palette.primary.main }} />
-            </Box>
-          ) : reportOptions.length === 0 ? (
-            <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', textAlign: 'center' }}>
-              Kein Spiel verfügbar. Sobald ein bestätigtes Spiel ohne Ergebnis vorliegt, kannst du es hier melden.
-            </Typography>
-          ) : (
-            <>
-              <Typography sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', textAlign: 'center' }}>
-                Wähle das Spiel aus und trage die erzielten Tore ein.
-              </Typography>
-              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-                <InputLabel sx={{ color: theme.palette.text.secondary, fontFamily: 'Comfortaa', '&.Mui-focused': { color: theme.palette.primary.main } }}>
-                  Spiel auswählen
-                </InputLabel>
-                <Select
-                  label="Spiel auswählen"
-                  value={reportForm.bookingId}
-                  onChange={(e) => setReportForm(prev => ({ ...prev, bookingId: e.target.value }))}
-                  sx={{
-                    backgroundColor: theme.palette.background.paper,
-                    borderRadius: 2,
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                    '& .MuiSelect-select': { color: theme.palette.text.primary, fontFamily: 'Comfortaa', fontWeight: 600 },
-                    '& .MuiSvgIcon-root': { color: theme.palette.text.primary },
-                  }}
-                  MenuProps={{ PaperProps: { sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, fontFamily: 'Comfortaa' } } }}
-                >
-                  {reportOptions.map(option => (
-                    <MenuItem key={option.id} value={option.id}>
-                      {option.formattedDate} {option.formattedTime} – {teamsMap[option.homeTeamId]?.name || 'Unbekannt'} vs. {teamsMap[option.awayTeamId]?.name || 'Unbekannt'}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  type="number"
-                  size="small"
-                  label="Heim-Tore"
-                  value={reportForm.homeScore}
-                  onChange={(e) => setReportForm(prev => ({ ...prev, homeScore: e.target.value }))}
-                  fullWidth
-                  InputProps={{ inputProps: { min: 0 } }}
-                  sx={{
-                    flex: 1,
-                    '& label': { color: theme.palette.text.secondary, fontFamily: 'Comfortaa' },
-                    '& label.Mui-focused': { color: theme.palette.primary.main },
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'rgba(255,255,255,0.08)',
-                      color: theme.palette.text.primary,
-                      fontFamily: 'Comfortaa',
-                      '& fieldset': { borderColor: theme.palette.divider },
-                      '&:hover fieldset': { borderColor: theme.palette.primary.main },
-                      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
-                    },
-                  }}
-                />
-                <TextField
-                  type="number"
-                  size="small"
-                  label="Auswärts-Tore"
-                  value={reportForm.awayScore}
-                  onChange={(e) => setReportForm(prev => ({ ...prev, awayScore: e.target.value }))}
-                  fullWidth
-                  InputProps={{ inputProps: { min: 0 } }}
-                  sx={{
-                    flex: 1,
-                    '& label': { color: theme.palette.text.secondary, fontFamily: 'Comfortaa' },
-                    '& label.Mui-focused': { color: theme.palette.primary.main },
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'rgba(255,255,255,0.08)',
-                      color: theme.palette.text.primary,
-                      fontFamily: 'Comfortaa',
-                      '& fieldset': { borderColor: theme.palette.divider },
-                      '&:hover fieldset': { borderColor: theme.palette.primary.main },
-                      '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
-                    },
-                  }}
-                />
-              </Box>
-
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
-                <Button variant="outlined" onClick={handleCloseReportModal} sx={{ borderColor: theme.palette.primary.main, color: theme.palette.primary.main }}>
-                  Abbrechen
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  sx={{ backgroundColor: theme.palette.primary.main }}
-                  disabled={reportSubmitting}
-                >
-                  {reportSubmitting ? 'Sende...' : 'Ergebnis melden'}
-                </Button>
-              </Box>
-            </>
-          )}
-        </Box>
-      </ReusableModal>
+      <ReportResultModal
+        open={isReportModalOpen}
+        onClose={handleCloseReportModal}
+        seasonId={currentSeason?.id}
+        teamId={teamId}
+        onReportSuccess={fetchData}
+        initialBookingId={selectedReportBookingId}
+      />
       {/* Snackbar for Notifications */}
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', fontFamily: 'Comfortaa' }}>

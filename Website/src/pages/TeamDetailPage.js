@@ -314,7 +314,7 @@ const TeamDetailPage = () => {
                 <Grid container spacing={3}>
                   {team.description && (
                     <Grid item xs={12}>
-                      <Typography variant="body1" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', lineHeight: 1.8 }}>
+                      <Typography variant="body1" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
                         {team.description}
                       </Typography>
                     </Grid>

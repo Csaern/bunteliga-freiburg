@@ -27,12 +27,14 @@ import * as bookingApi from '../../services/bookingApiService';
 import * as teamApi from '../../services/teamApiService';
 import * as seasonApi from '../../services/seasonApiService';
 
+import AppModal from './AppModal';
+
 const steps = ['Spielart', 'Platzwahl', 'Details & Buchung'];
 
 const CreateGameModal = ({ open, onClose, onGameCreated }) => {
     const { teamId } = useAuth();
     const theme = useTheme();
-    const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+    // fullScreen logic handled by AppModal
 
     const [activeStep, setActiveStep] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -625,61 +627,60 @@ const CreateGameModal = ({ open, onClose, onGameCreated }) => {
         );
     };
 
+    const actionButtons = (
+        <>
+            <Button onClick={onClose} color="inherit">
+                Abbrechen
+            </Button>
+            <Box sx={{ flex: '1 1 auto' }} />
+            {activeStep > 0 && (
+                <Button onClick={handleBack} sx={{ mr: 1 }}>
+                    Zurück
+                </Button>
+            )}
+            {activeStep < steps.length - 1 ? (
+                <Button onClick={handleNext} variant="contained">
+                    Weiter
+                </Button>
+            ) : (
+                <Button
+                    onClick={handleSubmit}
+                    variant="contained"
+                    color="primary"
+                    disabled={loading || success}
+                >
+                    {loading ? <CircularProgress size={24} /> : 'Spiel anfragen'}
+                </Button>
+            )}
+        </>
+    );
+
     return (
-        <Dialog
+        <AppModal
             open={open}
             onClose={onClose}
-            fullWidth
-            maxWidth="sm"
-            fullScreen={fullScreen}
+            title="Neues Spiel erstellen"
+            actions={actionButtons}
+            loading={loading}
         >
-            <DialogTitle sx={{ fontFamily: 'Comfortaa', fontWeight: 700 }}>
-                Neues Spiel erstellen
-            </DialogTitle>
-            <DialogContent dividers sx={{ minHeight: fullScreen ? 'auto' : '450px' }}>
-                <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
-                    {steps.map((label) => (
-                        <Step key={label}>
-                            <StepLabel>{label}</StepLabel>
-                        </Step>
-                    ))}
-                </Stepper>
+            <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
+                {steps.map((label) => (
+                    <Step key={label}>
+                        <StepLabel>{label}</StepLabel>
+                    </Step>
+                ))}
+            </Stepper>
 
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
-                {activeStep === 0 && renderStep1()}
-                {activeStep === 1 && renderStep2()}
-                {activeStep === 2 && renderStep3()}
-
-            </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
-                <Button onClick={onClose} color="inherit">
-                    Abbrechen
-                </Button>
-                <Box sx={{ flex: '1 1 auto' }} />
-                {activeStep > 0 && (
-                    <Button onClick={handleBack} sx={{ mr: 1 }}>
-                        Zurück
-                    </Button>
-                )}
-                {activeStep < steps.length - 1 ? (
-                    <Button onClick={handleNext} variant="contained">
-                        Weiter
-                    </Button>
-                ) : (
-                    <Button
-                        onClick={handleSubmit}
-                        variant="contained"
-                        color="primary"
-                        disabled={loading || success}
-                    >
-                        {loading ? <CircularProgress size={24} /> : 'Spiel anfragen'}
-                    </Button>
-                )}
-            </DialogActions>
-        </Dialog>
+            {activeStep === 0 && renderStep1()}
+            {activeStep === 1 && renderStep2()}
+            {activeStep === 2 && renderStep3()}
+        </AppModal>
     );
 };
 
 export default CreateGameModal;
+
+
