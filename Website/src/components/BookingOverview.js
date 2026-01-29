@@ -7,9 +7,10 @@ import * as bookingApi from '../services/bookingApiService';
 import * as teamApi from '../services/teamApiService';
 import { useAuth } from '../context/AuthProvider';
 import { ReusableModal } from './Helpers/modalUtils';
-import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel, InputAdornment, Tooltip, IconButton } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, Select, MenuItem, TextField, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, Divider, Checkbox, FormControlLabel, InputAdornment, Tooltip, IconButton, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import BlockIcon from '@mui/icons-material/Block';
 import BuildIcon from '@mui/icons-material/Build';
@@ -57,14 +58,14 @@ const BookingOverview = () => {
     return new Date(dateObj);
   };
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       // Verwende öffentliche APIs für alle User (auch ohne Admin-Rechte)
       const activeSeason = await seasonApi.getActiveSeasonPublic().catch(() => null);
       if (!activeSeason) {
         console.error('Keine aktive Saison gefunden.');
-        setLoading(false);
+        if (!isSilent) setLoading(false);
         return;
       }
       setCurrentSeason(activeSeason);
@@ -86,11 +87,11 @@ const BookingOverview = () => {
         teams,
         bookings: formattedBookings
       });
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     } catch (error) {
       console.error('Fehler beim Laden der Daten:', error);
       setNotification({ open: true, message: 'Fehler beim Laden der Daten.', severity: 'error' });
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, []);
 
@@ -163,10 +164,12 @@ const BookingOverview = () => {
       setAwayTeam('');
 
       // Refresh data
-      fetchData();
+      await fetchData(true);
     } catch (error) {
       console.error("Fehler bei der Buchung:", error);
       setNotification({ open: true, message: error.message || "Buchung fehlgeschlagen.", severity: 'error' });
+      // Refresh data to show current status without closing modal
+      await fetchData(true);
     } finally {
       setSubmitting(false);
     }
@@ -207,9 +210,9 @@ const BookingOverview = () => {
 
   // Helper for status labels and colors
   const getStatusConfig = (status, isAvailable) => {
+    // ... existing implementation ...
     if (isAvailable) return { label: 'Frei', color: theme.palette.success.main, icon: <EventAvailableIcon />, iconColor: 'success' };
 
-    // Status mapping for colors and labels
     switch (status) {
       case 'booked':
       case 'confirmed':
@@ -226,6 +229,7 @@ const BookingOverview = () => {
     }
   };
 
+  // ... existing filtering logic ...
   // Nur zukünftige Buchungen anzeigen (Vergangenheit ausblenden)
   // UND nur Buchungen auf offiziellen Plätzen anzeigen
   const now = new Date();
@@ -240,7 +244,6 @@ const BookingOverview = () => {
     }
   });
 
-  // Suchfelder für die Volltextsuche
   const searchableFields = [
     { key: 'date', accessor: (item) => formatDateForSearch(item.date) },
     { key: 'pitchId', accessor: (item) => getPitchName(item.pitchId) },
@@ -249,10 +252,8 @@ const BookingOverview = () => {
     { key: 'status', accessor: (item) => item.status === 'available' ? 'Frei' : (item.status === 'blocked' ? 'Gesperrt' : 'Belegt') }
   ];
 
-  // Filtere Buchungen basierend auf Suchbegriff
   const filteredBookings = filterData(upcomingBookings, searchTerm, searchableFields);
 
-  // Gruppiere gefilterte Buchungen nach Platz
   const bookingsByPitch = filteredBookings.reduce((acc, booking) => {
     const pitchId = booking.pitchId;
     if (!acc[pitchId]) {
@@ -262,12 +263,10 @@ const BookingOverview = () => {
     return acc;
   }, {});
 
-  // Sortiere Buchungen innerhalb jedes Platzes nach Datum
   Object.keys(bookingsByPitch).forEach(pitchId => {
     bookingsByPitch[pitchId].sort((a, b) => new Date(a.date) - new Date(b.date));
   });
 
-  // Sortiere Plätze alphabetisch
   const sortedPitchIds = Object.keys(bookingsByPitch).sort((a, b) => {
     const pitchA = getPitchName(a);
     const pitchB = getPitchName(b);
@@ -277,6 +276,15 @@ const BookingOverview = () => {
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: theme.palette.primary.main }} /></Box>;
   }
+
+  // Lookup current booking status for the modal
+  const currentModalBooking = selectedSlot ? (data.bookings || []).find(b => b.id === selectedSlot.id) : null;
+  const isModalBookingAvailable = currentModalBooking ? (
+    currentModalBooking.status === 'available' ||
+    (currentModalBooking.isAvailable === true && !currentModalBooking.homeTeamId && !currentModalBooking.awayTeamId)
+  ) : false;
+
+  const modalDisabled = !isModalBookingAvailable || submitting;
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3 } }}>
@@ -293,9 +301,11 @@ const BookingOverview = () => {
           fullWidth
           variant="outlined"
           size="small"
+          name="booking-search"
           placeholder="Suche nach Datum, Platz, Team..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          autoComplete="off"
           sx={{
             ...inputStyle,
             maxWidth: '600px'
@@ -323,146 +333,149 @@ const BookingOverview = () => {
             const pitchName = getPitchName(pitchId);
 
             return (
-              <TableContainer key={pitchId} component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider, maxWidth: '1200px', margin: '0 auto' }}>
-                <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="h6" sx={{ color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
-                    {pitchName}
-                  </Typography>
-                </Box>
-                <Table size="small">
-                  <TableHead>
-                    {isMobile ? (
-                      <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
-                        <TableCell align="center" colSpan={7} sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Verfügbare Termine</TableCell>
-                      </TableRow>
-                    ) : (
-                      <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
-                        <TableCell align="center" sx={{ width: '40px', color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Status</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Datum</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Zeitraum</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Heim</TableCell>
-                        <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Auswärts</TableCell>
-                        <TableCell align="center" sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Aktion</TableCell>
-                      </TableRow>
-                    )}
-                  </TableHead>
-                  <TableBody>
-                    {pitchBookings.map(booking => {
-                      const startTime = new Date(booking.date).toTimeString().slice(0, 5);
-                      const endTime = booking.duration ? new Date(new Date(booking.date).getTime() + booking.duration * 60000).toTimeString().slice(0, 5) : '-';
-                      const timeRange = `${startTime} - ${endTime}`;
+              <Box key={pitchId} sx={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+                <Accordion defaultExpanded={false} sx={{ width: '100%' }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: theme.palette.background.paper, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                    <Typography variant="h6" sx={{ color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
+                      {pitchName}
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ p: 0 }}>
+                    <TableContainer component={Box} sx={{ backgroundColor: theme.palette.background.paper }}>
+                      <Table size="small">
+                        <TableHead>
+                          {isMobile ? (
+                            <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+                              <TableCell align="center" colSpan={7} sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Verfügbare Termine</TableCell>
+                            </TableRow>
+                          ) : (
+                            <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
+                              <TableCell align="center" sx={{ width: '40px', color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Status</TableCell>
+                              <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Datum</TableCell>
+                              <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Zeitraum</TableCell>
+                              <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Heim</TableCell>
+                              <TableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Auswärts</TableCell>
+                              <TableCell align="center" sx={{ color: theme.palette.text.primary, fontWeight: 'bold', borderBottom: `1px solid ${theme.palette.divider}` }}>Aktion</TableCell>
+                            </TableRow>
+                          )}
+                        </TableHead>
+                        <TableBody>
+                          {pitchBookings.map(booking => {
+                            const startTime = new Date(booking.date).toTimeString().slice(0, 5);
+                            const endTime = booking.duration ? new Date(new Date(booking.date).getTime() + booking.duration * 60000).toTimeString().slice(0, 5) : '-';
+                            const timeRange = `${startTime} - ${endTime}`;
 
-                      // Eine Buchung ist verfügbar, wenn: status === 'available' ODER (isAvailable === true UND keine Teams zugewiesen)
-                      const isAvailable = booking.status === 'available' ||
-                        (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
+                            const isAvailable = booking.status === 'available' ||
+                              (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
 
-                      const statusConfig = getStatusConfig(booking.status, isAvailable);
+                            const statusConfig = getStatusConfig(booking.status, isAvailable);
 
-                      // Check if booking is allowed for this user
-                      let isBookable = isAvailable;
+                            let isBookable = isAvailable;
 
-                      if (isAvailable && leagueLimitReached && !booking.friendly) {
-                        isBookable = false;
-                        // disabledReason = 'Ligaspiel-Limit erreicht';
-                      }
+                            if (isAvailable && leagueLimitReached && !booking.friendly) {
+                              isBookable = false;
+                            }
 
-                      return isMobile ? (
-                        <TableRow
-                          key={booking.id}
-                          onClick={() => isBookable && handleBookNow(booking)}
-                          sx={{
-                            backgroundColor: theme.palette.background.default,
-                            cursor: isBookable ? 'pointer' : 'default',
-                            '&:hover': { backgroundColor: isBookable ? theme.palette.action.hover : 'inherit' }
-                          }}
-                        >
-                          <TableCell colSpan={7} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Box sx={{ display: 'flex', alignItems: 'stretch', minHeight: '70px' }}>
-                              <Box sx={{ width: '4px', bgcolor: statusConfig.color }} />
-                              <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                  <Box sx={{ textAlign: 'center', pr: 2 }}>
-                                    <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
-                                      <Typography sx={{ color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', fontSize: '0.8rem', userSelect: 'none' }}>F</Typography>
+                            return isMobile ? (
+                              <TableRow
+                                key={booking.id}
+                                onClick={() => isBookable && handleBookNow(booking)}
+                                sx={{
+                                  backgroundColor: theme.palette.background.default,
+                                  cursor: isBookable ? 'pointer' : 'default',
+                                  '&:hover': { backgroundColor: isBookable ? theme.palette.action.hover : 'inherit' }
+                                }}
+                              >
+                                <TableCell colSpan={7} sx={{ p: 0, border: 'none', borderBottom: `1px solid ${theme.palette.divider}` }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'stretch', minHeight: '70px' }}>
+                                    <Box sx={{ width: '4px', bgcolor: statusConfig.color }} />
+                                    <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Box sx={{ textAlign: 'center', pr: 2 }}>
+                                          <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
+                                            <Typography sx={{ color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', fontSize: '0.8rem', userSelect: 'none' }}>F</Typography>
+                                          </Box>
+                                        </Box>
+                                        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
+                                          {isAvailable ? (
+                                            <Typography sx={{ fontSize: '0.8rem', color: theme.palette.success.main }}>Frei</Typography>
+                                          ) : (
+                                            <>
+                                              <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary, textAlign: 'center' }}>{displayTeamName(booking.homeTeamId)}</Typography>
+                                              <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
+                                              <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary, textAlign: 'center' }}>{displayTeamName(booking.awayTeamId)}</Typography>
+                                            </>
+                                          )}
+                                        </Box>
+                                        <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
+                                          {isBookable ? (
+                                            <Tooltip title="Platz buchen">
+                                              <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); handleBookNow(booking); }}>
+                                                <EventAvailableIcon />
+                                              </IconButton>
+                                            </Tooltip>
+                                          ) : (
+                                            <Tooltip title={statusConfig.label}>
+                                              <span>
+                                                <IconButton size="small" color={statusConfig.iconColor} disabled>
+                                                  {statusConfig.icon}
+                                                </IconButton>
+                                              </span>
+                                            </Tooltip>
+                                          )}
+                                        </Box>
+                                      </Box>
                                     </Box>
                                   </Box>
-                                  <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
-                                    {isAvailable ? (
-                                      <Typography sx={{ fontSize: '0.8rem', color: theme.palette.success.main }}>Frei</Typography>
-                                    ) : (
-                                      <>
-                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary, textAlign: 'center' }}>{displayTeamName(booking.homeTeamId)}</Typography>
-                                        <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', my: 0.25 }}>vs.</Typography>
-                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, color: theme.palette.text.primary, textAlign: 'center' }}>{displayTeamName(booking.awayTeamId)}</Typography>
-                                      </>
-                                    )}
-                                  </Box>
-                                  <Box sx={{ pl: 2, borderLeft: `1px solid ${theme.palette.divider}` }}>
-                                    {isBookable ? (
-                                      <Tooltip title="Platz buchen">
-                                        <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); handleBookNow(booking); }}>
-                                          <EventAvailableIcon />
-                                        </IconButton>
-                                      </Tooltip>
-                                    ) : (
-                                      <Tooltip title={statusConfig.label}>
-                                        <span>
-                                          <IconButton size="small" color={statusConfig.iconColor} disabled>
-                                            {statusConfig.icon}
-                                          </IconButton>
-                                        </span>
-                                      </Tooltip>
-                                    )}
-                                  </Box>
-                                </Box>
-                              </Box>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <TableRow
-                          key={booking.id}
-                          onClick={() => isBookable && handleBookNow(booking)}
-                          sx={{
-                            cursor: isBookable ? 'pointer' : 'default',
-                            '&:hover': { backgroundColor: isBookable ? theme.palette.action.hover : 'inherit' }
-                          }}
-                        >
-                          <StyledTableCell align="center">
-                            <Box sx={{ width: '10px', height: '10px', bgcolor: statusConfig.color, borderRadius: '50%', boxShadow: `0 0 8px ${statusConfig.color}` }} title={statusConfig.label} />
-                          </StyledTableCell>
-                          <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE')}</StyledTableCell>
-                          <StyledTableCell>
-                            {timeRange}
-                            <Typography component="span" sx={{ ml: 1, color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', userSelect: 'none' }}>F</Typography>
-                          </StyledTableCell>
-                          <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.homeTeamId)}</StyledTableCell>
-                          <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.awayTeamId)}</StyledTableCell>
-                          <StyledTableCell align="center">
-                            {isBookable ? (
-                              <Tooltip title="Platz buchen">
-                                <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); handleBookNow(booking); }}>
-                                  <EventAvailableIcon />
-                                </IconButton>
-                              </Tooltip>
+                                </TableCell>
+                              </TableRow>
                             ) : (
-                              <Tooltip title={statusConfig.label}>
-                                <span>
-                                  <IconButton size="small" color={statusConfig.iconColor === 'default' ? 'inherit' : statusConfig.iconColor} disabled>
-                                    {statusConfig.icon}
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                            )}
-                          </StyledTableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                              <TableRow
+                                key={booking.id}
+                                onClick={() => isBookable && handleBookNow(booking)}
+                                sx={{
+                                  cursor: isBookable ? 'pointer' : 'default',
+                                  '&:hover': { backgroundColor: isBookable ? theme.palette.action.hover : 'inherit' }
+                                }}
+                              >
+                                <StyledTableCell align="center">
+                                  <Box sx={{ width: '10px', height: '10px', bgcolor: statusConfig.color, borderRadius: '50%', boxShadow: `0 0 8px ${statusConfig.color}` }} title={statusConfig.label} />
+                                </StyledTableCell>
+                                <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE')}</StyledTableCell>
+                                <StyledTableCell>
+                                  {timeRange}
+                                  <Typography component="span" sx={{ ml: 1, color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', userSelect: 'none' }}>F</Typography>
+                                </StyledTableCell>
+                                <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.homeTeamId)}</StyledTableCell>
+                                <StyledTableCell>{isAvailable ? '-' : displayTeamName(booking.awayTeamId)}</StyledTableCell>
+                                <StyledTableCell align="center">
+                                  {isBookable ? (
+                                    <Tooltip title="Platz buchen">
+                                      <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); handleBookNow(booking); }}>
+                                        <EventAvailableIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip title={statusConfig.label}>
+                                      <span>
+                                        <IconButton size="small" color={statusConfig.iconColor === 'default' ? 'inherit' : statusConfig.iconColor} disabled>
+                                          {statusConfig.icon}
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                </StyledTableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </AccordionDetails>
+                </Accordion>
+              </Box>
             );
           })}
         </Box>
@@ -472,6 +485,16 @@ const BookingOverview = () => {
       {selectedSlot && (
         <ReusableModal open={!!selectedSlot} onClose={() => setSelectedSlot(null)} title="Platz buchen">
           <Box component="form" onSubmit={submitBooking} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {!isModalBookingAvailable && (
+              <Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: theme.palette.error.main }}>
+                {(() => {
+                  const status = currentModalBooking?.status;
+                  if (status === 'blocked') return 'Dieser Termin wurde gerade gesperrt (Wochenlimit erreicht).';
+                  if (status === 'booked' || status === 'confirmed' || status === 'pending_away_confirm' || status === 'pending_home_confirm') return 'Dieser Termin wurde gerade von einem anderen Team reserviert.';
+                  return 'Dieser Termin ist nicht mehr verfügbar.';
+                })()}
+              </Alert>
+            )}
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField size="small" label="Datum" type="date" fullWidth value={new Date(selectedSlot.date).toISOString().split('T')[0]} InputLabelProps={{ shrink: true }} sx={inputStyle} disabled />
               <TextField size="small" label="Uhrzeit" type="time" fullWidth value={selectedSlot.time} InputLabelProps={{ shrink: true }} sx={inputStyle} disabled />
@@ -500,7 +523,7 @@ const BookingOverview = () => {
                   onChange={(e) => setAwayTeam(e.target.value)}
                   required
                   MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}
-                  disabled={isOpponentLoading}
+                  disabled={isOpponentLoading || modalDisabled}
                 >
                   <MenuItem value=""><em>-</em></MenuItem>
                   {isOpponentLoading ? (
@@ -521,11 +544,11 @@ const BookingOverview = () => {
                 checked={isFriendlyGame}
                 onChange={(e) => setIsFriendlyGame(e.target.checked)}
                 sx={{ color: 'grey.100', '&.Mui-checked': { color: '#FFD700' }, '&.Mui-disabled': { color: 'grey.700' } }}
-                disabled={!selectedSlot.friendly}
+                disabled={!selectedSlot.friendly || modalDisabled}
               />}
               label={
                 <Box>
-                  <Typography sx={{ color: !selectedSlot.friendly ? 'grey.600' : 'grey.100' }}>Freundschaftsspiel</Typography>
+                  <Typography sx={{ color: (!selectedSlot.friendly || modalDisabled) ? 'grey.600' : 'grey.100' }}>Freundschaftsspiel</Typography>
                   {!selectedSlot.friendly && <Typography variant="caption" sx={{ color: 'grey.600' }}>Nicht freigegeben</Typography>}
                 </Box>
               }
@@ -533,7 +556,7 @@ const BookingOverview = () => {
 
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
               <Button variant="outlined" color="inherit" onClick={() => setSelectedSlot(null)} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button>
-              <Button variant="contained" sx={{ bgcolor: theme.palette.primary.main }} type="submit" disabled={!awayTeam || submitting}>
+              <Button variant="contained" sx={{ bgcolor: theme.palette.primary.main }} type="submit" disabled={!awayTeam || modalDisabled}>
                 {submitting ? <CircularProgress size={20} /> : 'Jetzt buchen'}
               </Button>
             </Box>

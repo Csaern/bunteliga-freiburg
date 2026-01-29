@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, useTheme, useMediaQuery, Typography, TextField, InputAdornment, Select, MenuItem, FormControl, InputLabel, Checkbox, FormControlLabel, Divider, Alert, Snackbar, CircularProgress, ListItemText } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { ReusableModal } from '../Helpers/modalUtils';
+import AppModal from '../Modals/AppModal';
 import { formatGermanDate, formatDateForSearch, formatTime, createBerlinDate } from '../Helpers/dateUtils';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import * as bookingApiService from '../../services/bookingApiService';
@@ -89,6 +89,7 @@ const BookingManager = ({ currentSeason }) => {
     const [bulkModalStep, setBulkModalStep] = useState('form');
     const [bulkCheckResult, setBulkCheckResult] = useState(null);
     const [isChecking, setIsChecking] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
 
     // Removed collisionCheck, potentialOpponents, isOpponentLoading as they are now in AdminBookingForm
 
@@ -300,6 +301,8 @@ const BookingManager = ({ currentSeason }) => {
             setNotification({ open: true, message: 'Keine aktive Saison gefunden.', severity: 'error' });
             return;
         }
+
+        setIsCreating(true);
         try {
             const dataToSend = {
                 seasonId: currentSeason.id,
@@ -312,9 +315,13 @@ const BookingManager = ({ currentSeason }) => {
             fetchData();
         } catch (error) {
             setNotification({ open: true, message: error.message || 'Fehler beim Erstellen der Zeitslots!', severity: 'error' });
+        } finally {
+            setIsCreating(false);
         }
     };
 
+
+    const [showPastBookings, setShowPastBookings] = useState(false);
 
     const displayTeamName = (teamId) => getTeamName(teamId) || '-';
 
@@ -326,7 +333,18 @@ const BookingManager = ({ currentSeason }) => {
         { key: 'friendly', accessor: (booking) => booking.friendly ? 'Freundschaftsspiel' : '' }
     ];
 
-    const filteredBookings = filterData(localBookings, searchTerm, searchableFields);
+    let filteredBookings = filterData(localBookings, searchTerm, searchableFields);
+
+    // Date Filter: Hide past bookings by default
+    if (!showPastBookings) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        filteredBookings = filteredBookings.filter(b => {
+            const bookingDate = new Date(b.date);
+            return bookingDate >= today;
+        });
+    }
+
     const officialPitches = allPitches.filter(p => p.isVerified && !p.isArchived);
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
@@ -348,14 +366,16 @@ const BookingManager = ({ currentSeason }) => {
                 </Button>
             </Box>
 
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+            <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <TextField
                     fullWidth
                     variant="outlined"
                     size="small"
+                    name="booking-admin-search"
                     placeholder="Suche nach Datum, Platz, Team..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    autoComplete="off"
                     sx={{
                         ...inputStyle,
                         maxWidth: '600px'
@@ -368,9 +388,68 @@ const BookingManager = ({ currentSeason }) => {
                         ),
                     }}
                 />
+                <FormControlLabel
+                    control={
+                        <Checkbox
+                            checked={showPastBookings}
+                            onChange={(e) => setShowPastBookings(e.target.checked)}
+                            sx={{
+                                color: theme.palette.text.secondary,
+                                '&.Mui-checked': { color: theme.palette.primary.main },
+                            }}
+                        />
+                    }
+                    label={<Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.9rem' }}>Vergangene Buchungen anzeigen</Typography>}
+                />
             </Box>
 
-            <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neue Buchung erstellen' : 'Buchungsdetails'}>
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                title={modalMode === 'create' ? 'Neue Buchung erstellen' : 'Buchungsdetails'}
+                fullScreenMobile
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                        <Button
+                            onClick={handleCloseModal}
+                            sx={{ color: theme.palette.text.secondary }}
+                        >
+                            {modalMode === 'view' ? 'Schließen' : 'Abbrechen'}
+                        </Button>
+
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            {modalMode === 'view' && (
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                >
+                                    Löschen
+                                </Button>
+                            )}
+
+                            {modalMode === 'view' ? (
+                                <Button
+                                    variant="contained"
+                                    onClick={() => setModalMode('edit')}
+                                    sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                                >
+                                    Bearbeiten
+                                </Button>
+                            ) : (
+                                <Button
+                                    type="submit"
+                                    form="admin-booking-form"
+                                    variant="contained"
+                                    sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                                >
+                                    {modalMode === 'create' ? 'Erstellen' : 'Speichern'}
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
+                }
+            >
                 {showDeleteConfirm ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'center' }}>
                         <Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>
@@ -398,11 +477,71 @@ const BookingManager = ({ currentSeason }) => {
                         onDelete={() => setShowDeleteConfirm(true)}
                     />
                 )}
-            </ReusableModal>
+            </AppModal>
 
-            <ReusableModal open={isBulkModalOpen} onClose={handleCloseBulkModal} title={bulkModalStep === 'form' ? "Zeitslots erstellen" : "Erstellung prüfen"}>
+            <AppModal
+                open={isBulkModalOpen}
+                onClose={handleCloseBulkModal}
+                title={bulkModalStep === 'form' ? "Zeitslots erstellen" : "Erstellung prüfen"}
+                fullScreenMobile
+                loading={isCreating || isChecking}
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <Button
+                            onClick={handleCloseBulkModal}
+                            sx={{ color: theme.palette.text.secondary }}
+                            disabled={isCreating}
+                        >
+                            Abbrechen
+                        </Button>
+
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            {bulkModalStep === 'confirm' && (
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => setBulkModalStep('form')}
+                                    disabled={isCreating}
+                                    sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}
+                                >
+                                    Zurück
+                                </Button>
+                            )}
+
+                            {bulkModalStep === 'form' ? (
+                                (() => {
+                                    const start = new Date(`2000-01-01T${bulkFormData.startTime}`);
+                                    const end = new Date(`2000-01-01T${bulkFormData.endTime}`);
+                                    const diffMinutes = (end - start) / 60000;
+                                    const isTooShort = diffMinutes < 90;
+
+                                    return (
+                                        <Button
+                                            type="submit"
+                                            form="bulk-booking-form"
+                                            variant="contained"
+                                            disabled={isChecking || isTooShort}
+                                            sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                                        >
+                                            {isChecking ? <CircularProgress size={24} color="inherit" /> : 'Termine prüfen'}
+                                        </Button>
+                                    );
+                                })()
+                            ) : (
+                                <Button
+                                    variant="contained"
+                                    onClick={handleBulkCreate}
+                                    disabled={bulkCheckResult?.validSlots.length === 0 || isCreating}
+                                    sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                                >
+                                    {isCreating ? <CircularProgress size={24} color="inherit" /> : `${bulkCheckResult?.validSlots.length || 0} Termine erstellen`}
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
+                }
+            >
                 {bulkModalStep === 'form' ? (
-                    <form onSubmit={handleBulkCheck}>
+                    <form id="bulk-booking-form" onSubmit={handleBulkCheck}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <Box sx={{ display: 'flex', gap: 2 }}>
                                 <TextField
@@ -580,21 +719,6 @@ const BookingManager = ({ currentSeason }) => {
                                     });
                                 })()}
                             </Box>
-                            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                <Button variant="outlined" onClick={handleCloseBulkModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider, '&:hover': { borderColor: theme.palette.text.primary, color: theme.palette.text.primary } }}>Abbrechen</Button>
-                                {(() => {
-                                    const start = new Date(`2000-01-01T${bulkFormData.startTime}`);
-                                    const end = new Date(`2000-01-01T${bulkFormData.endTime}`);
-                                    const diffMinutes = (end - start) / 60000;
-                                    const isTooShort = diffMinutes < 90;
-
-                                    return (
-                                        <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }} disabled={isChecking || isTooShort}>
-                                            {isChecking ? <CircularProgress size={24} color="inherit" /> : 'Termine prüfen'}
-                                        </Button>
-                                    );
-                                })()}
-                            </Box>
                         </Box>
                     </form>
                 ) : (
@@ -617,17 +741,11 @@ const BookingManager = ({ currentSeason }) => {
                                         </Box>
                                     </Alert>
                                 )}
-                                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                    <Button variant="outlined" onClick={() => setBulkModalStep('form')} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider, '&:hover': { borderColor: theme.palette.text.primary, color: theme.palette.text.primary } }}>Zurück</Button>
-                                    <Button variant="contained" onClick={handleBulkCreate} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }} disabled={bulkCheckResult.validSlots.length === 0}>
-                                        {bulkCheckResult.validSlots.length} Termine erstellen
-                                    </Button>
-                                </Box>
                             </Box>
                         )}
                     </Box>
                 )}
-            </ReusableModal>
+            </AppModal>
 
             {
                 filteredBookings.length === 0 ? (

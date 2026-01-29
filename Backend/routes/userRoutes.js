@@ -65,8 +65,48 @@ router.put('/:uid/disable', checkAuth, checkAdmin, async (req, res) => {
     try {
         const { uid } = req.params;
         // Body sollte { disabled: true } oder { disabled: false } enthalten
-        const { disabled } = req.body; 
+        const { disabled } = req.body;
         const result = await userService.setUserDisabledStatus(uid, disabled);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Passwort zurücksetzen anfordern (Öffentlich)
+// POST /api/users/reset-password-request
+router.post('/reset-password-request', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const result = await userService.requestPasswordReset(email);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Passwort ändern (Eingeloggt)
+// POST /api/users/change-password
+router.post('/change-password', checkAuth, async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        const uid = req.user.uid; // Aus dem Auth Token
+        const result = await userService.changePassword(uid, oldPassword, newPassword);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+/**
+ * Persönliche Einstellungen aktualisieren (Eingeloggt)
+ * PUT /api/users/settings
+ */
+router.put('/settings', checkAuth, async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        const settings = req.body;
+        const result = await userService.updateUserSettings(uid, settings);
         res.status(200).json(result);
     } catch (error) {
         res.status(400).json({ message: error.message });

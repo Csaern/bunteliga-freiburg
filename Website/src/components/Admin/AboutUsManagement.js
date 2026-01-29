@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
     Box,
@@ -8,7 +7,6 @@ import {
     Paper,
     IconButton,
     useTheme,
-
     Alert,
     CircularProgress,
     Accordion,
@@ -19,12 +17,10 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import SaveIcon from '@mui/icons-material/Save';
-import CancelIcon from '@mui/icons-material/Cancel';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import * as websiteApi from '../../services/websiteApiService';
-import { ReusableModal } from '../Helpers/modalUtils';
+import AppModal from '../Modals/AppModal';
 import AboutUsSection from '../AboutUsSection';
 
 const AboutUsManagement = () => {
@@ -35,7 +31,7 @@ const AboutUsManagement = () => {
     const [error, setError] = useState(null);
 
     // Edit/Add state
-    const [isEditing, setIsEditing] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentSection, setCurrentSection] = useState(null); // { id, title, content }
 
     useEffect(() => {
@@ -77,7 +73,7 @@ const AboutUsManagement = () => {
 
             await websiteApi.updateSettings('about-us', { sections: updatedSections });
             setSections(updatedSections);
-            setIsEditing(false);
+            setIsModalOpen(false);
             setCurrentSection(null);
         } catch (err) {
             console.error('Failed to save', err);
@@ -116,16 +112,16 @@ const AboutUsManagement = () => {
 
     const startEdit = (section) => {
         setCurrentSection(section);
-        setIsEditing(true);
+        setIsModalOpen(true);
     };
 
     const startAdd = () => {
         setCurrentSection({ title: '', content: '' });
-        setIsEditing(true);
+        setIsModalOpen(true);
     };
 
     const handleCancel = () => {
-        setIsEditing(false);
+        setIsModalOpen(false);
         setCurrentSection(null);
     };
 
@@ -147,155 +143,134 @@ const AboutUsManagement = () => {
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="body1" color="text.secondary">
-                    Hier kannst du die Inhalte der "Über uns" Seite verwalten. Nutze den Editor für Formatierungen.
+                    Hier kannst du die Inhalte der "Über uns" Seite verwalten.
                 </Typography>
-                {!isEditing && (
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        startIcon={<AddIcon />}
-                        onClick={startAdd}
-                        sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}
-                    >
-                        Neuen Abschnitt
-                    </Button>
-                )}
+                <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<AddIcon />}
+                    onClick={startAdd}
+                    sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}
+                >
+                    Neuen Abschnitt
+                </Button>
             </Box>
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            {/* List of Sections (only visible when not editing) */
-                !isEditing && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {sections.length === 0 && (
-                            <Typography color="text.secondary" align="center">Keine Abschnitte vorhanden.</Typography>
-                        )}
-                        {sections.map((section, index) => (
-                            <Accordion key={section.id || index} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', '&:before': { display: 'none' } }}>
-                                <AccordionSummary
-                                    expandIcon={<ExpandMore />}
-                                    aria-controls={`panel${index}-content`}
-                                    id={`panel${index}-header`}
-                                    sx={{ flexDirection: 'row-reverse', '& .MuiAccordionSummary-content': { alignItems: 'center', justifyContent: 'space-between', ml: 2 } }}
-                                >
-                                    <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }}>
-                                        {section.title || '(Ohne Titel)'}
-                                    </Typography>
-                                    <Box>
-                                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); startEdit(section); }} sx={{ mr: 1 }}>
-                                            <EditIcon fontSize="small" />
-                                        </IconButton>
-                                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDeleteClick(section.id); }}>
-                                            <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                    </Box>
-                                </AccordionSummary>
-                                <AccordionDetails sx={{ borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', p: 3 }}>
-                                    <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 1 }}>Vorschau:</Typography>
-                                    <AboutUsSection
-                                        title={section.title}
-                                        content={section.content}
-                                    />
-                                </AccordionDetails>
-                            </Accordion>
-                        ))}
-                    </Box>
+            {/* List of Sections */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {sections.length === 0 && (
+                    <Typography color="text.secondary" align="center">Keine Abschnitte vorhanden.</Typography>
                 )}
-
-            {/* Editor Form */}
-            {isEditing && currentSection && (
-                <Paper sx={{ p: 3, mt: 2, borderRadius: 2, border: '1px solid', borderColor: 'secondary.main' }}>
-                    <Typography variant="h6" sx={{ fontFamily: 'Comfortaa', mb: 2 }}>
-                        {currentSection.id ? 'Abschnitt bearbeiten' : 'Neuer Abschnitt'}
-                    </Typography>
-
-                    <TextField
-                        fullWidth
-                        label="Titel (Optional)"
-                        value={currentSection.title}
-                        onChange={(e) => setCurrentSection({ ...currentSection, title: e.target.value })}
-                        sx={{ mb: 3 }}
-                    />
-
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>Inhalt</Typography>
-                    <Box sx={{
-                        mb: 3,
-                        '& .quill': {
-                            height: '300px',
-                            display: 'flex',
-                            flexDirection: 'column'
-                        },
-                        '& .ql-container': {
-                            flex: 1,
-                            borderBottomLeftRadius: '8px',
-                            borderBottomRightRadius: '8px',
-                            fontSize: '1rem', // Default font size
-                            fontFamily: 'inherit'
-                        },
-                        '& .ql-toolbar': {
-                            borderTopLeftRadius: '8px',
-                            borderTopRightRadius: '8px',
-                        }
-                    }}>
-                        <ReactQuill
-                            theme="snow"
-                            value={currentSection.content}
-                            onChange={(content) => setCurrentSection({ ...currentSection, content })}
-                            modules={modules}
-                            style={{ height: '250px' }}
-                        />
-                    </Box>
-
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 6 }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<CancelIcon />}
-                            onClick={handleCancel}
-                            disabled={saving}
+                {sections.map((section, index) => (
+                    <Accordion key={section.id || index} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', '&:before': { display: 'none' } }}>
+                        <AccordionSummary
+                            expandIcon={<ExpandMore />}
+                            aria-controls={`panel${index}-content`}
+                            id={`panel${index}-header`}
+                            sx={{ flexDirection: 'row-reverse', '& .MuiAccordionSummary-content': { alignItems: 'center', justifyContent: 'space-between', ml: 2 } }}
                         >
-                            Abbrechen
-                        </Button>
-                        <Button
-                            variant="contained"
-                            color="secondary"
-                            startIcon={<SaveIcon />}
-                            onClick={handleSave}
-                            disabled={saving}
-                            sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}
-                        >
+                            <Typography variant="subtitle1" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }}>
+                                {section.title || '(Ohne Titel)'}
+                            </Typography>
+                            <Box>
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); startEdit(section); }} sx={{ mr: 1 }}>
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDeleteClick(section.id); }}>
+                                    <DeleteIcon fontSize="small" />
+                                </IconButton>
+                            </Box>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', p: 3 }}>
+                            <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 1 }}>Vorschau:</Typography>
+                            <AboutUsSection
+                                title={section.title}
+                                content={section.content}
+                            />
+                        </AccordionDetails>
+                    </Accordion>
+                ))}
+            </Box>
+
+            {/* Editor Modal */}
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCancel}
+                title={currentSection?.id ? 'Abschnitt bearbeiten' : 'Neuer Abschnitt'}
+                fullScreenMobile
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <Button onClick={handleCancel} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                        <Button onClick={handleSave} variant="contained" disabled={saving} sx={{ backgroundColor: theme.palette.primary.main }}>
                             {saving ? 'Speichert...' : 'Speichern'}
                         </Button>
                     </Box>
-                </Paper>
-            )}
+                }
+            >
+                {currentSection && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                        <TextField
+                            fullWidth
+                            label="Titel (Optional)"
+                            value={currentSection.title}
+                            onChange={(e) => setCurrentSection({ ...currentSection, title: e.target.value })}
+                        />
+
+                        <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>Inhalt</Typography>
+                        <Box sx={{
+                            '& .quill': {
+                                height: '300px',
+                                display: 'flex',
+                                flexDirection: 'column'
+                            },
+                            '& .ql-container': {
+                                flex: 1,
+                                borderBottomLeftRadius: '8px',
+                                borderBottomRightRadius: '8px',
+                                fontSize: '1rem',
+                                fontFamily: 'inherit',
+                                borderColor: theme.palette.divider
+                            },
+                            '& .ql-toolbar': {
+                                borderTopLeftRadius: '8px',
+                                borderTopRightRadius: '8px',
+                                borderColor: theme.palette.divider
+                            }
+                        }}>
+                            <ReactQuill
+                                theme="snow"
+                                value={currentSection.content}
+                                onChange={(content) => setCurrentSection({ ...currentSection, content })}
+                                modules={modules}
+                                style={{ height: '250px' }}
+                            />
+                        </Box>
+                    </Box>
+                )}
+            </AppModal>
+
             {/* Delete Confirmation Modal */}
-            <ReusableModal
+            <AppModal
                 open={deleteDialogOpen}
                 onClose={cancelDelete}
                 title="Abschnitt löschen"
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, width: '100%' }}>
+                        <Button onClick={cancelDelete} sx={{ color: theme.palette.text.secondary }}>
+                            Abbrechen
+                        </Button>
+                        <Button variant="contained" color="error" onClick={confirmDelete}>
+                            Löschen
+                        </Button>
+                    </Box>
+                }
             >
-                <Typography sx={{ mb: 3, fontFamily: 'Comfortaa', color: 'text.primary' }}>
+                <Typography sx={{ mb: 3 }}>
                     Möchtest du diesen Abschnitt wirklich unwiderruflich löschen?
                 </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                    <Button
-                        variant="outlined"
-                        onClick={cancelDelete}
-                        sx={{ fontFamily: 'Comfortaa', borderColor: 'divider', color: 'text.secondary' }}
-                    >
-                        Abbrechen
-                    </Button>
-                    <Button
-                        onClick={confirmDelete}
-                        variant="contained"
-                        color="error"
-                        startIcon={<DeleteIcon />}
-                        sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}
-                    >
-                        Löschen
-                    </Button>
-                </Box>
-            </ReusableModal>
+            </AppModal>
         </Box>
     );
 };

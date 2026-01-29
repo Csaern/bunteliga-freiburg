@@ -25,6 +25,8 @@ const resultRoutes = require('./routes/resultRoutes');
 const userRoutes = require('./routes/userRoutes');
 const newsRoutes = require('./routes/newsRoutes');
 const websiteRoutes = require('./routes/websiteRoutes');
+const systemRoutes = require('./routes/systemRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 
 const db = getFirestore();
@@ -38,6 +40,12 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Request Logger Middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // NEU: Statische Dateien aus dem 'uploads'-Verzeichnis bereitstellen
 // Jede Anfrage an /uploads/... wird nun auf den lokalen 'uploads'-Ordner abgebildet
@@ -60,6 +68,8 @@ app.use('/api/results', resultRoutes);
 app.use('/api/users', userRoutes); // NEU: Benutzer-Routen registrieren
 app.use('/api/news', newsRoutes); // NEU: News-Routen registrieren
 app.use('/api/website', websiteRoutes); // NEU: Website-Routen registrieren
+app.use('/api/system', systemRoutes); // NEU: System-Routen registrieren
+app.use('/api/notifications', notificationRoutes); // NEU: Benachrichtigungen registrieren
 
 
 // 5. Den Server starten

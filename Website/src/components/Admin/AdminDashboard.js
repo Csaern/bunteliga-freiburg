@@ -21,7 +21,7 @@ import StadiumIcon from '@mui/icons-material/Stadium';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import LanguageIcon from '@mui/icons-material/Language';
+import SettingsIcon from '@mui/icons-material/Settings';
 import * as pitchApi from '../../services/pitchApiService'; // New import
 import AdminResultForm from './Forms/AdminResultForm';
 import AdminBookingForm from './Forms/AdminBookingForm';
@@ -218,7 +218,7 @@ const AdminDashboard = () => {
     { title: 'Saisons', icon: <EmojiEventsIcon />, link: '/admin/season', color: '#00A99D' }, // Teal
     { title: 'Teams', icon: <StyleIcon />, link: '/admin/teams', color: '#E91E63' }, // Pink
     { title: 'Plätze', icon: <StadiumIcon />, link: '/admin/pitches', color: '#4CAF50' }, // Green
-    { title: 'Website', icon: <LanguageIcon />, link: '/admin/website', color: '#607D8B' }, // Blue Grey
+    { title: 'Allgemein', icon: <SettingsIcon />, link: '/admin/general', color: '#607D8B' }, // Blue Grey
   ];
 
   const visibleActions = isDesktop

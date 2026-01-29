@@ -7,6 +7,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import { AuthProvider } from './context/AuthProvider';
 import HomePage from './pages/HomePage';
+import { NotificationProvider } from './context/NotificationContext';
 import ResultsPage from './pages/ResultsPage';
 import HistoryPage from './pages/HistoryPage';
 import ContactPage from './pages/ContactPage';
@@ -27,6 +28,7 @@ import LoginPage from './pages/LoginPage';
 import AdminBoard from './pages/AdminBoard';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import DashboardPage from './pages/DashboardPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import TeamPage from './pages/TeamPage';
 import TeamDetailPage from './pages/TeamDetailPage';
 import { checkBackendHealth } from './services/apiClient';
@@ -76,36 +78,38 @@ function App() {
     <ColorModeProvider>
       <CssBaseline />
       <AuthProvider>
-        <div className="app-container">
-          <Header />
-          <main className="main-content">
-            <Routes>
-              <Route path="/ergebnisse" element={<ResultsPage />} />
-              <Route path="/platzreservierung" element={<BookingOverview />} />
-              <Route path="/login" element={<LoginPage />} />
+        <NotificationProvider>
+          <div className="app-container">
+            <Header />
+            <main className="main-content">
+              <Routes>
+                <Route path="/ergebnisse" element={<ResultsPage />} />
+                <Route path="/platzreservierung" element={<BookingOverview />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-              {/* --- NEUE ADMIN ROUTEN --- */}
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/:tab" element={<AdminBoardWrapper />} />
-              <Route path="/admin" element={<AdminDashboard />} />
+                {/* --- NEUE ADMIN ROUTEN --- */}
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/:tab" element={<AdminBoardWrapper />} />
+                <Route path="/admin" element={<AdminDashboard />} />
 
-              <Route path="/dashboard" element={<DashboardPage />} />
-              {/* <Route path="/board" element={<UserBoard />} /> */}
-              <Route path="/historie" element={<HistoryPage />} />
-              <Route path="/kontakt" element={<ContactPage />} />
-              <Route path="/teams" element={<TeamsPage />} />
-              <Route path="/impressum" element={<ImpressumPage />} />
-              <Route path="/datenschutz" element={<PrivacyPage />} />
-              <Route path="/ueberuns" element={<VenuesPage />} />
-              <Route path="/regeln" element={<RulesPage />} />
-              <Route path="/team" element={<TeamPage />} />
-              <Route path="/team/:teamId" element={<TeamDetailPage />} />
-              {/* Die Catch-all Route muss immer am Ende stehen */}
-              <Route path="*" element={<HomePage />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/historie" element={<HistoryPage />} />
+                <Route path="/kontakt" element={<ContactPage />} />
+                <Route path="/teams" element={<TeamsPage />} />
+                <Route path="/impressum" element={<ImpressumPage />} />
+                <Route path="/datenschutz" element={<PrivacyPage />} />
+                <Route path="/ueberuns" element={<VenuesPage />} />
+                <Route path="/regeln" element={<RulesPage />} />
+                <Route path="/team" element={<TeamPage />} />
+                <Route path="/team/:teamId" element={<TeamDetailPage />} />
+                {/* Die Catch-all Route muss immer am Ende stehen */}
+                <Route path="*" element={<HomePage />} />
+              </Routes>
+            </main>
+            <Footer />
+          </div>
+        </NotificationProvider>
       </AuthProvider>
     </ColorModeProvider>
   );

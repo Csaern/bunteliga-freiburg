@@ -49,10 +49,16 @@ async function getUnreadNotificationsForTeam(teamId) {
     const snapshot = await notificationsCollection
         .where('teamId', '==', teamId)
         .where('read', '==', false)
-        .orderBy('createdAt', 'desc')
         .get();
 
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // In-memory Sortierung, um Index-Abhängigkeit zu vermeiden
+    return notifications.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt || 0);
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt || 0);
+        return timeB - timeA;
+    });
 }
 
 /**

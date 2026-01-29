@@ -192,7 +192,7 @@ const AdminBookingForm = ({
     };
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form id="admin-booking-form" onSubmit={handleSubmit}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField
@@ -346,43 +346,6 @@ const AdminBookingForm = ({
                     />}
                     label={<Typography sx={{ color: theme.palette.text.primary }}>Freundschaftsspiel</Typography>}
                 />
-
-                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    <Button variant="outlined" onClick={onCancel} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
-                        Abbrechen
-                    </Button>
-
-                    {mode === 'view' && onEdit && (
-                        <Button
-                            variant="contained"
-                            onClick={onEdit}
-                            sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
-                        >
-                            Bearbeiten
-                        </Button>
-                    )}
-
-                    {mode === 'view' && onDelete && (
-                        <Button
-                            variant="outlined"
-                            color="error"
-                            onClick={onDelete}
-                        >
-                            Löschen
-                        </Button>
-                    )}
-
-                    {mode !== 'view' && (
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
-                            disabled={collisionCheck.status === 'error' || collisionCheck.status === 'checking'}
-                        >
-                            {mode === 'create' ? 'Erstellen' : 'Speichern'}
-                        </Button>
-                    )}
-                </Box>
             </Box>
         </form>
     );

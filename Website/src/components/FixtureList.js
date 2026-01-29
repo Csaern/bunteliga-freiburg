@@ -141,12 +141,12 @@ const FixtureList = ({ title, details = true }) => {
                   Uhrzeit
                 </StyledTableCell>
               )}
-              
+
               {/* Die Breiten der verbleibenden Spalten passen sich an */}
               <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Heim</StyledTableCell>
               <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '15%' }}>Erg.</StyledTableCell>
               <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Auswärts</StyledTableCell>
-              
+
               {details && (
                 <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.grey[100], width: '15%' }} hideOnMobile={true}>
                   Ort
@@ -166,57 +166,57 @@ const FixtureList = ({ title, details = true }) => {
               >
                 {/* Die folgenden Zellen werden nur angezeigt, wenn details=true ist */}
                 {details && (
-                    <StyledTableCell>
-                        <Box sx={{display: 'flex', flexDirection:'column', alignItems: isMobile? 'center' : 'flex-start', textAlign: isMobile? 'center' : 'left'}}>
-                            {!isMobile && (
-                                <Typography variant="caption" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], fontSize: '0.7rem', lineHeight:1.2 }}>
-                                    {new Date(row.date.split('.').reverse().join('-')).toLocaleDateString('de-DE', { weekday: 'short' })}
-                                </Typography>
-                            )}
-                            <Typography variant="body2" sx={{ fontFamily: 'comfortaa', fontSize: isMobile ? '0.6rem' : '0.8rem', lineHeight:1.2 }}>
-                                {row.date}
-                            </Typography>
-                            {isMobile && (
-                                <Typography variant="caption" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], fontSize: '0.55rem', mt:0.25, lineHeight:1.2 }}>
-                                    {row.time} Uhr
-                                </Typography>
-                            )}
-                        </Box>
-                    </StyledTableCell>
+                  <StyledTableCell>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'center' : 'flex-start', textAlign: isMobile ? 'center' : 'left' }}>
+                      {!isMobile && (
+                        <Typography variant="caption" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], fontSize: '0.7rem', lineHeight: 1.2 }}>
+                          {new Date(row.date.split('.').reverse().join('-')).toLocaleDateString('de-DE', { weekday: 'short' })}
+                        </Typography>
+                      )}
+                      <Typography variant="body2" sx={{ fontFamily: 'comfortaa', fontSize: isMobile ? '0.6rem' : '0.8rem', lineHeight: 1.2 }}>
+                        {row.date}
+                      </Typography>
+                      {isMobile && (
+                        <Typography variant="caption" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[400], fontSize: '0.55rem', mt: 0.25, lineHeight: 1.2 }}>
+                          {row.time} Uhr
+                        </Typography>
+                      )}
+                    </Box>
+                  </StyledTableCell>
                 )}
                 {details && (
-                    <StyledTableCell align="center" hideOnMobile={true}>{row.time}</StyledTableCell>
+                  <StyledTableCell align="center" hideOnMobile={true}>{row.time}</StyledTableCell>
                 )}
-                
+
                 {/* Diese Zellen sind immer sichtbar */}
                 <StyledTableCell>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
-                        <Avatar alt={`${row.homeTeam} Logo`} sx={{ width: isMobile ? 22 : 20, height: isMobile ? 22 : 20, mb: 0.5, fontSize: isMobile ? '0.7rem' : '0.7rem', color: theme.palette.getContrastText(row.homeLogoColor || theme.palette.grey[700]), backgroundColor: row.homeLogoColor || theme.palette.grey[700] }}>
-                            {row.homeTeam.substring(0,1).toUpperCase()}
-                        </Avatar>
-                        <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width:'100%' }}>
-                            {row.homeTeam}
-                        </Typography>
-                    </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
+                    <Avatar alt={`${row.homeTeam} Logo`} sx={{ width: isMobile ? 22 : 20, height: isMobile ? 22 : 20, mb: 0.5, fontSize: isMobile ? '0.7rem' : '0.7rem', color: theme.palette.getContrastText(row.homeLogoColor || theme.palette.grey[700]), backgroundColor: row.homeLogoColor || theme.palette.grey[700] }}>
+                      {row.homeTeam.substring(0, 1).toUpperCase()}
+                    </Avatar>
+                    <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                      {row.homeTeam}
+                    </Typography>
+                  </Box>
                 </StyledTableCell>
                 <StyledTableCell align="center" sx={{ fontWeight: 'bold' }}>
-                    {row.isPast ? (
-                        <Chip label={`${row.homeScore} : ${row.awayScore}`} size="small" sx={{ fontFamily: 'comfortaa', fontWeight: 'bold', backgroundColor: theme.palette.grey[700], color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', height: isMobile ? '16px' : '22px', lineHeight: isMobile ? '16px' : '22px', px: isMobile ? 0.5 : 1 }} />
-                    ) : (
-                        <Typography variant="caption" sx={{color: theme.palette.grey[500], fontSize: isMobile ? '0.65rem' : 'inherit'}}>vs.</Typography>
-                    )}
+                  {row.isPast ? (
+                    <Chip label={`${row.homeScore} : ${row.awayScore}`} size="small" sx={{ fontFamily: 'comfortaa', fontWeight: 'bold', backgroundColor: theme.palette.grey[700], color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', height: isMobile ? '16px' : '22px', lineHeight: isMobile ? '16px' : '22px', px: isMobile ? 0.5 : 1 }} />
+                  ) : (
+                    <Typography variant="caption" sx={{ color: theme.palette.grey[500], fontSize: isMobile ? '0.65rem' : 'inherit' }}>vs.</Typography>
+                  )}
                 </StyledTableCell>
                 <StyledTableCell>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
-                        <Avatar alt={`${row.awayTeam} Logo`} sx={{ width: isMobile ? 22 : 20, height: isMobile ? 22 : 20, mb: 0.5, fontSize: isMobile ? '0.7rem' : '0.7rem', color: theme.palette.getContrastText(row.awayLogoColor || theme.palette.grey[700]), backgroundColor: row.awayLogoColor || theme.palette.grey[700] }}>
-                            {row.awayTeam.substring(0,1).toUpperCase()}
-                        </Avatar>
-                        <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width:'100%' }}>
-                            {row.awayTeam}
-                        </Typography>
-                    </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
+                    <Avatar alt={`${row.awayTeam} Logo`} sx={{ width: isMobile ? 22 : 20, height: isMobile ? 22 : 20, mb: 0.5, fontSize: isMobile ? '0.7rem' : '0.7rem', color: theme.palette.getContrastText(row.awayLogoColor || theme.palette.grey[700]), backgroundColor: row.awayLogoColor || theme.palette.grey[700] }}>
+                      {row.awayTeam.substring(0, 1).toUpperCase()}
+                    </Avatar>
+                    <Typography variant="body2" sx={{ fontFamily: 'comfortaa', color: theme.palette.grey[100], fontSize: isMobile ? '0.6rem' : '0.8rem', whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1, width: '100%' }}>
+                      {row.awayTeam}
+                    </Typography>
+                  </Box>
                 </StyledTableCell>
-                
+
                 {details && (
                   <StyledTableCell hideOnMobile={true}>{row.location}</StyledTableCell>
                 )}

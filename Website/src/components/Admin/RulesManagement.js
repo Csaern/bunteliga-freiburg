@@ -24,7 +24,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoIcon from '@mui/icons-material/Info';
-import { ReusableModal } from '../Helpers/modalUtils';
+import AppModal from '../Modals/AppModal';
 import * as websiteApi from '../../services/websiteApiService';
 
 const defaultLeagueRules = [
@@ -454,31 +454,25 @@ const RulesManagement = () => {
                 onFocusField={handleFocusField}
             />
 
-            <ReusableModal
+            <AppModal
                 open={deleteConfirm.open}
                 onClose={() => setDeleteConfirm({ open: false, type: null, index: null })}
                 title="Regel löschen"
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, width: '100%' }}>
+                        <Button onClick={() => setDeleteConfirm({ open: false, type: null, index: null })} sx={{ color: currentTheme.palette.text.secondary }}>
+                            Abbrechen
+                        </Button>
+                        <Button variant="contained" color="error" onClick={confirmDeleteRow}>
+                            Löschen
+                        </Button>
+                    </Box>
+                }
             >
-                <Typography sx={{ mb: 3, color: currentTheme.palette.text.primary }}>
+                <Typography sx={{ mb: 3 }}>
                     Möchtest du diese Regel wirklich unwiderruflich löschen?
                 </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                    <Button
-                        variant="outlined"
-                        onClick={() => setDeleteConfirm({ open: false, type: null, index: null })}
-                        sx={{ borderColor: 'divider', color: 'text.secondary' }}
-                    >
-                        Abbrechen
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={confirmDeleteRow}
-                    >
-                        Löschen
-                    </Button>
-                </Box>
-            </ReusableModal>
+            </AppModal>
         </Box>
     );
 };

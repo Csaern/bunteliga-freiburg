@@ -4,7 +4,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { ReusableModal } from '../Helpers/modalUtils';
+import AppModal from '../Modals/AppModal';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import { formatGermanDate } from '../Helpers/dateUtils';
 import * as resultApiService from '../../services/resultApiService';
@@ -13,7 +13,6 @@ import * as pitchApiService from '../../services/pitchApiService';
 import { API_BASE_URL } from '../../services/apiClient';
 import AdminResultForm from './Forms/AdminResultForm';
 
-// Status-Indikator als farbiger Kreis
 const StatusIndicator = ({ status }) => {
     const theme = useTheme();
     const statusConfig = {
@@ -26,7 +25,6 @@ const StatusIndicator = ({ status }) => {
     return <Box sx={{ width: 12, height: 12, backgroundColor: config.color, borderRadius: '50%' }} title={config.label} />;
 };
 
-// Helper-Komponente für Team-Logo-Anzeige
 const TeamLogo = ({ team, size = 24 }) => {
     const theme = useTheme();
     const isLightMode = theme.palette.mode === 'light';
@@ -65,7 +63,6 @@ const TeamLogo = ({ team, size = 24 }) => {
     );
 };
 
-// KORREKTUR: Die Komponente holt ihre Daten jetzt selbst und benötigt weniger Props.
 const ResultManager = ({ teams, currentSeason, getTeamName }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -80,10 +77,9 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.action.disabledBackground },
     };
 
-    // --- STATE MANAGEMENT ---
     const [results, setResults] = useState([]);
     const [bookingsNeedingResult, setBookingsNeedingResult] = useState([]);
-    const [allBookings, setAllBookings] = useState([]); // Neu: Für die Verknüpfung beim Erstellen
+    const [allBookings, setAllBookings] = useState([]);
     const [allPitches, setAllPitches] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,7 +91,6 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
 
-    // --- DATA FETCHING ---
     const fetchData = async () => {
         if (!currentSeason?.id) return;
         setLoading(true);
@@ -122,18 +117,12 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSeason?.id]);
 
-    // NEU: Hilfsfunktion zur sicheren Umwandlung von Firestore-Timestamps in JS-Date-Objekte.
     const parseDate = (dateObj) => {
         if (!dateObj) return new Date();
-        // Prüft, ob es bereits ein JS-Date-Objekt ist
         if (dateObj instanceof Date) return dateObj;
-        // Prüft auf das Firestore-Timestamp-Format
         if (dateObj._seconds) return new Date(dateObj._seconds * 1000);
-        // Fallback für andere String-Formate
         return new Date(dateObj);
     };
-
-
 
     const handleOpenCreateModal = () => {
         setSelectedResult(null);
@@ -163,8 +152,6 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
         setSelectedBooking(null);
         setAnchorEl(null);
     };
-
-
 
     const handleDelete = async () => {
         if (!selectedResult) return;
@@ -217,7 +204,6 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                         {bookingsNeedingResult.length > 0 ? bookingsNeedingResult.map(booking => {
                             return (
                                 <TableRow key={booking.id} onClick={() => handleBookingRowClick(booking)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
-                                    {/* KORREKTUR: Die neue parseDate-Funktion wird auch hier für die Anzeige verwendet. */}
                                     <StyledTableCell>{formatGermanDate(parseDate(booking.date))}</StyledTableCell>
                                     <StyledTableCell>
                                         <Typography variant="body2" sx={{ fontFamily: 'comfortaa', fontWeight: 'bold' }}>
@@ -241,8 +227,19 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
             </Box>
             <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...inputStyle, mb: 2 }} InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }} />
 
-            <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neues Ergebnis' : 'Ergebnisdetails'}>
-                {/* Form Logic Delegation for Create, Edit, and View */}
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                title={modalMode === 'create' ? 'Neues Ergebnis' : 'Ergebnisdetails'}
+                fullScreenMobile
+                actions={
+                    // Actions logic handled mostly within AdminResultForm or custom view below, but we can standardize the container here if needed.
+                    // However, specific actions like "Confirm / Reject" are unique to result view.
+                    // Let's implement generic close/cancel logic here if applicable, or leave empty if the form handles it.
+                    // For consistency, we should try to hoist buttons here.
+                    null
+                }
+            >
                 {modalMode !== 'delete' ? (
                     <AdminResultForm
                         initialData={modalMode === 'edit' || modalMode === 'view' ? selectedResult : (selectedBooking ? {
@@ -259,10 +256,9 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                         season={currentSeason}
                         results={results}
                         bookings={allBookings}
-                        mode={modalMode} // Pass mode prop
-                        onEdit={() => setModalMode('edit')} // Handler to switch to edit mode
+                        mode={modalMode}
+                        onEdit={() => setModalMode('edit')}
                         onSubmit={async (data) => {
-                            // Wrapper to match existing submit logic
                             if (!currentSeason) { setNotification({ open: true, message: 'Keine aktuelle Saison gefunden!', severity: 'error' }); return; }
 
                             try {
@@ -280,10 +276,13 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                             } catch (error) { setNotification({ open: true, message: error.message || 'Fehler beim Speichern.', severity: 'error' }); }
                         }}
                         onCancel={handleCloseModal}
+                    // Helper to hoist buttons or keep them inside form?
+                    // Given the complexity of AdminResultForm, keeping them inside might be easier for now, BUT `AppModal` expects actions prop.
+                    // Ideally AdminResultForm should not render its own buttons if we use AppModal actions.
+                    // I will keep existing behavior inside AppModal body for now to minimal risk, as AdminResultForm might have complex validation logic locally.
                     />
                 ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {/* View Mode Logic - Kept inline as it's distinct from the input form */}
                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mb: 2 }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <TeamLogo team={teams.find(t => t.id === selectedResult?.homeTeamId)} size={48} />
@@ -299,12 +298,32 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                         {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>Möchtest du dieses Ergebnis wirklich löschen?</Alert>)}
 
                         <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            {!showDeleteConfirm && (selectedResult?.status === 'pending' ? (<><Button variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => { }}>Ablehnen</Button><Button variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={handleConfirmResult}>Bestätigen</Button><IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ color: 'grey.400' }}><MoreVertIcon /></IconButton><Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } }}><MenuItem onClick={() => { setModalMode('edit'); setAnchorEl(null); }}>Bearbeiten</MenuItem><MenuItem onClick={() => { setShowDeleteConfirm(true); setAnchorEl(null); }}>Löschen</MenuItem></Menu></>) : (<><Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button></>))}
-                            {showDeleteConfirm && <><Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button variant="contained" color="error" onClick={handleDelete}>Endgültig löschen</Button></>}
+                            {!showDeleteConfirm && (selectedResult?.status === 'pending' ? (
+                                <>
+                                    <Button variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => { }}>Ablehnen</Button>
+                                    <Button variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={handleConfirmResult}>Bestätigen</Button>
+                                    <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ color: 'grey.400' }}><MoreVertIcon /></IconButton>
+                                    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } }}>
+                                        <MenuItem onClick={() => { setModalMode('edit'); setAnchorEl(null); }}>Bearbeiten</MenuItem>
+                                        <MenuItem onClick={() => { setShowDeleteConfirm(true); setAnchorEl(null); }}>Löschen</MenuItem>
+                                    </Menu>
+                                </>
+                            ) : (
+                                <>
+                                    <Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button>
+                                    <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button>
+                                </>
+                            ))}
+                            {showDeleteConfirm && (
+                                <>
+                                    <Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
+                                    <Button variant="contained" color="error" onClick={handleDelete}>Endgültig löschen</Button>
+                                </>
+                            )}
                         </Box>
                     </Box>
                 )}
-            </ReusableModal>
+            </AppModal>
 
             <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
                 <Table size="small">

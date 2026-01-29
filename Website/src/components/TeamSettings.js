@@ -30,7 +30,11 @@ import TwitterIcon from '@mui/icons-material/Twitter';
 import InfoIcon from '@mui/icons-material/Info';
 import ContactMailIcon from '@mui/icons-material/ContactMail';
 import ShareIcon from '@mui/icons-material/Share';
+import LockIcon from '@mui/icons-material/Lock'; // Import Lock icon
 import * as teamApi from '../services/teamApiService';
+import * as userApi from '../services/userApiService'; // Import user api
+import ChangePasswordModal from './Auth/ChangePasswordModal';
+
 import AppModal from './Modals/AppModal';
 
 
@@ -146,6 +150,10 @@ const TeamSettings = ({ onClose }) => {
     }
   };
 
+  // Password Change State
+  const [openChangePassword, setOpenChangePassword] = useState(false);
+
+
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
@@ -220,6 +228,7 @@ const TeamSettings = ({ onClose }) => {
             <Tab icon={<ContactMailIcon />} iconPosition="start" label="Kontakt" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
             <Tab icon={<ShareIcon />} iconPosition="start" label="Social" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
           </Tabs>
+
         </Box>
 
         <Box component="form" noValidate autoComplete="off">
@@ -260,6 +269,15 @@ const TeamSettings = ({ onClose }) => {
                   sx={inputStyle}
                   placeholder="Erzähl uns etwas über dein Team..."
                 />
+
+                <Button
+                  onClick={() => setOpenChangePassword(true)}
+                  variant="outlined"
+                  startIcon={<LockIcon />}
+                  sx={{ mt: 2, py: 1.5 }}
+                >
+                  Passwort ändern
+                </Button>
               </Box>
             )}
           </Box>
@@ -350,8 +368,12 @@ const TeamSettings = ({ onClose }) => {
             )}
           </Box>
 
+
         </Box>
       </AppModal>
+
+      <ChangePasswordModal open={openChangePassword} onClose={() => setOpenChangePassword(false)} />
+
 
       <Snackbar
         open={snackbar.open}

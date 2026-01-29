@@ -126,55 +126,37 @@ class BookingService {
      * @private
      */
     static _createBerlinDate(dateStr, timeStr) {
-        // Basis: Wir interpretieren die Eingabe als UTC
-        const utcBase = new Date(`${dateStr}T${timeStr}:00.000Z`);
-
-        // Prüffunktion: Was ist die Zeit dieses Timestamps in Berlin?
-        // Wir nutzen 'de-DE' mit options, da Node.js Intl supportet.
-        const checkBerlinTime = (d) => {
-            return new Intl.DateTimeFormat('de-DE', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Europe/Berlin',
-                hour12: false
-            }).format(d);
-        };
-
-        const berlinStr = checkBerlinTime(utcBase);
-        const [berlinH, berlinM] = berlinStr.split(':').map(Number);
-        const [targetH, targetM] = timeStr.split(':').map(Number);
-
-        const targetMinutes = targetH * 60 + targetM;
-        const berlinMinutes = berlinH * 60 + berlinM;
-
-        let diffMinutes = targetMinutes - berlinMinutes;
-        if (diffMinutes > 720) diffMinutes -= 1440;
-        if (diffMinutes < -720) diffMinutes += 1440;
-
-        return new Date(utcBase.getTime() + diffMinutes * 60000);
+        // Use local system time construction
+        // This accepts 'YYYY-MM-DD' and 'HH:MM' and creates a Date object
+        // representing that wall-clock time in the local system timezone.
+        return new Date(`${dateStr}T${timeStr}:00`);
     }
+
+
 
     /**
      * NEU: Gleicht den Status aller leeren Zeitslots eines Platzes mit dem wöchentlichen Limit ab.
-     * Wenn das Limit erreicht ist, werden freie Slots auf 'blocked' gesetzt.
-     * Wenn wieder Platz frei wird, werden sie auf 'available' zurückgesetzt.
+     * Logik:
+     * 1. Zähle aktive Buchungen (confirmed, pending_away_confirm) in der Woche.
+     * 2. Wenn Limit erreicht: Alle 'available' Slots werden zu 'blocked'.
+     * 3. Wenn Limit NICHT erreicht: Alle 'blocked' Slots werden zu 'available'.
      * @private
      */
     static async _syncPitchWeeklySlots(pitchId, date) {
         if (!pitchId || !date) return;
 
         const pitchDoc = await pitchesCollection.doc(pitchId).get();
-        if (!pitchDoc.exists) return;
-
+        if (!pitchDoc.exists) return; // Platz gelöscht?
         const pitchData = pitchDoc.data();
         const limit = pitchData.weeklyLimit;
 
-        // Wenn kein Limit gesetzt ist, beenden wir frühzeitig.
-        if (limit === null || limit === undefined || limit === '' || Number(limit) === 0) return;
+        // Wenn kein Limit gesetzt oder 0 (unbegrenzt?), nichts tun.
+        const hasLimit = (limit !== null && limit !== undefined && limit !== '' && Number(limit) > 0);
+        const limitNum = Number(limit);
 
         const bookingDate = new Date(getMillisFromDate(date));
 
-        // Berechne Wochenbereich (Montag bis Sonntag)
+        // Wochenberechnung (Mo-So)
         const day = bookingDate.getDay();
         const diffToMonday = bookingDate.getDate() - day + (day === 0 ? -6 : 1);
         const monday = new Date(bookingDate);
@@ -188,65 +170,65 @@ class BookingService {
         // 1. Zähle alle aktiven Buchungen in dieser Woche auf diesem Platz
         const snapshot = await bookingsCollection
             .where('pitchId', '==', pitchId)
-            .where('status', 'in', ['confirmed', 'pending_away_confirm'])
             .get();
 
         let activeCount = 0;
+        const weekDocs = [];
+
         snapshot.forEach(doc => {
-            const d = getMillisFromDate(doc.data().date);
+            const data = doc.data();
+            const d = getMillisFromDate(data.date);
+            // Filtere nach Woche
             if (d >= monday.getTime() && d <= sunday.getTime()) {
-                activeCount++;
+                weekDocs.push({ ref: doc.ref, ...data });
+                // Zähle aktive Buchungen
+                if (['confirmed', 'pending_away_confirm'].includes(data.status)) {
+                    activeCount++;
+                }
             }
         });
 
-        const isLimitReached = activeCount >= Number(limit);
-
-        // 2. Finde alle "leeren" Slots in dieser Woche (keine Teams zugeordnet)
-        // Wir holen alle Buchungen der Woche erneut, um sie zu aktualisieren.
-        // (Alternativ könnte man die erste Query erweitern, aber so ist es sauberer getrennt).
-        const allWeekBookings = await bookingsCollection
-            .where('pitchId', '==', pitchId)
-            .get();
+        const loopsReachedLimit = hasLimit && activeCount >= limitNum;
 
         const batch = db.batch();
         let updateCount = 0;
 
-        allWeekBookings.forEach(doc => {
-            const data = doc.data();
-            const d = getMillisFromDate(data.date);
+        for (const doc of weekDocs) {
+            // Wir ändern nur Slots, die "leer" sind (keine Teams zugeordnet) oder explizit "blocked" sind.
+            // Ignoriere aktive Buchungen (confirmed/pending) oder Wartung/Custom, falls relevant.
 
-            // Nur innerhalb der Woche
-            if (d < monday.getTime() || d > sunday.getTime()) return;
+            const isControllable = (doc.status === 'available' || doc.status === 'blocked') &&
+                !doc.homeTeamId && !doc.awayTeamId;
 
-            // Nur Slots, die wirklich leer sind (Heim und Auswärts null)
-            const isEmptySlot = !data.homeTeamId && !data.awayTeamId;
-            if (!isEmptySlot) return;
+            if (!isControllable) continue;
 
-            // Logik: 
-            // - Limit erreicht -> Alle leeren Slots zu blocked
-            // - Limit unterboten -> Alle blocked Slots wieder zu available
             let newStatus = null;
-            if (isLimitReached) {
-                if (data.status !== 'blocked') {
+
+            if (loopsReachedLimit) {
+                // Limit voll -> sperren
+                if (doc.status === 'available') {
                     newStatus = 'blocked';
                 }
-            } else if (data.status === 'blocked') {
-                newStatus = 'available';
+            } else {
+                // Limit noch nicht voll -> freigeben
+                if (doc.status === 'blocked') {
+                    newStatus = 'available';
+                }
             }
 
             if (newStatus) {
                 batch.update(doc.ref, {
                     status: newStatus,
-                    isAvailable: newStatus === 'available',
-                    autoBlocked: isLimitReached // Hilfs-Flag, falls wir es später brauchen
+                    isAvailable: newStatus === 'available', // Legacy Feld syncen
+                    autoBlocked: true // Markiere, dass dies automatisch geschehen ist
                 });
                 updateCount++;
             }
-        });
+        }
 
         if (updateCount > 0) {
             await batch.commit();
-            console.log(`[_syncPitchWeeklySlots] ${updateCount} Slots auf '${pitchData.name}' automatisch ${isLimitReached ? 'gesperrt' : 'freigegeben'} (Limit: ${limit}, Aktiv: ${activeCount})`);
+            console.log(`[_syncPitchWeeklySlots] ${updateCount} Slots auf '${pitchData.name}' ${loopsReachedLimit ? 'GESPERRT' : 'FREIGEGEBEN'} (Limit: ${limit}, Aktiv: ${activeCount})`);
         }
     }
 
@@ -414,20 +396,39 @@ class BookingService {
 
             if (snapshot.empty) return;
 
+            // NEU: Platz-Konfigurationen laden und cachen
+            const pitchConfigs = new Map();
+
             const batch = db.batch();
             let updateCount = 0;
             let totalChecked = 0;
 
-            snapshot.forEach(doc => {
+            for (const doc of snapshot.docs) {
                 const data = doc.data();
 
                 // Überspringen, wenn bereits als friendly markiert oder Auto-Sync deaktiviert ist
-                if (data.friendly === true || data.friendlyAutoSync === false) return;
+                if (data.friendly === true || data.friendlyAutoSync === false) continue;
+
+                // NEU: Platz-Config prüfen
+                if (!pitchConfigs.has(data.pitchId)) {
+                    const pitchDoc = await pitchesCollection.doc(data.pitchId).get();
+                    if (pitchDoc.exists) {
+                        const pitchData = pitchDoc.data();
+                        // Default ist true, falls nicht gesetzt
+                        pitchConfigs.set(data.pitchId, pitchData.allowFriendlyAutoRelease !== false);
+                    } else {
+                        pitchConfigs.set(data.pitchId, true); // Fallback
+                    }
+                }
+
+                // Wenn der Platz NICHT automatisch freigegeben werden soll, überspringen
+                if (!pitchConfigs.get(data.pitchId)) {
+                    continue;
+                }
 
                 totalChecked++;
                 const slotDateMillis = getMillisFromDate(data.date);
                 const diffMillis = slotDateMillis - now;
-                const hoursToGame = diffMillis / (60 * 60 * 1000);
 
                 // Wenn der Termin innerhalb der Release-Frist liegt
                 if (slotDateMillis > 0 && diffMillis <= releaseMillis) {
@@ -437,7 +438,7 @@ class BookingService {
                     });
                     updateCount++;
                 }
-            });
+            }
 
             if (updateCount > 0) {
                 await batch.commit();
@@ -565,9 +566,11 @@ class BookingService {
         }
 
         if (collidingBookingInfo) {
+            console.log('[checkSingleSlot] Collision detected:', collidingBookingInfo);
             return { isAvailable: false, collidingBooking: collidingBookingInfo };
         }
 
+        console.log('[checkSingleSlot] Slot is available.');
         return { isAvailable: true };
     }
 
@@ -591,7 +594,10 @@ class BookingService {
         }
 
         const hasBothTeams = bookingData.homeTeamId && bookingData.awayTeamId;
-        const status = hasBothTeams ? 'confirmed' : 'available';
+        const status = (bookingData.status) ? bookingData.status : (hasBothTeams ? 'confirmed' : 'available');
+
+        // 3. Sync limit (automatisches Sperren/Freigeben)
+        await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
 
         const newBooking = {
             ...bookingData,
@@ -603,9 +609,6 @@ class BookingService {
             friendly: bookingData.friendly || false, // NEU
         };
         const docRef = await bookingsCollection.add(newBooking);
-
-        // 3. NEU: Automatische Synchronisierung der freien Slots für diese Woche
-        await BookingService._syncPitchWeeklySlots(newBooking.pitchId, newBooking.date);
 
         return { id: docRef.id, ...newBooking };
     }
@@ -646,6 +649,18 @@ class BookingService {
         const hasBothTeams = updateData.homeTeamId && updateData.awayTeamId;
         // FIX: Allow admin to override status
         let status = updateData.status || (hasBothTeams ? 'confirmed' : 'available');
+
+        // 3. Sync limit nach Update
+        // Wir syncen für den ALTEN und den NEUEN Termin/Platz, falls geändert.
+        const targetPitchId = updateData.pitchId || originalBooking.pitchId;
+        const targetDate = updateData.date || originalBooking.date;
+        await BookingService._syncPitchWeeklySlots(targetPitchId, targetDate);
+
+        // Falls Platz/Datum geändert wurde, auch den alten Platz syncen
+        if ((updateData.pitchId && updateData.pitchId !== originalBooking.pitchId) ||
+            (updateData.date && updateData.date !== originalBooking.date)) {
+            await BookingService._syncPitchWeeklySlots(originalBooking.pitchId, originalBooking.date);
+        }
 
         // NEU: Wenn Status "cancelled" (Abgesagt) oder "blocked" (Gesperrt) ist, wird die Buchung zurückgesetzt.
         let finalHomeTeamId = updateData.homeTeamId;
@@ -806,24 +821,75 @@ class BookingService {
         const { seasonId, slotsToCreate } = data;
         const batch = db.batch();
 
+        // Use a set to track unique keys for syncing (PitchId + Date)
+        const syncedKeys = new Set();
+        // Identify valid keys to sync after batch commit
+        const keysToSync = [];
+
         for (const slot of slotsToCreate) {
+            // FIX: Robust date parsing for data coming back from frontend (JSON)
+            let dateObj;
+            try {
+                if (slot.date && typeof slot.date === 'string') {
+                    dateObj = new Date(slot.date);
+                } else if (slot.date && typeof slot.date === 'object') {
+                    if (slot.date.seconds) {
+                        dateObj = new Date(slot.date.seconds * 1000); // Standard Firestore format
+                    } else if (slot.date._seconds) {
+                        dateObj = new Date(slot.date._seconds * 1000); // Internal format
+                    } else if (typeof slot.date.toDate === 'function') {
+                        dateObj = slot.date.toDate();
+                    } else {
+                        // Attempt to parse if it's a completely plain object but shouldn't happen usually
+                        dateObj = new Date(slot.date);
+                    }
+                } else {
+                    dateObj = new Date(slot.date);
+                }
+            } catch (e) {
+                console.error("Error parsing date in bulkCreate:", slot.date, e);
+                continue;
+            }
+
+            if (!dateObj || isNaN(dateObj.getTime())) {
+                console.error("Invalid date object derived from:", slot.date);
+                continue;
+            }
+
+            const firestoreDate = admin.firestore.Timestamp.fromDate(dateObj);
+
             const newBooking = {
                 seasonId,
                 pitchId: slot.pitchId,
-                date: slot.date, // Ist bereits ein Timestamp aus dem Check-Schritt
-                duration: slot.duration, // NEU
+                date: firestoreDate,
+                duration: slot.duration,
                 status: 'available',
                 homeTeamId: null,
                 awayTeamId: null,
-                friendly: false, // NEU: Explizit false setzen für Sync-Query
+                friendly: false,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 createdBy: user.uid,
             };
             const docRef = bookingsCollection.doc();
             batch.set(docRef, newBooking);
+
+            // Prepare sync key
+            const dateStr = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+            const key = `${slot.pitchId}_${dateStr}`;
+
+            if (!syncedKeys.has(key)) {
+                syncedKeys.add(key);
+                keysToSync.push({ pitchId: slot.pitchId, date: firestoreDate });
+            }
         }
 
         await batch.commit();
+
+        // 3. Sync slots after commit
+        for (const item of keysToSync) {
+            await BookingService._syncPitchWeeklySlots(item.pitchId, item.date);
+        }
+
         return { message: `${slotsToCreate.length} Spieltermine erfolgreich erstellt.` };
     }
 
@@ -887,7 +953,26 @@ class BookingService {
             requestedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // 3. NEU: Automatische Synchronisierung der freien Slots
+        // 3. NEU: Benachrichtigung an das Auswärtsteam (falls vorhanden)
+        if (awayTeamId) {
+            try {
+                const homeTeamDoc = await teamsCollection.doc(homeTeamId).get();
+                const homeTeamName = homeTeamDoc.exists ? homeTeamDoc.data().name : 'Ein Team';
+                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                await notificationService.notifyTeam(
+                    awayTeamId,
+                    'new_booking_request',
+                    'Neue Spielanfrage',
+                    `${homeTeamName} möchte am ${dateStr} gegen euch spielen.`,
+                    { bookingId, homeTeamId, homeTeamName, date: bookingData.date }
+                );
+            } catch (e) {
+                console.error('Error sending notification for booking request:', e);
+            }
+        }
+
+        // 4. NEU: Automatische Synchronisierung der freien Slots
         await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
 
         return { message: 'Buchung erfolgreich angefragt.' };
@@ -942,6 +1027,23 @@ class BookingService {
                 confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
+            // NEU: Benachrichtigung an das Heimteam
+            try {
+                const awayTeamDoc = await teamsCollection.doc(bookingData.awayTeamId).get();
+                const awayTeamName = awayTeamDoc.exists ? awayTeamDoc.data().name : 'Das Auswärtsteam';
+                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                await notificationService.notifyTeam(
+                    bookingData.homeTeamId,
+                    'booking_confirmed',
+                    'Spiel bestätigt',
+                    `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} angenommen.`,
+                    { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date }
+                );
+            } catch (e) {
+                console.error('Error sending notification for booking confirmation:', e);
+            }
+
             // 3. NEU: Automatische Synchronisierung der freien Slots
             await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
 
@@ -965,6 +1067,23 @@ class BookingService {
                 deniedAt: admin.firestore.FieldValue.serverTimestamp(),
                 denialReason: reason,
             });
+
+            // NEU: Benachrichtigung an das Heimteam
+            try {
+                const awayTeamDoc = await teamsCollection.doc(bookingData.awayTeamId).get();
+                const awayTeamName = awayTeamDoc.exists ? awayTeamDoc.data().name : 'Das Auswärtsteam';
+                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                await notificationService.notifyTeam(
+                    bookingData.homeTeamId,
+                    'booking_denied',
+                    'Anfrage abgelehnt',
+                    `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} abgelehnt.`,
+                    { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date, reason }
+                );
+            } catch (e) {
+                console.error('Error sending notification for booking denial:', e);
+            }
 
             // 3. NEU: Automatische Synchronisierung der freien Slots
             await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
@@ -1021,6 +1140,26 @@ class BookingService {
 
             return { message };
         });
+
+        // NEU: Benachrichtigung an den Gegner senden
+        const opponentTeamId = bookingData.homeTeamId === cancellingTeamId ? bookingData.awayTeamId : bookingData.homeTeamId;
+        if (opponentTeamId) {
+            try {
+                const cancellingTeamDoc = await teamsCollection.doc(cancellingTeamId).get();
+                const cancellingTeamName = cancellingTeamDoc.exists ? cancellingTeamDoc.data().name : 'Ein Team';
+                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                await notificationService.notifyTeam(
+                    opponentTeamId,
+                    'booking_cancelled',
+                    'Spiel abgesagt',
+                    `${cancellingTeamName} hat das Spiel am ${dateStr} abgesagt.`,
+                    { bookingId, cancellingTeamId, cancellingTeamName, date: bookingData.date, reason }
+                );
+            } catch (e) {
+                console.error('Error sending notification for booking cancellation:', e);
+            }
+        }
 
         // 3. NEU: Automatische Synchronisierung der freien Slots
         await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
@@ -1256,6 +1395,23 @@ class BookingService {
             cancelledBy: adminUid,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+
+        // NEU: Benachrichtigung an beide Teams
+        const teamsToNotify = [bookingData.homeTeamId, bookingData.awayTeamId].filter(Boolean);
+        for (const teamId of teamsToNotify) {
+            try {
+                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+                await notificationService.notifyTeam(
+                    teamId,
+                    'admin_booking_cancelled',
+                    'Spiel durch Admin abgesagt',
+                    `Das Spiel am ${dateStr} wurde durch einen Administrator abgesagt.`,
+                    { bookingId, date: bookingData.date, reason }
+                );
+            } catch (e) {
+                console.error(`Error sending admin cancellation notification to team ${teamId}:`, e);
+            }
+        }
 
         // 3. NEU: Automatische Synchronisierung der freien Slots
         await BookingService._syncPitchWeeklySlots(bookingDoc.data().pitchId, bookingDoc.data().date);

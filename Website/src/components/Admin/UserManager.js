@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment, Alert, useTheme, useMediaQuery, CircularProgress, Snackbar } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { ReusableModal } from '../Helpers/modalUtils';
+import AppModal from '../Modals/AppModal';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';
-import * as userApiService from '../../services/userApiService'; // NEU
+import * as userApiService from '../../services/userApiService';
 
-// NEU: Status-Indikator für die mobile Ansicht
 const StatusIndicator = ({ isAdmin }) => {
     const theme = useTheme();
     return (
@@ -49,7 +48,7 @@ const UserManager = ({ teams, getTeamName }) => {
     const [loading, setLoading] = useState(true);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalMode, setModalMode] = useState('view'); // 'create', 'view', 'edit'
+    const [modalMode, setModalMode] = useState('view');
     const [selectedUser, setSelectedUser] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [formData, setFormData] = useState({ email: '', password: '', teamId: '', isAdmin: false, displayName: '' });
@@ -59,7 +58,6 @@ const UserManager = ({ teams, getTeamName }) => {
         try {
             setLoading(true);
             const fetchedUsers = await userApiService.getAllUsers();
-            // Die Anreicherung passiert jetzt im Backend. Wir fügen nur noch die 'id' hinzu.
             const usersWithId = fetchedUsers.map(u => ({ ...u, id: u.uid }));
             setUsers(usersWithId);
         } catch (err) {
@@ -124,7 +122,7 @@ const UserManager = ({ teams, getTeamName }) => {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         try {
             if (modalMode === 'edit' && selectedUser) {
                 await userApiService.updateUser(selectedUser.id, {
@@ -165,7 +163,7 @@ const UserManager = ({ teams, getTeamName }) => {
     const searchableFields = [
         { key: 'email' },
         { key: 'displayName' },
-        { key: 'teamName' }, // KORREKTUR: Direkt nach dem vom Backend gelieferten Team-Namen suchen
+        { key: 'teamName' },
     ];
 
     const filteredUsers = filterData(users, searchTerm, searchableFields);
@@ -189,12 +187,60 @@ const UserManager = ({ teams, getTeamName }) => {
                 </Alert>
             </Snackbar>
 
-            <TextField fullWidth variant="outlined" size="small" placeholder="Suche nach Email, Name oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ ...inputStyle, mb: 2 }}
+            <TextField fullWidth variant="outlined" size="small" name="user-search" placeholder="Suche nach Email, Name oder Team..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} autoComplete="off" sx={{ ...inputStyle, mb: 2 }}
                 InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }}
             />
 
-            <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neuen Benutzer erstellen' : 'Benutzerdetails'}>
-                <form onSubmit={handleSubmit}>
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                title={modalMode === 'create' ? 'Neuen Benutzer erstellen' : 'Benutzerdetails'}
+                fullScreenMobile
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        {modalMode === 'create' && (
+                            <>
+                                <Button onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button onClick={handleSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Erstellen</Button>
+                            </>
+                        )}
+                        {modalMode === 'view' && !showDeleteConfirm && (
+                            <>
+                                <Button onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary }}>Schließen</Button>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button>
+                                    <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main }}>Bearbeiten</Button>
+                                </Box>
+                            </>
+                        )}
+                        {modalMode === 'view' && showDeleteConfirm && (
+                            <>
+                                <Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button variant="contained" color="error" onClick={handleDelete}>Endgültig löschen</Button>
+                            </>
+                        )}
+                        {modalMode === 'edit' && (
+                            <>
+                                <Button onClick={() => {
+                                    if (selectedUser) {
+                                        setFormData({
+                                            email: selectedUser.email || '',
+                                            displayName: selectedUser.displayName || '',
+                                            password: '',
+                                            teamId: selectedUser.teamId || '',
+                                            isAdmin: selectedUser.isAdmin || false,
+                                            role: selectedUser.role || 'user',
+                                        });
+                                    }
+                                    setModalMode('view');
+                                }} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button onClick={handleSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Speichern</Button>
+                            </>
+                        )}
+                    </Box>
+                }
+            >
+                <form id="user-form" onSubmit={handleSubmit}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <TextField size="small" label="Email" type="email" fullWidth required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={inputStyle} disabled={modalMode !== 'create'} />
                         <TextField size="small" label="Anzeigename" type="text" fullWidth value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
@@ -221,42 +267,9 @@ const UserManager = ({ teams, getTeamName }) => {
                                 Benutzer wirklich löschen? Dies kann nicht rückgängig gemacht werden.
                             </Alert>
                         )}
-
-                        <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            {modalMode === 'create' && <>
-                                <Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700', '&:hover': { borderColor: 'grey.500' } }}>Abbrechen</Button>
-                                <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Erstellen</Button>
-                            </>}
-                            {modalMode === 'view' && !showDeleteConfirm && <>
-                                <Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button>
-                                <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button>
-                            </>}
-                            {modalMode === 'view' && showDeleteConfirm && <>
-                                <Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700', '&:hover': { borderColor: 'grey.500' } }}>Abbrechen</Button>
-                                <Button variant="contained" color="error" onClick={handleDelete}>Endgültig löschen</Button>
-                            </>}
-                            {modalMode === 'edit' && <>
-                                <Button variant="outlined" onClick={() => {
-                                    // Setzt das Formular auf den ursprünglichen Zustand des ausgewählten Benutzers zurück
-                                    if (selectedUser) {
-                                        setFormData({
-                                            email: selectedUser.email || '',
-                                            displayName: selectedUser.displayName || '',
-                                            password: '',
-                                            teamId: selectedUser.teamId || '',
-                                            isAdmin: selectedUser.isAdmin || false,
-                                            role: selectedUser.role || 'user', // 'role' hinzugefügt
-                                        });
-                                    }
-                                    setModalMode('view');
-                                }} sx={{ color: 'grey.400', borderColor: 'grey.700', '&:hover': { borderColor: 'grey.500' } }}>Abbrechen</Button>
-                                <Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Speichern</Button>
-                            </>}
-
-                        </Box>
                     </Box>
                 </form>
-            </ReusableModal>
+            </AppModal>
 
             {filteredUsers.length === 0 ? (
                 <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: 3, textAlign: 'center', border: '1px solid', borderColor: theme.palette.divider }}>

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Switch, FormControlLabel, Alert, useTheme, useMediaQuery, CircularProgress, Snackbar, Link, InputAdornment } from '@mui/material';
+import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Switch, FormControlLabel, Alert, useTheme, useMediaQuery, CircularProgress, Snackbar, Link, InputAdornment, Tabs, Tab, Grid } from '@mui/material';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import SearchIcon from '@mui/icons-material/Search';
-import { ReusableModal } from '../Helpers/modalUtils';
+import InfoIcon from '@mui/icons-material/Info';
+import TuneIcon from '@mui/icons-material/Tune';
+import AppModal from '../Modals/AppModal';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import * as pitchApiService from '../../services/pitchApiService';
-import { API_BASE_URL } from '../../services/apiClient'; // NEU: Für Bild-URL benötigt
+import { API_BASE_URL } from '../../services/apiClient';
+
 
 const PitchManager = ({ teams }) => {
     const theme = useTheme();
@@ -31,7 +34,7 @@ const PitchManager = ({ teams }) => {
         },
     };
 
-    const initialFormData = { name: '', address: '', type: '', notes: '', teamId: '', isVerified: false, weeklyLimit: '' };
+    const initialFormData = { name: '', address: '', type: '', notes: '', teamId: '', isVerified: false, weeklyLimit: '', allowFriendlyAutoRelease: true };
 
     const [pitches, setPitches] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -46,6 +49,7 @@ const PitchManager = ({ teams }) => {
     const [pitchImageFile, setPitchImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
     const [showImageDeleteConfirm, setShowImageDeleteConfirm] = useState(false); // NEU: State für Lösch-Bestätigung
+    const [activeTab, setActiveTab] = useState(0);
 
     const fetchData = async () => {
         try {
@@ -81,6 +85,7 @@ const PitchManager = ({ teams }) => {
                 teamId: selectedPitch.teamId || '',
                 isVerified: selectedPitch.isVerified || false,
                 weeklyLimit: selectedPitch.weeklyLimit !== undefined ? selectedPitch.weeklyLimit : '',
+                allowFriendlyAutoRelease: selectedPitch.allowFriendlyAutoRelease !== undefined ? selectedPitch.allowFriendlyAutoRelease : true,
             });
             // NEU: Setzt die Vorschau auf das vorhandene Bild
             if (selectedPitch.imageUrl) {
@@ -113,6 +118,7 @@ const PitchManager = ({ teams }) => {
             URL.revokeObjectURL(imagePreview);
         }
         setImagePreview('');
+        setActiveTab(0);
     };
 
     const handleNotificationClose = () => setNotification({ ...notification, open: false });
@@ -221,132 +227,213 @@ const PitchManager = ({ teams }) => {
                 InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: 'grey.500' }} /></InputAdornment>), }}
             />
 
-            <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neuen Platz erstellen' : 'Platzdetails'}>
-                <form onSubmit={handleSubmit}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '70vh', overflowY: 'auto', pr: 1, pt: 1 }}>
-                        <TextField size="small" label="Platzname" fullWidth required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
-                        <TextField size="small" label="Adresse" fullWidth value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                title={modalMode === 'create' ? 'Neuen Platz erstellen' : 'Platzdetails'}
+                loading={loading}
+                actions={
+                    <>
+                        <Button onClick={handleCloseModal} sx={{ mr: 'auto', color: theme.palette.text.secondary }}>Schließen</Button>
 
-                        {/* KORREKTUR: Live Google Maps Link zur Überprüfung */}
-                        {googleMapsLink && modalMode !== 'view' && (
-                            <Button component={Link} href={googleMapsLink} target="_blank" rel="noopener noreferrer" variant="outlined" sx={{ color: theme.palette.primary.main, borderColor: theme.palette.divider, '&:hover': { borderColor: theme.palette.primary.main } }}>
-                                Adresse auf Google Maps prüfen
-                            </Button>
+                        {modalMode === 'create' && (
+                            <>
+                                <Button onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button onClick={handleSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Erstellen</Button>
+                            </>
                         )}
+                        {modalMode === 'view' && !showDeleteConfirm && (
+                            <>
+                                <Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Archivieren</Button>
+                                <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button>
+                            </>
+                        )}
+                        {modalMode === 'view' && showDeleteConfirm && (
+                            <>
+                                <Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button variant="contained" color="error" onClick={handleArchive}>Endgültig archivieren</Button>
+                            </>
+                        )}
+                        {modalMode === 'edit' && (
+                            <>
+                                <Button onClick={() => setModalMode('view')} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button onClick={handleSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Speichern</Button>
+                            </>
+                        )}
+                    </>
+                }
+            >
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, mx: -3, mb: 2 }}>
+                    <Tabs
+                        value={activeTab}
+                        onChange={(e, val) => setActiveTab(val)}
+                        variant="fullWidth"
+                        textColor="primary"
+                        indicatorColor="primary"
+                    >
+                        <Tab icon={<InfoIcon />} iconPosition="start" label="Allgemein" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
+                        <Tab icon={<TuneIcon />} iconPosition="start" label="Details" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
+                    </Tabs>
+                </Box>
 
-                        {/* NEU: Bild-Upload-Sektion */}
-                        {(modalMode === 'edit' || modalMode === 'view') && (
-                            <Box sx={{ border: '1px dashed', borderColor: 'grey.700', p: 2, borderRadius: 1, mt: 1 }}>
-                                <Typography sx={{ color: 'grey.300', mb: 1 }}>Platz-Bild</Typography>
-                                {imagePreview && (
-                                    <Box
-                                        component="img"
-                                        src={imagePreview}
-                                        alt="Platz-Vorschau"
-                                        sx={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 1, mb: 2 }}
+                <form id="pitch-form" onSubmit={handleSubmit}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+                        {/* TAB 1: ALLGEMEIN (Wichtigste Daten + Einstellungen) */}
+                        <Box role="tabpanel" hidden={activeTab !== 0}>
+                            {activeTab === 0 && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <TextField size="small" label="Platzname" fullWidth required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+                                    <TextField size="small" label="Adresse" fullWidth value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+
+                                    {/* Live Google Maps Link zur Überprüfung */}
+                                    {googleMapsLink && modalMode !== 'view' && (
+                                        <Button component={Link} href={googleMapsLink} target="_blank" rel="noopener noreferrer" variant="outlined" sx={{ color: theme.palette.primary.main, borderColor: theme.palette.divider, '&:hover': { borderColor: theme.palette.primary.main } }}>
+                                            Adresse auf Google Maps prüfen
+                                        </Button>
+                                    )}
+
+                                    <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
+                                        <InputLabel>Gehört zu Team</InputLabel>
+                                        <Select value={formData.teamId} label="Gehört zu Team" onChange={(e) => setFormData({ ...formData, teamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
+                                            <MenuItem value=""><em>Kein Team / Liga-Platz</em></MenuItem>
+                                            {teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+
+                                    <TextField
+                                        size="small"
+                                        label="Wöchentliches Buchungslimit"
+                                        type="number"
+                                        fullWidth
+                                        value={formData.weeklyLimit}
+                                        onChange={(e) => setFormData({ ...formData, weeklyLimit: e.target.value })}
+                                        sx={inputStyle}
+                                        disabled={modalMode === 'view'}
+                                        helperText="Wie viele Spiele dürfen hier pro Woche stattfinden?"
                                     />
-                                )}
 
-                                {/* NEU: Sektion für Lösch-Bestätigung */}
-                                {showImageDeleteConfirm ? (
-                                    <Box>
-                                        <Alert severity="warning" sx={{ mb: 1 }}>Bild wirklich entfernen?</Alert>
-                                        <Button variant="outlined" size="small" onClick={() => setShowImageDeleteConfirm(false)} sx={{ mr: 1, color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
-                                        <Button variant="contained" size="small" color="error" onClick={handleDeleteImage}>Endgültig entfernen</Button>
-                                    </Box>
-                                ) : (
-                                    <Box>
-                                        <input
-                                            accept="image/png, image/jpeg, image/webp"
-                                            style={{ display: 'none' }}
-                                            id="pitch-image-upload"
-                                            type="file"
-                                            onChange={handleFileChange}
-                                            disabled={modalMode === 'view'}
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2, border: '1px solid', borderColor: theme.palette.divider, borderRadius: 1 }}>
+                                        {/* Styling für Switch angepasst: Grün wenn aktiv, wie Friendly-Toggle */}
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={formData.isVerified}
+                                                    onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
+                                                    disabled={modalMode === 'view'}
+                                                    sx={{
+                                                        '& .MuiSwitch-switchBase.Mui-checked': { color: theme.palette.primary.main },
+                                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: theme.palette.primary.main },
+                                                    }}
+                                                />
+                                            }
+                                            label="Offizieller Liga-Platz"
+                                            sx={{
+                                                color: theme.palette.text.secondary,
+                                                '& .MuiFormControlLabel-label.Mui-disabled': { color: theme.palette.text.disabled }
+                                            }}
                                         />
-                                        <label htmlFor="pitch-image-upload">
-                                            <Button variant="outlined" component="span" disabled={modalMode === 'view'} sx={{ color: 'grey.400', borderColor: 'grey.700', mr: 1 }}>
-                                                Datei auswählen
-                                            </Button>
-                                        </label>
-                                        {pitchImageFile && (
-                                            <Button variant="contained" onClick={handleImageUpload} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
-                                                Jetzt hochladen
-                                            </Button>
-                                        )}
-                                        {/* NEU: Button zum Starten des Löschvorgangs */}
-                                        {imagePreview && !pitchImageFile && modalMode !== 'view' && (
-                                            <Button variant="outlined" color="error" size="small" onClick={() => setShowImageDeleteConfirm(true)} sx={{ ml: 1 }}>
-                                                Entfernen
-                                            </Button>
-                                        )}
+
+                                        {/* Toggle für Friendly-Auto-Release */}
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={formData.allowFriendlyAutoRelease}
+                                                    onChange={(e) => setFormData({ ...formData, allowFriendlyAutoRelease: e.target.checked })}
+                                                    disabled={modalMode === 'view'}
+                                                    sx={{
+                                                        '& .MuiSwitch-switchBase.Mui-checked': { color: theme.palette.primary.main },
+                                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: theme.palette.primary.main },
+                                                    }}
+                                                />
+                                            }
+                                            label="Automatisch für Freundschaftsspiele freigeben"
+                                            sx={{
+                                                color: theme.palette.text.secondary,
+                                                '& .MuiFormControlLabel-label.Mui-disabled': { color: theme.palette.text.disabled }
+                                            }}
+                                        />
                                     </Box>
-                                )}
-                            </Box>
-                        )}
+                                </Box>
+                            )}
+                        </Box>
 
-                        <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
-                            <InputLabel>Typ</InputLabel>
-                            <Select value={formData.type} label="Typ" onChange={(e) => setFormData({ ...formData, type: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
-                                <MenuItem value="Rasen">Rasen</MenuItem>
-                                <MenuItem value="Kunstrasen">Kunstrasen</MenuItem>
-                                <MenuItem value="Hartplatz">Hartplatz</MenuItem>
-                                <MenuItem value="Bolzplatz">Bolzplatz</MenuItem>
-                                <MenuItem value="Sonstiges">Sonstiges</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
-                            <InputLabel>Gehört zu Team</InputLabel>
-                            <Select value={formData.teamId} label="Gehört zu Team" onChange={(e) => setFormData({ ...formData, teamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
-                                <MenuItem value=""><em>Kein Team / Liga-Platz</em></MenuItem>
-                                {teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-                            </Select>
-                        </FormControl>
-                        <TextField size="small" label="Hinweise" multiline rows={3} fullWidth value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+                        {/* TAB 2: DETAILS (Unwichtigere Infos) */}
+                        <Box role="tabpanel" hidden={activeTab !== 1}>
+                            {activeTab === 1 && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
-                        <TextField
-                            size="small"
-                            label="Wöchentliches Buchungslimit"
-                            type="number"
-                            fullWidth
-                            value={formData.weeklyLimit}
-                            onChange={(e) => setFormData({ ...formData, weeklyLimit: e.target.value })}
-                            sx={inputStyle}
-                            disabled={modalMode === 'view'}
-                            helperText="Wie viele Spiele dürfen hier pro Woche stattfinden?"
-                        />
+                                    {/* Bild-Upload-Sektion */}
+                                    {(modalMode === 'edit' || modalMode === 'view') && (
+                                        <Box sx={{ border: '1px dashed', borderColor: 'grey.700', p: 2, borderRadius: 1 }}>
+                                            <Typography sx={{ color: 'grey.300', mb: 1 }}>Platz-Bild</Typography>
+                                            {imagePreview && (
+                                                <Box
+                                                    component="img"
+                                                    src={imagePreview}
+                                                    alt="Platz-Vorschau"
+                                                    sx={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 1, mb: 2 }}
+                                                />
+                                            )}
 
-                        {/* KORREKTUR: Styling für Switch und Label vom UserManager übernommen */}
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={formData.isVerified}
-                                    onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
-                                    disabled={modalMode === 'view'}
-                                    sx={{
-                                        '& .MuiSwitch-switchBase.Mui-checked': { color: theme.palette.warning.main },
-                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: theme.palette.warning.main },
-                                    }}
-                                />
-                            }
-                            label="Offizieller Liga-Platz"
-                            sx={{
-                                color: theme.palette.text.secondary,
-                                '& .MuiFormControlLabel-label.Mui-disabled': { color: theme.palette.text.disabled }
-                            }}
-                        />
+                                            {/* Sektion für Lösch-Bestätigung */}
+                                            {showImageDeleteConfirm ? (
+                                                <Box>
+                                                    <Alert severity="warning" sx={{ mb: 1 }}>Bild wirklich entfernen?</Alert>
+                                                    <Button variant="outlined" size="small" onClick={() => setShowImageDeleteConfirm(false)} sx={{ mr: 1, color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
+                                                    <Button variant="contained" size="small" color="error" onClick={handleDeleteImage}>Endgültig entfernen</Button>
+                                                </Box>
+                                            ) : (
+                                                <Box>
+                                                    <input
+                                                        accept="image/png, image/jpeg, image/webp"
+                                                        style={{ display: 'none' }}
+                                                        id="pitch-image-upload"
+                                                        type="file"
+                                                        onChange={handleFileChange}
+                                                        disabled={modalMode === 'view'}
+                                                    />
+                                                    <label htmlFor="pitch-image-upload">
+                                                        <Button variant="outlined" component="span" disabled={modalMode === 'view'} sx={{ color: 'grey.400', borderColor: 'grey.700', mr: 1 }}>
+                                                            Datei auswählen
+                                                        </Button>
+                                                    </label>
+                                                    {pitchImageFile && (
+                                                        <Button variant="contained" onClick={handleImageUpload} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
+                                                            Jetzt hochladen
+                                                        </Button>
+                                                    )}
+                                                    {/* Button zum Starten des Löschvorgangs */}
+                                                    {imagePreview && !pitchImageFile && modalMode !== 'view' && (
+                                                        <Button variant="outlined" color="error" size="small" onClick={() => setShowImageDeleteConfirm(true)} sx={{ ml: 1 }}>
+                                                            Entfernen
+                                                        </Button>
+                                                    )}
+                                                </Box>
+                                            )}
+                                        </Box>
+                                    )}
 
-                        {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: theme.palette.background.default, color: theme.palette.error.main }}>Platz wirklich archivieren?</Alert>)}
+                                    <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
+                                        <InputLabel>Typ</InputLabel>
+                                        <Select value={formData.type} label="Typ" onChange={(e) => setFormData({ ...formData, type: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
+                                            <MenuItem value="Rasen">Rasen</MenuItem>
+                                            <MenuItem value="Kunstrasen">Kunstrasen</MenuItem>
+                                            <MenuItem value="Hartplatz">Hartplatz</MenuItem>
+                                            <MenuItem value="Bolzplatz">Bolzplatz</MenuItem>
+                                            <MenuItem value="Sonstiges">Sonstiges</MenuItem>
+                                        </Select>
+                                    </FormControl>
 
-                        <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            {modalMode === 'create' && <><Button variant="outlined" onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Erstellen</Button></>}
-                            {modalMode === 'view' && !showDeleteConfirm && <><Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Archivieren</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button></>}
-                            {modalMode === 'view' && showDeleteConfirm && <><Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button variant="contained" color="error" onClick={handleArchive}>Endgültig archivieren</Button></>}
-                            {modalMode === 'edit' && <><Button variant="outlined" onClick={() => setModalMode('view')} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Speichern</Button></>}
+                                    <TextField size="small" label="Hinweise" multiline rows={3} fullWidth value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+
+                                    {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: theme.palette.background.default, color: theme.palette.error.main }}>Platz wirklich archivieren?</Alert>)}
+                                </Box>
+                            )}
                         </Box>
                     </Box>
                 </form>
-            </ReusableModal>
+            </AppModal>
 
             <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
                 <Table size="small">

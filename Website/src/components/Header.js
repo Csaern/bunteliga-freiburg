@@ -9,6 +9,7 @@ import MenuItem from '@mui/material/MenuItem';
 import MenuIcon from '@mui/icons-material/Menu';
 import Container from '@mui/material/Container';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
 import Drawer from '@mui/material/Drawer';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -55,6 +56,12 @@ import { useAuth } from '../context/AuthProvider';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { ColorModeContext } from '../context/ColorModeContext';
+import LockIcon from '@mui/icons-material/Lock';
+import Avatar from '@mui/material/Avatar';
+import Badge from '@mui/material/Badge';
+import UserSettingsModal from './Auth/UserSettingsModal';
+import { useNotifications } from '../context/NotificationContext';
+
 
 
 const pages = [
@@ -162,6 +169,8 @@ function Header() {
   const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = React.useState(false);
   const [teamboardMenuAnchorEl, setTeamboardMenuAnchorEl] = React.useState(null);
   const [mobileTeamboardMenuOpen, setMobileTeamboardMenuOpen] = React.useState(false);
+  const [openSettings, setOpenSettings] = React.useState(false);
+
 
   // Determine dynamic background color for AppBar based on theme mode
   const appBarBackgroundColor = theme.palette.mode === 'dark'
@@ -172,6 +181,7 @@ function Header() {
   const isMobile = useMediaQuery('(max-width:850px)');
 
   const { currentUser, isAdmin, teamId } = useAuth();
+  const { unreadCount } = useNotifications();
 
   const handleLogout = async () => {
     try {
@@ -220,9 +230,28 @@ function Header() {
       }}
     >
       <CustomDrawerHeader sx={{ justifyContent: 'space-between' }}>
-        <IconButton sx={{ ml: 1 }} onClick={colorMode.toggleColorMode} color="inherit">
-          {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {currentUser && (
+            <IconButton onClick={() => { setOpenSettings(true); handleDrawerToggle(); }} color="inherit" sx={{ ml: 1 }}>
+              <Badge badgeContent={unreadCount} color="error">
+                <Avatar sx={{
+                  width: 32,
+                  height: 32,
+                  fontSize: '0.9rem',
+                  bgcolor: theme.palette.secondary.main,
+                  color: theme.palette.common.white,
+                  fontFamily: 'Comfortaa',
+                  fontWeight: 'bold'
+                }}>
+                  {getInitials(currentUser)}
+                </Avatar>
+              </Badge>
+            </IconButton>
+          )}
+          <IconButton sx={{ ml: 1 }} onClick={colorMode.toggleColorMode} color="inherit">
+            {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+          </IconButton>
+        </Box>
         <IconButton onClick={handleDrawerToggle} sx={{ color: theme.palette.text.primary }}>
           {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </IconButton>
@@ -316,26 +345,16 @@ function Header() {
 
       <Box sx={{ marginTop: 'auto' }}>
         <Divider sx={{ borderColor: theme.palette.divider, mt: 1, mb: 0 }} />
-        <ListItem disablePadding>
-          {currentUser ? (
-            <ListItemButton onClick={() => { handleLogout(); handleDrawerToggle(); }} sx={{ margin: 0, width: '100%', borderRadius: 0, bgcolor: theme.palette.error.main, '&:hover': { bgcolor: theme.palette.error.dark } }}>
-              <ListItemIcon sx={{ color: theme.palette.common.white, minWidth: 'auto', mr: 1.5 }}><LogoutIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary={`Abmelden`} secondary={currentUser.email} primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.common.white }} secondaryTypographyProps={{
-                fontSize: '0.7rem',
-                color: 'rgba(255,255,255,0.7)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }} />
-            </ListItemButton>
-          ) : (
+        {!currentUser && (
+          <ListItem disablePadding>
             <ListItemButton component={Link} to="/login" onClick={handleDrawerToggle} sx={{ margin: 0, width: '100%', borderRadius: 0, bgcolor: theme.palette.primary.main, '&:hover': { bgcolor: theme.palette.secondary.main } }}>
               <ListItemIcon sx={{ color: theme.palette.common.white, minWidth: 'auto', mr: 1.5 }}><VpnKeyIcon fontSize="small" /></ListItemIcon>
               <ListItemText primary="Anmelden" primaryTypographyProps={{ fontWeight: 'bold', color: theme.palette.common.white }} />
             </ListItemButton>
-          )}
-        </ListItem>
+          </ListItem>
+        )}
       </Box>
+
     </Box>
   );
 
@@ -392,6 +411,8 @@ function Header() {
           </Box>
 
 
+
+
           <Drawer variant="temporary" anchor="left" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRight: `1px solid ${theme.palette.divider}`, overflowX: 'hidden' } }}>
             {drawerContent}
           </Drawer>
@@ -442,17 +463,36 @@ function Header() {
               </>
             )}
 
-            <IconButton sx={{ ml: 1 }} onClick={colorMode.toggleColorMode} color="inherit">
-              {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-            </IconButton>
+            <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton sx={{ ml: 0 }} onClick={colorMode.toggleColorMode} color="inherit">
+                {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+              </IconButton>
 
-            <Box sx={{ ml: 1 }}>
               {currentUser ? (
-                <Button onClick={handleLogout} variant="contained"
-                  sx={{ ml: 1, bgcolor: theme.palette.error.main, '&:hover': { bgcolor: theme.palette.error.dark }, fontSize: isShrunk ? '0.7rem' : '0.8rem', fontWeight: 700, textTransform: 'none', borderRadius: '16px' }}
-                >
-                  Logout
-                </Button>
+                <Tooltip title="Einstellungen">
+                  <IconButton onClick={() => setOpenSettings(true)} color="inherit">
+                    <Badge badgeContent={unreadCount} color="error">
+                      <Avatar sx={{
+                        width: 40,
+                        height: 40,
+                        fontSize: '1rem',
+                        bgcolor: theme.palette.secondary.main,
+                        color: theme.palette.common.white,
+                        fontFamily: 'Comfortaa',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        border: `2px solid ${alpha(theme.palette.common.white, 0.2)}`,
+                        '&:hover': {
+                          border: `2px solid ${theme.palette.secondary.main}`,
+                          transform: 'scale(1.05)'
+                        },
+                        transition: 'all 0.2s ease-in-out'
+                      }}>
+                        {getInitials(currentUser)}
+                      </Avatar>
+                    </Badge>
+                  </IconButton>
+                </Tooltip>
               ) : (
                 <Button component={Link} to="/login" variant="contained"
                   sx={{ ml: 1, bgcolor: theme.palette.secondary.main, '&:hover': { bgcolor: theme.palette.primary.main }, fontSize: isShrunk ? '0.7rem' : '0.8rem', fontWeight: 700, textTransform: 'none', borderRadius: '16px' }}
@@ -464,7 +504,19 @@ function Header() {
           </Box>
         </Toolbar>
       </Container>
+      <UserSettingsModal open={openSettings} onClose={() => setOpenSettings(false)} />
     </AppBar>
   );
 }
+
+const getInitials = (user) => {
+  if (!user) return '';
+  if (user.displayName) {
+    const names = user.displayName.split(' ');
+    if (names.length >= 2) return (names[0][0] + names[1][0]).toUpperCase();
+    return names[0].substring(0, 2).toUpperCase();
+  }
+  return user.email.substring(0, 2).toUpperCase();
+};
+
 export default Header;

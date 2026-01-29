@@ -13,7 +13,8 @@ class User {
     email,
     displayName = null,
     teamId = null,
-    isAdmin = false
+    isAdmin = false,
+    settings = {}
   }) {
     // 1. Validierung
     if (!uid || !email) {
@@ -27,7 +28,17 @@ class User {
     this.teamId = teamId;
     this.isAdmin = isAdmin;
 
-    // 3. Ableitung der Rolle für einfache Berechtigungsprüfungen
+    // 3. Einstellungen initialisieren
+    this.settings = {
+      emailNotifications: {
+        gameRequests: settings?.emailNotifications?.gameRequests ?? true,
+        gameResults: settings?.emailNotifications?.gameResults ?? true,
+        gameCancellations: settings?.emailNotifications?.gameCancellations ?? true,
+      },
+      ...settings
+    };
+
+    // 4. Ableitung der Rolle für einfache Berechtigungsprüfungen
     this.role = isAdmin ? 'admin' : (teamId ? 'team' : 'user');
   }
 
@@ -43,6 +54,7 @@ class User {
       teamId: this.teamId,
       isAdmin: this.isAdmin,
       role: this.role,
+      settings: this.settings,
       // createdAt und updatedAt werden vom Service gesetzt.
     };
   }

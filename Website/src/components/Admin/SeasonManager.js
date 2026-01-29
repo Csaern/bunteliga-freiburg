@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, useTheme, useMediaQuery, CircularProgress, Alert, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, IconButton, Tooltip, Autocomplete } from '@mui/material';
-import { ReusableModal } from '../Helpers/modalUtils';
+import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, useTheme, useMediaQuery, CircularProgress, Alert, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, IconButton, Tooltip, Autocomplete, List, ListItem, ListItemText } from '@mui/material';
+import AppModal from '../Modals/AppModal';
 import { StyledTableCell } from '../Helpers/tableUtils';
 import * as seasonApiService from '../../services/seasonApiService';
 import * as teamApiService from '../../services/teamApiService';
@@ -9,7 +9,6 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { List, ListItem, ListItemText } from '@mui/material';
 
 const formatDateForInput = (dateValue) => {
     if (!dateValue) return '';
@@ -74,6 +73,23 @@ const SeasonManager = () => {
         '& .MuiAutocomplete-popupIndicator': { color: theme.palette.text.secondary },
     };
 
+    const scrollbarStyle = {
+        '&::-webkit-scrollbar': { width: '8px' },
+        '&::-webkit-scrollbar-track': { background: theme.palette.action.hover, borderRadius: '4px' },
+        '&::-webkit-scrollbar-thumb': { background: theme.palette.primary.main, borderRadius: '4px' },
+        '&::-webkit-scrollbar-thumb:hover': { background: theme.palette.primary.dark }
+    };
+
+    const menuProps = {
+        PaperProps: {
+            sx: {
+                bgcolor: theme.palette.background.paper,
+                color: theme.palette.text.primary,
+                ...scrollbarStyle
+            }
+        }
+    };
+
     const [seasons, setSeasons] = useState([]);
     const [allTeams, setAllTeams] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -89,7 +105,6 @@ const SeasonManager = () => {
     const [teamsBelowMinimum, setTeamsBelowMinimum] = useState([]);
 
     useEffect(() => {
-        // Dieser Hook fokussiert das Suchfeld neu, NACHDEM es durch den key-Wechsel zurückgesetzt wurde.
         if ((modalMode === 'edit' || modalMode === 'create') && activeTab === 1) {
             setTimeout(() => autocompleteInputRef.current?.focus(), 0);
         }
@@ -145,7 +160,7 @@ const SeasonManager = () => {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         try {
             const dataToSend = {
                 ...formData,
@@ -153,7 +168,6 @@ const SeasonManager = () => {
                 rankingCriteria: (formData.rankingCriteria || []).slice(0, 3)
             };
 
-            // FINALE KORREKTUR: Sende ein vollständiges, unmissverständliches ISO-Datum (UTC).
             if (dataToSend.startDate && typeof dataToSend.startDate === 'string') {
                 dataToSend.startDate = `${dataToSend.startDate}T00:00:00.000Z`;
             } else {
@@ -179,16 +193,10 @@ const SeasonManager = () => {
         const season = seasons.find(s => s.id === seasonId);
         if (season) {
             if (action === 'finish') {
-                // Berechne Teams, die nicht genug Spiele haben
                 try {
                     const results = await resultApiService.getResultsForSeason(seasonId);
-                    // Nur bestätigte und gültige Ergebnisse zählen
                     const validResults = results.filter(r => r.status === 'confirmed' && r.isValid !== false);
-
-                    // Nur aktive Teams berücksichtigen
                     const activeTeams = season.teams.filter(team => team.status !== 'inactive');
-
-                    // Zähle Spiele pro Team (nur für aktive Teams)
                     const gamesPerTeam = {};
                     activeTeams.forEach(team => {
                         gamesPerTeam[team.id] = 0;
@@ -203,10 +211,7 @@ const SeasonManager = () => {
                         }
                     });
 
-                    // Berechne Minimum (Anzahl aktiver Teams / 2, aufgerundet)
                     const minGames = Math.ceil(activeTeams.length / 2);
-
-                    // Finde Teams unter dem Minimum (nur aktive Teams)
                     const teamsBelowMin = activeTeams
                         .filter(team => gamesPerTeam[team.id] < minGames)
                         .map(team => ({
@@ -228,21 +233,16 @@ const SeasonManager = () => {
         }
     };
 
-    // Funktion 2: Ergebnisse von Teams unter Minimum als ungültig markieren
     const markResultsAsInvalid = async (seasonId, teamIds) => {
         if (!teamIds || teamIds.length === 0) return;
 
         try {
-            // Lade alle Ergebnisse der Saison
             const results = await resultApiService.getResultsForSeason(seasonId);
-
-            // Finde alle Ergebnisse, die diese Teams betreffen
             const resultsToInvalidate = results.filter(result =>
                 (teamIds.includes(result.homeTeamId) || teamIds.includes(result.awayTeamId)) &&
                 result.status === 'confirmed'
             );
 
-            // Markiere jedes Ergebnis als ungültig
             const updatePromises = resultsToInvalidate.map(result =>
                 resultApiService.adminUpdateResult(result.id, { isValid: false })
             );
@@ -262,15 +262,10 @@ const SeasonManager = () => {
                     await seasonApiService.setCurrentSeason(seasonId);
                     break;
                 case 'finish':
-                    // Markiere Ergebnisse von Teams unter Minimum als ungültig
                     if (teamsBelowMinimum.length > 0) {
                         const teamIds = teamsBelowMinimum.map(t => t.id);
                         await markResultsAsInvalid(seasonId, teamIds);
                     }
-
-                    // TODO: Später aktivieren - addToEternalTable(seasonId);
-
-                    // Rechne die Saison ab (setzt evaluated = true, Status bleibt active)
                     await seasonApiService.evaluateSeason(seasonId);
                     break;
                 case 'archive':
@@ -318,13 +313,36 @@ const SeasonManager = () => {
             </Box>
             {error && <Alert severity="error" sx={{ mb: 2, bgcolor: theme.palette.background.default, color: theme.palette.error.main }}>{error}</Alert>}
 
-            <ReusableModal
+            <AppModal
                 open={isConfirmModalOpen}
                 onClose={() => {
                     setIsConfirmModalOpen(false);
                     setTeamsBelowMinimum([]);
                 }}
                 title={actionToConfirm?.action === 'finish' ? "Saison abrechnen" : actionToConfirm?.action === 'delete' ? "Saison löschen" : "Aktion bestätigen"}
+                fullScreenMobile
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, width: '100%' }}>
+                        <Button variant="outlined" onClick={() => {
+                            setIsConfirmModalOpen(false);
+                            setTeamsBelowMinimum([]);
+                        }} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>
+                            Abbrechen
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleConfirmAction}
+                            sx={{
+                                backgroundColor: actionToConfirm?.action === 'delete' ? theme.palette.error.main : theme.palette.primary.main,
+                                '&:hover': {
+                                    backgroundColor: actionToConfirm?.action === 'delete' ? theme.palette.error.dark : theme.palette.primary.dark
+                                }
+                            }}
+                        >
+                            {actionToConfirm?.action === 'delete' ? 'Endgültig löschen' : 'Bestätigen'}
+                        </Button>
+                    </Box>
+                }
             >
                 {actionToConfirm && (
                     <>
@@ -395,37 +413,44 @@ const SeasonManager = () => {
                                     }" für die Saison "${actionToConfirm.seasonName}" wirklich durchführen?`}
                             </Typography>
                         )}
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                            <Button variant="outlined" onClick={() => {
-                                setIsConfirmModalOpen(false);
-                                setTeamsBelowMinimum([]);
-                            }} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>
-                                Abbrechen
-                            </Button>
-                            <Button
-                                variant="contained"
-                                onClick={handleConfirmAction}
-                                sx={{
-                                    backgroundColor: actionToConfirm.action === 'delete' ? theme.palette.error.main : theme.palette.primary.main,
-                                    '&:hover': {
-                                        backgroundColor: actionToConfirm.action === 'delete' ? theme.palette.error.dark : theme.palette.primary.dark
-                                    }
-                                }}
-                            >
-                                {actionToConfirm.action === 'delete' ? 'Endgültig löschen' : 'Bestätigen'}
-                            </Button>
-                        </Box>
                     </>
                 )}
-            </ReusableModal>
+            </AppModal>
 
-            <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neue Saison erstellen' : 'Saison Details'}>
-                <form onSubmit={handleSubmit}>
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                title={modalMode === 'create' ? 'Neue Saison erstellen' : 'Saison Details'}
+                fullScreenMobile
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        {modalMode === 'create' && (
+                            <>
+                                <Button onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button onClick={handleSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Erstellen</Button>
+                            </>
+                        )}
+                        {modalMode === 'view' && (
+                            <>
+                                <Button onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary }}>Schließen</Button>
+                                <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main }}>Bearbeiten</Button>
+                            </>
+                        )}
+                        {modalMode === 'edit' && (
+                            <>
+                                <Button onClick={() => setModalMode('view')} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                <Button onClick={handleSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Speichern</Button>
+                            </>
+                        )}
+                    </Box>
+                }
+            >
+                <form id="season-form" onSubmit={handleSubmit}>
                     <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ borderBottom: 1, borderColor: theme.palette.divider, '& .MuiTabs-indicator': { backgroundColor: theme.palette.primary.main }, '& .MuiTab-root.Mui-selected': { color: theme.palette.primary.main } }}>
                         <Tab label="Allgemein & Regeln" sx={{ color: theme.palette.text.secondary, textTransform: 'none' }} />
                         <Tab label={`Teams (${formData.teams.length})`} sx={{ color: theme.palette.text.secondary, textTransform: 'none' }} />
                     </Tabs>
-                    <Box sx={{ height: '55vh', overflowY: 'auto' }}>
+                    <Box sx={{ height: '55vh', overflowY: 'auto', mt: 2 }}>
                         <TabPanel value={activeTab} index={0}>
                             <TextField size="small" label="Name" name="name" value={formData.name} onChange={handleFormChange} disabled={isReadOnly} fullWidth sx={darkInputStyle} />
                             <TextField size="small" label="Startdatum" name="startDate" type="date" value={formData.startDate} onChange={handleFormChange} disabled={isReadOnly} fullWidth InputLabelProps={{ shrink: true }} sx={darkInputStyle} />
@@ -468,13 +493,12 @@ const SeasonManager = () => {
                         <TabPanel value={activeTab} index={1}>
                             {!isReadOnly && (
                                 <Autocomplete
-                                    key={formData.teams.length} // Dieser Key erzwingt das Neuladen der Komponente und leert sie
+                                    key={formData.teams.length}
                                     options={availableTeams}
                                     getOptionLabel={(option) => option.name}
                                     onChange={(event, newValue) => {
                                         if (newValue) {
                                             handleAddTeam(newValue);
-                                            // Der Fokus wird jetzt durch den useEffect oben gesteuert
                                         }
                                     }}
                                     noOptionsText={<Typography sx={{ color: 'grey.400' }}>Keine Teams gefunden</Typography>}
@@ -515,13 +539,8 @@ const SeasonManager = () => {
                             </TableContainer>
                         </TabPanel>
                     </Box>
-                    <Box sx={{ p: 2, borderTop: 1, borderColor: theme.palette.divider, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        {modalMode === 'create' && (<><Button variant="outlined" onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Erstellen</Button></>)}
-                        {modalMode === 'view' && (<><Button variant="outlined" onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Schließen</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main }}>Bearbeiten</Button></>)}
-                        {modalMode === 'edit' && (<><Button variant="outlined" onClick={() => setModalMode('view')} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Speichern</Button></>)}
-                    </Box>
                 </form>
-            </ReusableModal>
+            </AppModal>
 
             <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
                 <Table>

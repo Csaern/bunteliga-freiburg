@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
-const User = require('../models/user'); // Das neue Model importieren
+const User = require('../models/user');
+const emailService = require('./emailService'); // Import email service
 const db = admin.firestore();
 const teamsCollection = db.collection('teams');
 
@@ -16,7 +17,7 @@ async function createUser(userData) {
     email: email,
     password: password,
     displayName: displayName,
-    emailVerified: true, 
+    emailVerified: true,
   });
 
   // 2. Custom Claims für Admin-Rolle und Team-ID setzen
@@ -24,7 +25,7 @@ async function createUser(userData) {
   if (isAdmin) claims.admin = true;
   if (teamId) claims.teamId = teamId;
   if (Object.keys(claims).length > 0) {
-      await admin.auth().setCustomUserClaims(userRecord.uid, claims);
+    await admin.auth().setCustomUserClaims(userRecord.uid, claims);
   }
 
   // 3. Benutzerdokument in Firestore mit dem Model erstellen
@@ -54,18 +55,18 @@ async function updateUser(uid, updates) {
   // 1. Custom Claims aktualisieren
   const user = await admin.auth().getUser(uid);
   const currentClaims = user.customClaims || {};
-  
+
   const newClaims = { ...currentClaims, admin: !!isAdmin };
 
   if (teamId) {
-      newClaims.teamId = teamId;
+    newClaims.teamId = teamId;
   } else {
-      delete newClaims.teamId; // Wichtig: Claim entfernen, wenn kein Team zugewiesen ist
+    delete newClaims.teamId; // Wichtig: Claim entfernen, wenn kein Team zugewiesen ist
   }
-  
+
   // Nur setzen, wenn sich die Claims geändert haben
   if (JSON.stringify(currentClaims) !== JSON.stringify(newClaims)) {
-      await admin.auth().setCustomUserClaims(uid, newClaims);
+    await admin.auth().setCustomUserClaims(uid, newClaims);
   }
 
   // 2. Firestore-Dokument aktualisieren
@@ -122,37 +123,70 @@ async function removeCaptainFromTeam(userId, teamId) {
 }
 
 /**
+ * Aktualisiert die personalisierten Einstellungen eines Benutzers.
+ * @param {string} uid - Die UID des Benutzers.
+ * @param {object} settings - Das neue Einstellungs-Objekt.
+ */
+async function updateUserSettings(uid, settings) {
+  const userDocRef = db.collection('users').doc(uid);
+  const userDoc = await userDocRef.get();
+
+  if (!userDoc.exists) {
+    throw new Error('Benutzer nicht gefunden.');
+  }
+
+  const currentSettings = userDoc.data().settings || {};
+
+  // Merge settings to avoid overwriting everything
+  const newSettings = {
+    ...currentSettings,
+    ...settings,
+    emailNotifications: {
+      ...(currentSettings.emailNotifications || {}),
+      ...(settings.emailNotifications || {}),
+    }
+  };
+
+  await userDocRef.update({
+    settings: newSettings,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return newSettings;
+}
+
+/**
  * Ruft eine Liste aller Benutzer ab und reichert sie mit dem Team-Namen an.
  */
 async function getAllUsers() {
-    // 1. Alle Teams für ein schnelles Nachschlagen der Namen abrufen
-    const teamsSnapshot = await teamsCollection.get();
-    const teamsMap = new Map();
-    teamsSnapshot.forEach(doc => {
-        teamsMap.set(doc.id, doc.data().name);
-    });
+  // 1. Alle Teams für ein schnelles Nachschlagen der Namen abrufen
+  const teamsSnapshot = await teamsCollection.get();
+  const teamsMap = new Map();
+  teamsSnapshot.forEach(doc => {
+    teamsMap.set(doc.id, doc.data().name);
+  });
 
-    // 2. Alle Benutzer aus Firebase Auth abrufen
-    const listUsersResult = await admin.auth().listUsers(1000);
-    
-    // 3. Daten aus Auth mit dem aufgelösten Team-Namen anreichern
-    const enrichedUsers = listUsersResult.users.map(userRecord => {
-        const customClaims = userRecord.customClaims || {};
-        const teamId = customClaims.teamId || null;
+  // 2. Alle Benutzer aus Firebase Auth abrufen
+  const listUsersResult = await admin.auth().listUsers(1000);
 
-        return {
-            uid: userRecord.uid,
-            email: userRecord.email,
-            displayName: userRecord.displayName,
-            disabled: userRecord.disabled,
-            isAdmin: customClaims.admin || false,
-            teamId: teamId,
-            teamName: teamId ? teamsMap.get(teamId) || null : null, // Team-Namen direkt hier auflösen
-            customClaims: customClaims,
-        };
-    });
+  // 3. Daten aus Auth mit dem aufgelösten Team-Namen anreichern
+  const enrichedUsers = listUsersResult.users.map(userRecord => {
+    const customClaims = userRecord.customClaims || {};
+    const teamId = customClaims.teamId || null;
 
-    return enrichedUsers;
+    return {
+      uid: userRecord.uid,
+      email: userRecord.email,
+      displayName: userRecord.displayName,
+      disabled: userRecord.disabled,
+      isAdmin: customClaims.admin || false,
+      teamId: teamId,
+      teamName: teamId ? teamsMap.get(teamId) || null : null, // Team-Namen direkt hier auflösen
+      customClaims: customClaims,
+    };
+  });
+
+  return enrichedUsers;
 }
 
 /**
@@ -161,10 +195,10 @@ async function getAllUsers() {
  * @param {object} roles - Ein Objekt mit den Rollen, z.B. { admin: true }
  */
 async function updateUserRole(uid, roles) {
-    const user = await admin.auth().getUser(uid);
-    // Setze die neuen Claims, behalte aber bestehende bei (falls es andere gibt)
-    await admin.auth().setCustomUserClaims(uid, { ...user.customClaims, ...roles });
-    return { message: `Rollen für Benutzer ${user.email} erfolgreich aktualisiert.` };
+  const user = await admin.auth().getUser(uid);
+  // Setze die neuen Claims, behalte aber bestehende bei (falls es andere gibt)
+  await admin.auth().setCustomUserClaims(uid, { ...user.customClaims, ...roles });
+  return { message: `Rollen für Benutzer ${user.email} erfolgreich aktualisiert.` };
 }
 
 /**
@@ -173,9 +207,104 @@ async function updateUserRole(uid, roles) {
  * @param {boolean} disabled - true zum Deaktivieren, false zum Reaktivieren.
  */
 async function setUserDisabledStatus(uid, disabled) {
-    await admin.auth().updateUser(uid, { disabled });
-    const status = disabled ? 'deaktiviert' : 'reaktiviert';
-    return { message: `Benutzer wurde erfolgreich ${status}.` };
+  await admin.auth().updateUser(uid, { disabled });
+  const status = disabled ? 'deaktiviert' : 'reaktiviert';
+  return { message: `Benutzer wurde erfolgreich ${status}.` };
+}
+
+/**
+ * Sendet einen Link zum Zurücksetzen des Passworts an die angegebene E-Mail-Adresse.
+ * @param {string} email - Die E-Mail-Adresse des Benutzers.
+ */
+async function requestPasswordReset(email) {
+  try {
+    // 1. Prüfen, ob der Benutzer existiert
+    await admin.auth().getUserByEmail(email);
+
+    // 2. Link generieren
+    // Wir generieren den Link und passen ihn so an, dass er auf unsere eigene Reset-Seite zeigt
+    const firebaseLink = await admin.auth().generatePasswordResetLink(email);
+
+    // Extrahiere die Parameter (oobCode, apiKey, etc.) aus dem Firebase-Link
+    const urlObj = new URL(firebaseLink);
+    const params = urlObj.search;
+
+    // Basis-URL für die Website - in der Produktion sollte dies aus einer Config kommen
+    const websiteUrl = process.env.WEBSITE_URL || 'http://localhost:3000';
+    const link = `${websiteUrl}/reset-password${params}`;
+
+    // 3. E-Mail senden
+    await emailService.sendEmail({
+      to: email,
+      subject: 'Passwort zurücksetzen - Bunte Liga Freiburg',
+      html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                    <h2 style="color: #00A99D;">Passwort zurücksetzen</h2>
+                    <p>Hallo,</p>
+                    <p>wir haben eine Anfrage zum Zurücksetzen Ihres Passworts erhalten.</p>
+                    <p>Klicken Sie auf den folgenden Link, um ein neues Passwort zu vergeben:</p>
+                    <p style="text-align: center; margin: 30px 0;">
+                        <a href="${link}" style="background-color: #00A99D; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Passwort zurücksetzen</a>
+                    </p>
+                    <p>Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>
+                    <p style="word-break: break-all; color: #555;">${link}</p>
+                    <br>
+                    <p>Wenn Sie dies nicht angefordert haben, können Sie diese E-Mail ignorieren.</p>
+                </div>
+            `
+    });
+
+    return { message: 'Falls die E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen gesendet.' };
+  } catch (error) {
+    if (error.code === 'auth/user-not-found') {
+      // Aus Sicherheitsgründen geben wir dieselbe Nachricht zurück
+      return { message: 'Falls die E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen gesendet.' };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Ändert das Passwort eines Benutzers (für eingeloggte Benutzer).
+ * @param {string} uid - Die UID des Benutzers.
+ * @param {string} oldPassword - Das aktuelle Passwort zur Verifizierung.
+ * @param {string} newPassword - Das neue Passwort.
+ */
+async function changePassword(uid, oldPassword, newPassword) {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Das neue Passwort muss mindestens 6 Zeichen lang sein.');
+  }
+
+  // 1. Benutzerdaten abrufen (für die E-Mail)
+  const user = await admin.auth().getUser(uid);
+  const email = user.email;
+
+  // 2. Altes Passwort verifizieren (via Firebase Auth REST API)
+  // Wir nutzen die REST API, da das Admin SDK keine Passwort-Verifizierung bietet
+  const apiKey = "AIzaSyBY9qrrtw9Yc7vY-FdMUiZaVzLo-8FD3XA";
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password: oldPassword,
+      returnSecureToken: true
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    if (errorData.error && (errorData.error.message === 'INVALID_PASSWORD' || errorData.error.message === 'INVALID_LOGIN_CREDENTIALS')) {
+      throw new Error('Das aktuelle Passwort ist nicht korrekt.');
+    }
+    throw new Error('Fehler bei der Verifizierung des aktuellen Passworts.');
+  }
+
+  // 3. Passwort aktualisieren
+  await admin.auth().updateUser(uid, { password: newPassword });
+  return { message: 'Passwort erfolgreich geändert.' };
 }
 
 module.exports = {
@@ -184,7 +313,10 @@ module.exports = {
   deleteUser,
   addCaptainToTeam,
   removeCaptainFromTeam,
+  updateUserSettings,
   getAllUsers,
   updateUserRole,
-  setUserDisabledStatus, // NEU
+  setUserDisabledStatus,
+  requestPasswordReset, // NEU
+  changePassword, // NEU
 };

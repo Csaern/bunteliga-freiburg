@@ -11,7 +11,7 @@ import SeasonManager from '../components/Admin/SeasonManager';
 import ResultManager from '../components/Admin/ResultManager';
 import TeamManager from '../components/Admin/TeamManager';
 import PitchManager from '../components/Admin/PitchManager';
-import WebsiteManager from '../components/Admin/WebsiteManager';
+import GeneralSettings from '../components/Admin/GeneralSettings';
 
 const AdminBoard = ({ initialTab = 'bookings' }) => {
     // HINWEIS: Der 'pitches'-State wird hier nicht mehr benötigt.
@@ -129,8 +129,8 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
             // Er erhält die 'teams'-Liste nur, um die Teamnamen anzuzeigen.
             case 'pitches':
                 return <PitchManager teams={teams} />;
-            case 'website':
-                return <WebsiteManager />;
+            case 'general':
+                return <GeneralSettings />;
             default:
                 return null;
         }

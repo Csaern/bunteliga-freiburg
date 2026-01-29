@@ -19,13 +19,14 @@ export const AuthProvider = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [teamId, setTeamId] = useState(null);
   const [role, setRole] = useState(null);
+  const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
 
   // onAuthStateChanged lauscht auf An- und Abmeldungen
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      
+
       if (user) {
         // Prüfe Admin-Status in Firestore
         try {
@@ -35,10 +36,12 @@ export const AuthProvider = ({ children }) => {
             setIsAdmin(data.isAdmin || false);
             setTeamId(data.teamId || null);
             setRole(data.role || (data.isAdmin ? 'admin' : 'team'));
+            setSettings(data.settings || {});
           } else {
             setIsAdmin(false);
             setTeamId(null);
             setRole(null);
+            setSettings({});
           }
         } catch (error) {
           console.error('Fehler beim Laden des Benutzer-Status:', error);
@@ -50,8 +53,9 @@ export const AuthProvider = ({ children }) => {
         setIsAdmin(false);
         setTeamId(null);
         setRole(null);
+        setSettings({});
       }
-      
+
       setLoading(false);
     });
 
@@ -65,6 +69,8 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     teamId,
     role,
+    settings,
+    setSettings, // NEU: Damit wir sie nach Updates direkt im Context aktualisieren können
     // Hier können später Login/Logout-Funktionen hinzugefügt werden
   };
 

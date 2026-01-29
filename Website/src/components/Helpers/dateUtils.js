@@ -98,34 +98,6 @@ export const formatTime = (dateInput) => {
  */
 export const createBerlinDate = (dateStr, timeStr) => {
     if (!dateStr || !timeStr) return null;
-
-    // Basis: Wir interpretieren die Eingabe als UTC
-    const utcBase = new Date(`${dateStr}T${timeStr}:00.000Z`);
-
-    // Prüffunktion: Was ist die Zeit dieses Timestamps in Berlin?
-    const checkBerlinTime = (d) => {
-        return new Intl.DateTimeFormat('en-GB', {
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'Europe/Berlin',
-            hour12: false
-        }).format(d);
-    };
-
-    // Was ist das in Berlin?
-    const berlinStr = checkBerlinTime(utcBase); // z.B. "12:00" (wenn Berlin +2)
-    const [berlinH, berlinM] = berlinStr.split(':').map(Number);
-    const [targetH, targetM] = timeStr.split(':').map(Number);
-
-    // Differenz in Minuten
-    const targetMinutes = targetH * 60 + targetM;
-    const berlinMinutes = berlinH * 60 + berlinM;
-
-    let diffMinutes = targetMinutes - berlinMinutes;
-    // Korrektur für Tagesüberlauf
-    if (diffMinutes > 720) diffMinutes -= 1440;
-    if (diffMinutes < -720) diffMinutes += 1440;
-
-    // Addiere Differenz zu UTC Base
-    return new Date(utcBase.getTime() + diffMinutes * 60000);
+    // Use local system time construction
+    return new Date(`${dateStr}T${timeStr}:00`);
 };

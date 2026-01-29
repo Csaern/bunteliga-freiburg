@@ -1,14 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, useTheme, useMediaQuery, Alert, FormControl, InputLabel, Select, MenuItem, Snackbar, CircularProgress } from '@mui/material';
-import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
-import ShieldIcon from '@mui/icons-material/Shield'; // NEU: Gefülltes Wappen-Icon importieren
-import { ReusableModal } from '../Helpers/modalUtils';
-import { StyledTableCell } from '../Helpers/tableUtils';
+import { Box, Button, Table, TableBody, TableContainer, TableHead, TableRow, Paper, Typography, TextField, useTheme, useMediaQuery, Alert, Snackbar, CircularProgress, InputAdornment, Tabs, Tab } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import AppModal from '../Modals/AppModal';
+import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import * as teamApiService from '../../services/teamApiService';
 import { API_BASE_URL } from '../../services/apiClient';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import ShieldIcon from '@mui/icons-material/Shield';
 
-// KORREKTUR: Die Komponente ist jetzt autark und holt ihre Daten selbst.
-// Die Props 'teams' und 'fetchData' werden nicht mehr benötigt.
+const TabPanel = (props) => {
+    const { children, value, index, ...other } = props;
+    return (
+        <div role="tabpanel" hidden={value !== index} {...other}>
+            {value === index && (
+                <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {children}
+                </Box>
+            )}
+        </div>
+    );
+};
+
 const TeamManager = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -28,12 +41,10 @@ const TeamManager = () => {
     };
 
     const initialFormData = {
-        name: '', foundedYear: '', description: '', contactPerson: '',
-        contactEmail: '', contactPhone: '', website: '', logoColor: '#666666',
-        socialMedia: { facebook: '', instagram: '', twitter: '' }
+        name: '', contactPerson: '',
+        contactEmail: '', contactPhone: '', logoColor: '#666666'
     };
 
-    // NEU: Die Komponente verwaltet ihren eigenen State für Teams, Ladezustand und Fehler.
     const [teams, setTeams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,7 +54,9 @@ const TeamManager = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
     const [logoFile, setLogoFile] = useState(null);
-    const [logoFileLight, setLogoFileLight] = useState(null); // NEU
+    const [logoFileLight, setLogoFileLight] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState(0);
 
     const fetchData = async () => {
         setLoading(true);
@@ -69,6 +82,7 @@ const TeamManager = () => {
         setIsModalOpen(true);
         setLogoFile(null);
         setLogoFileLight(null);
+        setActiveTab(0);
     };
 
     const handleCloseModal = () => {
@@ -83,27 +97,24 @@ const TeamManager = () => {
         setSelectedTeam(team);
         setFormData({
             name: team.name,
-            foundedYear: team.foundedYear || '',
-            description: team.description || '',
             contactPerson: team.contactPerson || '',
             contactEmail: team.contactEmail || '',
             contactPhone: team.contactPhone || '',
-            website: team.website || '',
-            logoColor: team.logoColor || '#666666',
-            socialMedia: team.socialMedia || { facebook: '', instagram: '', twitter: '' }
+            logoColor: team.logoColor || '#666666'
         });
         setModalMode('view');
         setIsModalOpen(true);
+        setActiveTab(0);
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         try {
             if (modalMode === 'create') {
                 const newTeam = await teamApiService.createTeam(formData);
                 setTeams([...teams, newTeam]);
                 setNotification({ open: true, message: 'Team erfolgreich erstellt.', severity: 'success' });
-                // Wenn ein Logo ausgewählt wurde, lade es jetzt hoch
+
                 if (logoFile) {
                     const formDataLogo = new FormData();
                     formDataLogo.append('teamLogo', logoFile);
@@ -115,7 +126,7 @@ const TeamManager = () => {
                     await teamApiService.uploadTeamLogo(newTeam.id, formDataLogo, 'light');
                 }
                 handleCloseModal();
-                fetchData(); // Refresh um sicherzugehen
+                fetchData();
             } else if (modalMode === 'edit' && selectedTeam) {
                 const updatedTeam = await teamApiService.updateTeam(selectedTeam.id, formData);
                 setTeams(teams.map(t => t.id === selectedTeam.id ? updatedTeam : t));
@@ -153,7 +164,6 @@ const TeamManager = () => {
         formData.append('teamLogo', fileToUpload);
 
         try {
-            // API Call mit type Parameter
             const updatedTeam = await teamApiService.uploadTeamLogo(selectedTeam.id, formData, type);
             setNotification({ open: true, message: `${type === 'light' ? 'Light Mode' : 'Dark Mode'} Logo erfolgreich hochgeladen.`, severity: 'success' });
 
@@ -167,16 +177,10 @@ const TeamManager = () => {
         }
     };
 
-    const generateYears = () => {
-        const currentYear = new Date().getFullYear();
-        const years = [];
-        for (let year = currentYear; year >= 1950; year--) {
-            years.push(year);
-        }
-        return years;
-    };
-    const years = generateYears();
     const isReadOnly = modalMode === 'view';
+
+    const searchableFields = [{ key: 'name' }, { key: 'contactPerson' }, { key: 'contactEmail' }];
+    const filteredTeams = filterData(teams, searchTerm, searchableFields);
 
     if (loading) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress sx={{ color: '#00A99D' }} /></Box>;
@@ -193,36 +197,122 @@ const TeamManager = () => {
                 </Button>
             </Box>
 
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+                <TextField
+                    fullWidth
+                    variant="outlined"
+                    size="small"
+                    placeholder="Suche nach Team, Kontakt..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    sx={{ ...inputStyle, maxWidth: '600px' }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
+            </Box>
+
             <Snackbar open={notification.open} autoHideDuration={6000} onClose={handleNotificationClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <Alert onClose={handleNotificationClose} severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>
             </Snackbar>
 
-            <ReusableModal open={isModalOpen} onClose={handleCloseModal} title={modalMode === 'create' ? 'Neues Team' : 'Teamdetails'}>
-                <form onSubmit={handleSubmit}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '70vh', overflowY: 'auto', pr: 1, pt: 1 }}>
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                title={modalMode === 'create' ? 'Neues Team' : 'Teamdetails'}
+                fullScreenMobile
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                        <Button
+                            onClick={handleCloseModal}
+                            sx={{ color: theme.palette.text.secondary }}
+                        >
+                            {modalMode === 'view' ? 'Schließen' : 'Abbrechen'}
+                        </Button>
+
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            {modalMode === 'view' && !showDeleteConfirm && (
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                    >
+                                        Löschen
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        onClick={() => setModalMode('edit')}
+                                        sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                                    >
+                                        Bearbeiten
+                                    </Button>
+                                </>
+                            )}
+
+                            {modalMode === 'view' && showDeleteConfirm && (
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        onClick={() => setShowDeleteConfirm(false)}
+                                        sx={{ color: theme.palette.text.secondary }}
+                                    >
+                                        Abbrechen
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        onClick={handleDelete}
+                                    >
+                                        Endgültig löschen
+                                    </Button>
+                                </>
+                            )}
+
+                            {modalMode !== 'view' && (
+                                <Button
+                                    onClick={handleSubmit}
+                                    variant="contained"
+                                    sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                                >
+                                    {modalMode === 'create' ? 'Erstellen' : 'Speichern'}
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
+                }
+            >
+                <form id="team-form" onSubmit={handleSubmit}>
+                    <Tabs
+                        value={activeTab}
+                        onChange={(e, newValue) => setActiveTab(newValue)}
+                        variant="fullWidth"
+                        textColor="primary"
+                        indicatorColor="primary"
+                        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+                    >
+                        <Tab icon={<PersonOutlineIcon />} label="Allgemeine Daten" />
+                        <Tab icon={<PaletteOutlinedIcon />} label="Logos & Farben" />
+                    </Tabs>
+
+                    <TabPanel value={activeTab} index={0}>
                         <TextField size="small" label="Teamname" fullWidth required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
-                        <FormControl size="small" fullWidth sx={inputStyle} disabled={isReadOnly}>
-                            <InputLabel>Gründungsjahr</InputLabel>
-                            <Select value={formData.foundedYear} label="Gründungsjahr" onChange={(e) => setFormData({ ...formData, foundedYear: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, maxHeight: 200 } } }}>
-                                {years.map(year => <MenuItem key={year} value={year}>{year}</MenuItem>)}
-                            </Select>
-                        </FormControl>
-                        <TextField size="small" label="Beschreibung" multiline rows={3} fullWidth value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
                         <TextField size="small" label="Kontaktperson" fullWidth value={formData.contactPerson} onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
                         <TextField size="small" label="Kontakt E-Mail" type="email" fullWidth value={formData.contactEmail} onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
                         <TextField size="small" label="Kontakt Telefon" fullWidth value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
-                        <TextField size="small" label="Webseite" fullWidth value={formData.website} onChange={(e) => setFormData({ ...formData, website: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
-                        <TextField size="small" label="Logofarbe (Hex-Code)" fullWidth value={formData.logoColor} onChange={(e) => setFormData({ ...formData, logoColor: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
-                        <TextField size="small" label="Facebook URL" fullWidth value={formData.socialMedia.facebook} onChange={(e) => setFormData({ ...formData, socialMedia: { ...formData.socialMedia, facebook: e.target.value } })} sx={inputStyle} disabled={isReadOnly} />
-                        {/* KORREKTUR: Tippfehler e.g.value -> e.target.value */}
-                        <TextField size="small" label="Instagram URL" fullWidth value={formData.socialMedia.instagram} onChange={(e) => setFormData({ ...formData, socialMedia: { ...formData.socialMedia, instagram: e.target.value } })} sx={inputStyle} disabled={isReadOnly} />
-                        <TextField size="small" label="Twitter URL" fullWidth value={formData.socialMedia.twitter} onChange={(e) => setFormData({ ...formData, socialMedia: { ...formData.socialMedia, twitter: e.target.value } })} sx={inputStyle} disabled={isReadOnly} />
+                    </TabPanel>
 
-                        {/* NEU: Logo-Upload-Sektion (Dark Mode / Default) */}
-                        {(modalMode === 'edit' || modalMode === 'view') && selectedTeam && (
+                    <TabPanel value={activeTab} index={1}>
+                        <TextField size="small" label="Logofarbe (Hex-Code)" fullWidth value={formData.logoColor} onChange={(e) => setFormData({ ...formData, logoColor: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
+
+                        {(modalMode === 'edit' || modalMode === 'view') && selectedTeam ? (
                             <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
-                                <Box sx={{ border: '1px dashed', borderColor: 'grey.700', p: 2, borderRadius: 1, mt: 1, flex: 1 }}>
-                                    <Typography sx={{ color: 'grey.300', mb: 1 }}>Logo (Dark Mode / Default)</Typography>
+                                <Box sx={{ border: '1px dashed', borderColor: theme.palette.divider, p: 2, borderRadius: 1, mt: 1, flex: 1 }}>
+                                    <Typography sx={{ color: theme.palette.text.secondary, mb: 1 }}>Logo (Dark Mode / Default)</Typography>
                                     <input
                                         accept="image/png, image/jpeg, image/webp"
                                         style={{ display: 'none' }}
@@ -231,7 +321,7 @@ const TeamManager = () => {
                                         onChange={(e) => setLogoFile(e.target.files[0])}
                                     />
                                     <label htmlFor="logo-upload-file-dark">
-                                        <Button variant="outlined" component="span" sx={{ color: 'grey.400', borderColor: 'grey.700', mr: 1, mb: 1 }}>
+                                        <Button variant="outlined" component="span" disabled={isReadOnly} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider, mr: 1, mb: 1 }}>
                                             Datei auswählen
                                         </Button>
                                     </label>
@@ -240,17 +330,17 @@ const TeamManager = () => {
                                             Hochladen
                                         </Button>
                                     )}
-                                    {logoFile && <Typography sx={{ color: 'grey.500', fontSize: '0.8rem', display: 'block' }}>{logoFile.name}</Typography>}
+                                    {logoFile && <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.8rem', display: 'block' }}>{logoFile.name}</Typography>}
                                     {selectedTeam?.logoUrl && (
                                         <Box mt={2}>
-                                            <Typography variant="caption" display="block" color="grey.500" mb={0.5}>Aktuell:</Typography>
+                                            <Typography variant="caption" display="block" color={theme.palette.text.secondary} mb={0.5}>Aktuell:</Typography>
                                             <Box component="img" src={`${API_BASE_URL}${selectedTeam.logoUrl}`} alt="Dark Logo" sx={{ width: 48, height: 48, objectFit: 'contain', bgcolor: '#222', p: 0.5, borderRadius: 1 }} />
                                         </Box>
                                     )}
                                 </Box>
 
-                                <Box sx={{ border: '1px dashed', borderColor: 'grey.700', p: 2, borderRadius: 1, mt: 1, flex: 1 }}>
-                                    <Typography sx={{ color: 'grey.300', mb: 1 }}>Logo (Light Mode)</Typography>
+                                <Box sx={{ border: '1px dashed', borderColor: theme.palette.divider, p: 2, borderRadius: 1, mt: 1, flex: 1 }}>
+                                    <Typography sx={{ color: theme.palette.text.secondary, mb: 1 }}>Logo (Light Mode)</Typography>
                                     <input
                                         accept="image/png, image/jpeg, image/webp"
                                         style={{ display: 'none' }}
@@ -259,7 +349,7 @@ const TeamManager = () => {
                                         onChange={(e) => setLogoFileLight(e.target.files[0])}
                                     />
                                     <label htmlFor="logo-upload-file-light">
-                                        <Button variant="outlined" component="span" sx={{ color: 'grey.400', borderColor: 'grey.700', mr: 1, mb: 1 }}>
+                                        <Button variant="outlined" component="span" disabled={isReadOnly} sx={{ color: theme.palette.text.secondary, borderColor: theme.palette.divider, mr: 1, mb: 1 }}>
                                             Datei auswählen
                                         </Button>
                                     </label>
@@ -268,42 +358,39 @@ const TeamManager = () => {
                                             Hochladen
                                         </Button>
                                     )}
-                                    {logoFileLight && <Typography sx={{ color: 'grey.500', fontSize: '0.8rem', display: 'block' }}>{logoFileLight.name}</Typography>}
+                                    {logoFileLight && <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.8rem', display: 'block' }}>{logoFileLight.name}</Typography>}
                                     {selectedTeam.logoUrlLight && (
                                         <Box mt={2}>
-                                            <Typography variant="caption" display="block" color="grey.500" mb={0.5}>Aktuell:</Typography>
+                                            <Typography variant="caption" display="block" color={theme.palette.text.secondary} mb={0.5}>Aktuell:</Typography>
                                             <Box component="img" src={`${API_BASE_URL}${selectedTeam.logoUrlLight}`} alt="Light Logo" sx={{ width: 48, height: 48, objectFit: 'contain', bgcolor: '#eee', p: 0.5, borderRadius: 1 }} />
                                         </Box>
                                     )}
                                 </Box>
                             </Box>
+                        ) : (
+                            (modalMode === 'create' || !selectedTeam) && (
+                                <Alert severity="info" sx={{ mt: 2 }}>
+                                    Du kannst Bilder hochladen, nachdem das Team erstellt wurde.
+                                </Alert>
+                            )
                         )}
-
-                        {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>Möchtest du dieses Team wirklich löschen?</Alert>)}
-                    </Box>
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        {modalMode === 'create' && <><Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Erstellen</Button></>}
-                        {modalMode === 'view' && !showDeleteConfirm && <><Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button><Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button></>}
-                        {modalMode === 'view' && showDeleteConfirm && <><Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button variant="contained" color="error" onClick={handleDelete}>Endgültig löschen</Button></>}
-                        {modalMode === 'edit' && <><Button variant="outlined" onClick={() => { setModalMode('view'); setShowDeleteConfirm(false); }} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button><Button type="submit" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Speichern</Button></>}
-                    </Box>
+                        {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2', mt: 2 }}>Möchtest du dieses Team wirklich löschen?</Alert>)}
+                    </TabPanel>
                 </form>
-            </ReusableModal>
+            </AppModal>
 
             <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
-                            {/* KORREKTUR: Leere Zelle für die korrekte Ausrichtung, kein Header-Text für das Logo */}
                             <StyledTableCell sx={{ width: isMobile ? '15%' : '5%', color: theme.palette.text.primary, fontWeight: 'bold' }} />
                             <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Name</StyledTableCell>
-                            {/* KORREKTUR: Spalten werden im Mobile-Modus ausgeblendet */}
                             {!isMobile && <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Kontaktperson</StyledTableCell>}
                             {!isMobile && <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>E-Mail</StyledTableCell>}
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {teams.map(team => (
+                        {filteredTeams.map(team => (
                             <TableRow key={team.id} onClick={() => handleRowClick(team)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
                                 <StyledTableCell>
                                     {team.logoUrl ? (
@@ -312,53 +399,41 @@ const TeamManager = () => {
                                             src={`${API_BASE_URL}${team.logoUrl}`}
                                             alt={`${team.name} Logo`}
                                             sx={{
-                                                width: 48, // Leicht vergrößert für bessere Darstellung
+                                                width: 48,
                                                 height: 48,
                                                 objectFit: 'contain',
-                                                borderRadius: 1.5, // Etwas weichere Kanten
+                                                borderRadius: 1.5,
                                             }}
                                         />
                                     ) : (
-                                        // KORREKTUR: Wappen mit farbigem Inneren und feinem Rand
                                         <Box sx={{
                                             position: 'relative',
                                             width: 48,
                                             height: 48,
+                                            backgroundColor: 'rgba(0,0,0,0.1)',
+                                            borderRadius: 1.5,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center'
                                         }}>
-                                            {/* Ebene 1: Die farbige Füllung */}
-                                            <ShieldIcon sx={{
-                                                position: 'absolute',
-                                                width: '100%',
-                                                height: '100%',
-                                                color: team.logoColor || theme.palette.grey[700]
-                                            }} />
-                                            {/* Ebene 2: Der darüberliegende, feinere Rand */}
-                                            <ShieldOutlinedIcon sx={{
-                                                position: 'absolute',
-                                                width: '100%',
-                                                height: '100%',
-                                                color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)'
-                                            }} />
-                                            {/* Ebene 3: Der Buchstabe */}
-                                            <Typography sx={{
-                                                position: 'relative',
-                                                color: 'white',
-                                                fontWeight: 'bold',
-                                                fontSize: '1.2rem',
-                                                textShadow: '1px 1px 3px rgba(0,0,0,0.7)'
-                                            }}>
-                                                {team.name.substring(0, 1).toUpperCase()}
-                                            </Typography>
+                                            <ShieldIcon sx={{ fontSize: 40, color: 'rgba(0,0,0,0.2)' }} />
+                                            {team.name && (
+                                                <Typography sx={{
+                                                    position: 'absolute',
+                                                    fontWeight: 'bold',
+                                                    color: '#fff',
+                                                    textShadow: '0px 1px 2px rgba(0,0,0,0.5)',
+                                                    fontSize: '0.8rem',
+                                                }}>
+                                                    {team.name.charAt(0)}
+                                                </Typography>
+                                            )}
                                         </Box>
                                     )}
                                 </StyledTableCell>
-                                <StyledTableCell>{team.name}</StyledTableCell>
-                                {/* KORREKTUR: Spalten werden im Mobile-Modus ausgeblendet */}
-                                {!isMobile && <StyledTableCell>{team.contactPerson || '-'}</StyledTableCell>}
-                                {!isMobile && <StyledTableCell>{team.contactEmail || '-'}</StyledTableCell>}
+                                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{team.name}</StyledTableCell>
+                                {!isMobile && <StyledTableCell sx={{ color: theme.palette.text.primary }}>{team.contactPerson || '-'}</StyledTableCell>}
+                                {!isMobile && <StyledTableCell sx={{ color: theme.palette.text.primary }}>{team.contactEmail || '-'}</StyledTableCell>}
                             </TableRow>
                         ))}
                     </TableBody>
@@ -369,4 +444,3 @@ const TeamManager = () => {
 };
 
 export default TeamManager;
-

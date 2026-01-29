@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-
   Typography,
   Button,
   TextField,
@@ -12,7 +11,7 @@ import {
   useTheme,
   Alert
 } from '@mui/material';
-import { ReusableModal } from '../Helpers/modalUtils';
+import AppModal from '../Modals/AppModal';
 import * as newsApi from '../../services/newsApiService';
 
 const NewsManagement = ({ onDataChange }) => {
@@ -327,34 +326,27 @@ const NewsManagement = ({ onDataChange }) => {
           )}
         </Box>
       </Box>
-      <ReusableModal
+      <AppModal
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         title="News löschen"
+        actions={
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, width: '100%' }}>
+            <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ color: theme.palette.text.secondary }}>
+              Abbrechen
+            </Button>
+            <Button variant="contained" color="error" onClick={confirmDelete}>
+              Löschen
+            </Button>
+          </Box>
+        }
       >
         <Typography sx={{ mb: 3, color: theme.palette.text.primary }}>
           Möchten Sie diese News wirklich löschen?
         </Typography>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button
-            variant="outlined"
-            onClick={() => setDeleteConfirmOpen(false)}
-            sx={{ borderColor: 'divider', color: 'text.secondary' }}
-          >
-            Abbrechen
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={confirmDelete}
-          >
-            Löschen
-          </Button>
-        </Box>
-      </ReusableModal>
+      </AppModal>
     </Box>
   );
 };
 
 export default NewsManagement;
-

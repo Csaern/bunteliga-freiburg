@@ -11,13 +11,13 @@ import {
     Select,
     MenuItem,
     FormControl,
+    InputLabel,
+    InputAdornment,
 
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
-import CheckIcon from '@mui/icons-material/Check';
 import BusinessIcon from '@mui/icons-material/Business';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
@@ -33,7 +33,7 @@ import GavelIcon from '@mui/icons-material/Gavel';
 import GroupsIcon from '@mui/icons-material/Groups';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
-import { ReusableModal } from '../Helpers/modalUtils';
+import AppModal from '../Modals/AppModal';
 import * as websiteApi from '../../services/websiteApiService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -55,8 +55,6 @@ const iconOptions = [
     { label: 'Phone', value: 'PhoneIcon', icon: <PhoneIcon /> },
 ];
 
-
-
 const FunctionariesManagement = () => {
     const theme = useTheme();
 
@@ -65,10 +63,20 @@ const FunctionariesManagement = () => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
 
-    // Edit State: similar to RulesManagement
-    const [editState, setEditState] = useState(null); // { id, data: { ... } }
+    // Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState('create');
+    const [currentFunctionary, setCurrentFunctionary] = useState(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
+
+    // Form Data State
+    const [formData, setFormData] = useState({
+        id: '',
+        function: '',
+        name: '',
+        icon: 'BusinessIcon'
+    });
 
     useEffect(() => {
         loadData();
@@ -88,7 +96,6 @@ const FunctionariesManagement = () => {
             if (entries.length > 0) {
                 const migratedData = entries.map(item => ({
                     ...item,
-                    // Ensure ID is present
                     id: item.id || uuidv4()
                 }));
                 setFunctionaries(migratedData);
@@ -118,46 +125,53 @@ const FunctionariesManagement = () => {
         }
     };
 
-    // Start editing a row
-    const handleEditClick = (item) => {
-        setEditState({
-            id: item.id,
-            data: { ...item }
+    const handleOpenCreate = () => {
+        setFormData({
+            id: uuidv4(),
+            function: '',
+            name: '',
+            icon: 'BusinessIcon'
         });
+        setModalMode('create');
+        setIsModalOpen(true);
     };
 
-    // Cancel editing
-    const handleCancelEdit = () => {
-        setEditState(null);
+    const handleOpenEdit = (item) => {
+        setCurrentFunctionary(item);
+        setFormData({ ...item });
+        setModalMode('edit');
+        setIsModalOpen(true);
     };
 
-    // Update field in edit state
-    const handleFieldChange = (field, value) => {
-        setEditState(prev => ({
-            ...prev,
-            data: { ...prev.data, [field]: value }
-        }));
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setCurrentFunctionary(null);
     };
 
-    // Save single edited row
-    const handleSaveRow = async () => {
-        if (!editState) return;
+    const handleFormSubmit = async () => {
+        if (!formData.function || !formData.name) {
+            setError('Bitte Funktion und Name ausfüllen');
+            setTimeout(() => setError(null), 3000);
+            return;
+        }
 
-        const newList = functionaries.map(item =>
-            item.id === editState.id ? editState.data : item
-        );
+        let newList;
+        if (modalMode === 'create') {
+            newList = [...functionaries, formData];
+        } else {
+            newList = functionaries.map(item => item.id === formData.id ? formData : item);
+        }
 
         await handleSaveList(newList);
-        setEditState(null);
+        handleCloseModal();
     };
 
-    // Prepare delete
+
     const handleDeleteClick = (id) => {
         setItemToDelete(id);
         setDeleteModalOpen(true);
     };
 
-    // Confirm delete
     const confirmDelete = async () => {
         const newList = functionaries.filter(item => item.id !== itemToDelete);
         await handleSaveList(newList);
@@ -165,27 +179,23 @@ const FunctionariesManagement = () => {
         setItemToDelete(null);
     };
 
-    // Add new item
-    const handleAddNew = () => {
-        const newItem = {
-            id: uuidv4(),
-            function: 'Neue Funktion',
-            name: '',
-            icon: 'BusinessIcon'
-        };
-        // Add to list and immediately go to edit mode
-        const newList = [...functionaries, newItem];
-        setFunctionaries(newList); // Optimistic update
-        setEditState({ id: newItem.id, data: newItem });
-        // Warning: We are not saving to backend yet, only when user clicks 'save' on the row.
-        // If they cancel, we should probably remove the "new" item or just let it revert.
-        // Actually, if they cancel edit on a NEW item that hasn't been saved, it will revert to "Neue Funktion" which is fine.
-    };
-
     const getIconComponent = (iconName) => {
         const option = iconOptions.find(o => o.value === iconName);
         return option ? option.icon : <BusinessIcon />;
     };
+
+    const inputStyle = {
+        '& label.Mui-focused': { color: theme.palette.primary.main },
+        '& .MuiOutlinedInput-root': {
+            '& fieldset': { borderColor: theme.palette.divider },
+            '&:hover fieldset': { borderColor: theme.palette.text.secondary },
+            '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
+        },
+        '& .MuiInputBase-input': { color: theme.palette.text.primary },
+        '& label': { color: theme.palette.text.secondary },
+        '& .MuiSelect-icon': { color: theme.palette.text.secondary },
+    };
+
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -199,139 +209,112 @@ const FunctionariesManagement = () => {
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={handleAddNew}
-                    disabled={!!editState} // Disable add while editing
+                    onClick={handleOpenCreate}
                 >
                     Hinzufügen
                 </Button>
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {functionaries.map((item) => {
-                    const isEditing = editState && editState.id === item.id;
-                    const displayData = isEditing ? editState.data : item;
+                {functionaries.map((item) => (
+                    <Paper key={item.id} sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                        <Box sx={{ minWidth: 40, display: 'flex', justifyContent: 'center', color: theme.palette.secondary.main }}>
+                            {getIconComponent(item.icon)}
+                        </Box>
 
-                    return (
-                        <Paper key={item.id} sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                            {/* Icon Selection */}
-                            <Box sx={{ minWidth: 80, display: 'flex', justifyContent: 'center' }}>
-                                {isEditing ? (
-                                    <FormControl size="small">
-                                        <Select
-                                            value={displayData.icon}
-                                            onChange={(e) => handleFieldChange('icon', e.target.value)}
-                                            displayEmpty
-                                            renderValue={(selected) => (
-                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    {getIconComponent(selected)}
-                                                </Box>
-                                            )}
-                                        >
-                                            {iconOptions.map((option) => (
-                                                <MenuItem key={option.value} value={option.value}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                        {option.icon}
-                                                        {/* Show label in dropdown, but requested to remove text... 
-                                                             User said "Entferne den Text beim icon". If they mean in the dropdown item too? 
-                                                             Let's keep label in dropdown for clarity but hide in selection (renderValue). 
-                                                          */}
-                                                    </Box>
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                ) : (
-                                    <Box sx={{ color: theme.palette.secondary.main }}>
-                                        {getIconComponent(item.icon)}
-                                    </Box>
-                                )}
-                            </Box>
+                        <Box sx={{ flexGrow: 1, display: 'flex', gap: 2, flexDirection: 'column' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{item.function}</Typography>
+                            <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>{item.name}</Typography>
+                        </Box>
 
-                            {/* Function & Name */}
-                            <Box sx={{ flexGrow: 1, display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
-                                {isEditing ? (
-                                    <>
-                                        <TextField
-                                            label="Funktion"
-                                            value={displayData.function}
-                                            onChange={(e) => handleFieldChange('function', e.target.value)}
-                                            fullWidth
-                                            size="small"
-                                        />
-                                        <TextField
-                                            label="Name"
-                                            value={displayData.name}
-                                            onChange={(e) => handleFieldChange('name', e.target.value)}
-                                            fullWidth
-                                            size="small"
-                                        />
-                                    </>
-                                ) : (
-                                    <>
-                                        <Box sx={{ flex: 1 }}>
-                                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{item.function}</Typography>
-                                        </Box>
-                                        <Box sx={{ flex: 1 }}>
-                                            <Typography variant="body1">{item.name}</Typography>
-                                        </Box>
-                                    </>
-                                )}
-                            </Box>
-
-                            {/* Actions */}
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                {isEditing ? (
-                                    <>
-                                        <IconButton color="success" onClick={handleSaveRow}>
-                                            <CheckIcon />
-                                        </IconButton>
-                                        <IconButton onClick={handleCancelEdit}>
-                                            <CloseIcon />
-                                        </IconButton>
-                                    </>
-                                ) : (
-                                    <>
-                                        <IconButton color="primary" onClick={() => handleEditClick(item)}>
-                                            <EditIcon />
-                                        </IconButton>
-                                        <IconButton color="error" onClick={() => handleDeleteClick(item.id)}>
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </>
-                                )}
-                            </Box>
-                        </Paper>
-                    );
-                })}
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            <IconButton color="primary" onClick={() => handleOpenEdit(item)}>
+                                <EditIcon />
+                            </IconButton>
+                            <IconButton color="error" onClick={() => handleDeleteClick(item.id)}>
+                                <DeleteIcon />
+                            </IconButton>
+                        </Box>
+                    </Paper>
+                ))}
                 {functionaries.length === 0 && (
                     <Typography color="text.secondary" align="center">Keine Funktionäre eingetragen.</Typography>
                 )}
             </Box>
 
-            <ReusableModal
+            {/* Create/Edit Modal */}
+            <AppModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                title={modalMode === 'create' ? 'Funktionär hinzufügen' : 'Funktionär bearbeiten'}
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <Button onClick={handleCloseModal} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                        <Button onClick={handleFormSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Speichern</Button>
+                    </Box>
+                }
+            >
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                    <TextField
+                        label="Funktion"
+                        value={formData.function}
+                        onChange={(e) => setFormData({ ...formData, function: e.target.value })}
+                        fullWidth
+                        size="small"
+                        sx={inputStyle}
+                    />
+                    <TextField
+                        label="Name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        fullWidth
+                        size="small"
+                        sx={inputStyle}
+                    />
+                    <FormControl size="small" fullWidth sx={inputStyle}>
+                        <InputLabel>Icon</InputLabel>
+                        <Select
+                            label="Icon"
+                            value={formData.icon}
+                            onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                            renderValue={(selected) => (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {getIconComponent(selected)}
+                                    <Typography>{iconOptions.find(o => o.value === selected)?.label}</Typography>
+                                </Box>
+                            )}
+                        >
+                            {iconOptions.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {option.icon}
+                                        <Typography>{option.label}</Typography>
+                                    </Box>
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
+            </AppModal>
+
+            {/* Delete Confirmation Details */}
+            <AppModal
                 open={deleteModalOpen}
                 onClose={() => setDeleteModalOpen(false)}
                 title="Eintrag löschen"
+                actions={
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, width: '100%' }}>
+                        <Button onClick={() => setDeleteModalOpen(false)} sx={{ color: theme.palette.text.secondary }}>
+                            Abbrechen
+                        </Button>
+                        <Button variant="contained" color="error" onClick={confirmDelete}>
+                            Löschen
+                        </Button>
+                    </Box>
+                }
             >
                 <Typography>Wollen Sie diesen Eintrag wirklich löschen?</Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
-                    <Button
-                        onClick={() => setDeleteModalOpen(false)}
-                        variant="outlined"
-                        sx={{ fontFamily: 'Comfortaa', borderColor: 'divider', color: 'text.secondary' }}
-                    >
-                        Abbrechen
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={confirmDelete}
-                        sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}
-                    >
-                        Löschen
-                    </Button>
-                </Box>
-            </ReusableModal>
+            </AppModal>
         </Box>
     );
 };

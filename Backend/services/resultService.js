@@ -7,6 +7,7 @@ const seasonsCollection = db.collection('seasons');
 const bookingsCollection = db.collection('bookings');
 const pitchesCollection = db.collection('pitches');
 const { checkCaptainOfActingTeam } = require('../middleware/permissionMiddleware');
+const notificationService = require('./notificationService');
 
 
 /**
@@ -56,6 +57,23 @@ async function reportResult(bookingId, resultData) {
     transaction.update(bookingRef, { status: 'played' });
 
     return { id: newResultRef.id, ...firestoreObject };
+  }).then(async (result) => {
+    // NEU: Benachrichtigung an das gegnerische Team
+    try {
+      const opponentTeamId = result.homeTeamId === result.reportedByTeamId ? result.awayTeamId : result.homeTeamId;
+      const reportingTeamName = result.homeTeamId === result.reportedByTeamId ? result.homeTeamName : result.awayTeamName;
+
+      await notificationService.notifyTeam(
+        opponentTeamId,
+        'result_reported',
+        'Ergebnis eingetragen',
+        `${reportingTeamName} hat ein Ergebnis (${result.homeScore}:${result.awayScore}) für euer Spiel gemeldet. Bitte bestätigen.`,
+        { resultId: result.id, bookingId, homeScore: result.homeScore, awayScore: result.awayScore }
+      );
+    } catch (e) {
+      console.error('Error sending result reported notification:', e);
+    }
+    return result;
   });
 }
 
@@ -114,6 +132,23 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
         transaction.update(bookingRef, { status: 'confirmed' });
       }
       return { message: 'Ergebnis abgelehnt. Es kann nun neu gemeldet werden.' };
+    }).then(async (res) => {
+      // NEU: Benachrichtigung an das meldende Team
+      try {
+        const actingTeamDoc = await teamsCollection.doc(actingTeamId).get();
+        const actingTeamName = actingTeamDoc.exists ? actingTeamDoc.data().name : 'Der Gegner';
+
+        await notificationService.notifyTeam(
+          resultDoc.data().reportedByTeamId,
+          'result_rejected',
+          'Ergebnis abgelehnt',
+          `${actingTeamName} hat das Ergebnis für euer Spiel abgelehnt.`,
+          { resultId, actingTeamId, actingTeamName }
+        );
+      } catch (e) {
+        console.error('Error sending result rejected notification:', e);
+      }
+      return res;
     });
   }
 
@@ -124,6 +159,24 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
       confirmedByUserId: actingUserId,
       confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // NEU: Benachrichtigung an das meldende Team
+    try {
+      const actingTeamDoc = await teamsCollection.doc(actingTeamId).get();
+      const actingTeamName = actingTeamDoc.exists ? actingTeamDoc.data().name : 'Der Gegner';
+      const data = resultDoc.data();
+
+      await notificationService.notifyTeam(
+        data.reportedByTeamId,
+        'result_confirmed',
+        'Ergebnis bestätigt',
+        `${actingTeamName} hat das Ergebnis (${data.homeScore}:${data.awayScore}) bestätigt.`,
+        { resultId, actingTeamId, actingTeamName, homeScore: data.homeScore, awayScore: data.awayScore }
+      );
+    } catch (e) {
+      console.error('Error sending result confirmed notification:', e);
+    }
+
     return { message: 'Ergebnis erfolgreich bestätigt.' };
   }
 
@@ -293,6 +346,24 @@ async function adminOverrideResult(resultId, scores, adminUid) {
     confirmedBy: adminUid,
     confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  // NEU: Benachrichtigung an beide Teams
+  try {
+    const data = (await resultRef.get()).data();
+    const teamsToNotify = [data.homeTeamId, data.awayTeamId].filter(Boolean);
+    for (const teamId of teamsToNotify) {
+      await notificationService.notifyTeam(
+        teamId,
+        'admin_result_override',
+        'Ergebnis finalisiert',
+        `Ein Admin hat das Ergebnis für euer Spiel auf ${homeScore}:${awayScore} festgelegt.`,
+        { resultId, homeScore, awayScore }
+      );
+    }
+  } catch (e) {
+    console.error('Error sending admin result override notification:', e);
+  }
+
   return { message: 'Ergebnis wurde durch Admin final festgelegt.' };
 }
 

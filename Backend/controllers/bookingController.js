@@ -22,7 +22,7 @@ class BookingController {
 
     static async adminCreateBooking(req, res) {
         try {
-            const newBooking = await BookingService.adminCreateBooking(req.body);
+            const newBooking = await BookingService.adminCreateBooking(req.body, req.user); // Pass req.user
             res.status(201).json(newBooking);
         } catch (error) {
             res.status(500).json({ message: error.message });
