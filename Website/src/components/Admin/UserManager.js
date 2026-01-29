@@ -125,21 +125,24 @@ const UserManager = ({ teams, getTeamName }) => {
         if (e) e.preventDefault();
         try {
             if (modalMode === 'edit' && selectedUser) {
+                // BUG FIX: Include displayName in the update payload
                 await userApiService.updateUser(selectedUser.id, {
                     teamId: formData.teamId || null,
                     isAdmin: formData.isAdmin,
+                    displayName: formData.displayName // Added this
                 });
                 setNotification({ open: true, message: 'Benutzer erfolgreich aktualisiert.', severity: 'success' });
             } else if (modalMode === 'create') {
-                const password = formData.password || generatePassword();
+                // Simplified creation: No password handling here, backend generates it.
+                // Assuming backend now handles password generation and email sending if password is skipped/random
                 await userApiService.createUser({
                     email: formData.email,
-                    password: password,
-                    displayName: formData.displayName || formData.email.split('@')[0],
+                    // password: password, // Removed/Handled by backend or service
+                    displayName: formData.displayName, // Now required
                     teamId: formData.teamId || null,
                     isAdmin: formData.isAdmin,
                 });
-                setNotification({ open: true, message: `Benutzer erfolgreich erstellt! Passwort: ${password}`, severity: 'success' });
+                setNotification({ open: true, message: `Benutzer erstellt. Einladungs-Email wurde versendet.`, severity: 'success' });
             }
             fetchData();
             handleCloseModal();
@@ -225,8 +228,8 @@ const UserManager = ({ teams, getTeamName }) => {
                                     if (selectedUser) {
                                         setFormData({
                                             email: selectedUser.email || '',
-                                            displayName: selectedUser.displayName || '',
-                                            password: '',
+                                            displayName: selectedUser.displayName || '', // Ensure name is preserved on cancel
+                                            password: '', // Reset password field
                                             teamId: selectedUser.teamId || '',
                                             isAdmin: selectedUser.isAdmin || false,
                                             role: selectedUser.role || 'user',
@@ -234,6 +237,23 @@ const UserManager = ({ teams, getTeamName }) => {
                                     }
                                     setModalMode('view');
                                 }} sx={{ color: theme.palette.text.secondary }}>Abbrechen</Button>
+                                {/* Password Reset Button for existing users */}
+                                <Button
+                                    variant="outlined"
+                                    color="warning"
+                                    onClick={async () => {
+                                        if (selectedUser && selectedUser.email) {
+                                            try {
+                                                await userApiService.requestPasswordReset(selectedUser.email);
+                                                setNotification({ open: true, message: 'Passwort-Reset Email gesendet.', severity: 'success' });
+                                            } catch (e) {
+                                                setNotification({ open: true, message: 'Fehler beim Senden der Email.', severity: 'error' });
+                                            }
+                                        }
+                                    }}
+                                >
+                                    Passwort Reset
+                                </Button>
                                 <Button onClick={handleSubmit} variant="contained" sx={{ backgroundColor: theme.palette.primary.main }}>Speichern</Button>
                             </>
                         )}
@@ -243,10 +263,8 @@ const UserManager = ({ teams, getTeamName }) => {
                 <form id="user-form" onSubmit={handleSubmit}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <TextField size="small" label="Email" type="email" fullWidth required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} sx={inputStyle} disabled={modalMode !== 'create'} />
-                        <TextField size="small" label="Anzeigename" type="text" fullWidth value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
-                        {modalMode === 'create' && (
-                            <TextField size="small" label="Passwort (optional)" type="password" fullWidth placeholder="Leer lassen für autom. Passwort" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} sx={inputStyle} />
-                        )}
+                        <TextField size="small" label="Name" type="text" fullWidth required value={formData.displayName} onChange={(e) => setFormData({ ...formData, displayName: e.target.value })} sx={inputStyle} disabled={modalMode === 'view'} />
+                        {/* Password field removed for create mode */}
                         <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
                             <InputLabel>Team</InputLabel>
                             <Select value={formData.teamId} label="Team" onChange={(e) => setFormData({ ...formData, teamId: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
@@ -269,62 +287,64 @@ const UserManager = ({ teams, getTeamName }) => {
                         )}
                     </Box>
                 </form>
-            </AppModal>
+            </AppModal >
 
-            {filteredUsers.length === 0 ? (
-                <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: 3, textAlign: 'center', border: '1px solid', borderColor: theme.palette.divider }}>
-                    <Typography sx={{ color: theme.palette.text.secondary }}>{searchTerm ? 'Keine passenden Benutzer gefunden.' : 'Keine Benutzer vorhanden.'}</Typography>
-                </Paper>
-            ) : (
-                <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: theme.shape.borderRadius, border: `1px solid ${theme.palette.divider}` }}>
-                    <Table size="small">
-                        <TableHead>
-                            <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
-                                {isMobile ? (
-                                    <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Benutzer</StyledTableCell>
-                                ) : (
-                                    <>
-                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Email</StyledTableCell>
-                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Anzeigename</StyledTableCell>
-                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Team</StyledTableCell>
-                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Rolle</StyledTableCell>
-                                    </>
-                                )}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredUsers.map(user => (
-                                <TableRow key={user.id} onClick={() => handleRowClick(user)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
+            {
+                filteredUsers.length === 0 ? (
+                    <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: 3, textAlign: 'center', boxShadow: 'none' }}>
+                        <Typography sx={{ color: theme.palette.text.secondary }}>{searchTerm ? 'Keine passenden Benutzer gefunden.' : 'Keine Benutzer vorhanden.'}</Typography>
+                    </Paper>
+                ) : (
+                    <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: theme.shape.borderRadius, boxShadow: 'none' }}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
                                     {isMobile ? (
-                                        <StyledTableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <StatusIndicator isAdmin={user.isAdmin} />
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '0.9rem', color: theme.palette.text.primary }}>{user.email}</Typography>
-                                                    <Typography sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>{user.teamName || 'Kein Team'}</Typography>
-                                                </Box>
-                                            </Box>
-                                        </StyledTableCell>
+                                        <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Benutzer</StyledTableCell>
                                     ) : (
                                         <>
-                                            <StyledTableCell sx={{ py: 1.5 }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    <StatusIndicator isAdmin={user.isAdmin} />
-                                                    {user.email}
-                                                </Box>
-                                            </StyledTableCell>
-                                            <StyledTableCell sx={{ py: 1.5 }}>{user.displayName || '-'}</StyledTableCell>
-                                            <StyledTableCell sx={{ py: 1.5 }}>{user.teamName || '-'}</StyledTableCell>
-                                            <StyledTableCell sx={{ py: 1.5 }}>{user.isAdmin ? 'Admin' : 'User'}</StyledTableCell>
+                                            <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Email</StyledTableCell>
+                                            <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Name</StyledTableCell>
+                                            <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Team</StyledTableCell>
+                                            <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Rolle</StyledTableCell>
                                         </>
                                     )}
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            )}
-        </Box>
+                            </TableHead>
+                            <TableBody>
+                                {filteredUsers.map(user => (
+                                    <TableRow key={user.id} onClick={() => handleRowClick(user)} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: theme.palette.action.hover } }}>
+                                        {isMobile ? (
+                                            <StyledTableCell>
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <StatusIndicator isAdmin={user.isAdmin} />
+                                                    <Box>
+                                                        <Typography sx={{ fontSize: '0.9rem', color: theme.palette.text.primary }}>{user.email}</Typography>
+                                                        <Typography sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>{user.teamName || 'Kein Team'}</Typography>
+                                                    </Box>
+                                                </Box>
+                                            </StyledTableCell>
+                                        ) : (
+                                            <>
+                                                <StyledTableCell sx={{ py: 1.5 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        <StatusIndicator isAdmin={user.isAdmin} />
+                                                        {user.email}
+                                                    </Box>
+                                                </StyledTableCell>
+                                                <StyledTableCell sx={{ py: 1.5 }}>{user.displayName || '-'}</StyledTableCell>
+                                                <StyledTableCell sx={{ py: 1.5 }}>{user.teamName || '-'}</StyledTableCell>
+                                                <StyledTableCell sx={{ py: 1.5 }}>{user.isAdmin ? 'Admin' : 'User'}</StyledTableCell>
+                                            </>
+                                        )}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                )
+            }
+        </Box >
     );
 };
 

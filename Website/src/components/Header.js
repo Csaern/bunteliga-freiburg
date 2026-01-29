@@ -81,7 +81,7 @@ const adminPages = [
   { text: 'Ergebnisse', path: '/admin/results', iconName: 'InsightsIcon' },
   { text: 'Teams', path: '/admin/teams', iconName: 'StyleIcon' },
   { text: 'Plätze', path: '/admin/pitches', iconName: 'StadiumIcon' },
-  { text: 'Website', path: '/admin/website', iconName: 'LanguageIcon' },
+  { text: 'Allgemein', path: '/admin/general', iconName: 'SettingsIcon' },
 ];
 
 const teamboardPages = [

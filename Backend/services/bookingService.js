@@ -167,7 +167,8 @@ class BookingService {
         sunday.setDate(monday.getDate() + 6);
         sunday.setHours(23, 59, 59, 999);
 
-        // 1. Zähle alle aktiven Buchungen in dieser Woche auf diesem Platz
+        // OPTIMIERUNG: Load all bookings for this pitch and filter in memory to avoid Index requirements
+        // "FAILED_PRECONDITION: The query requires an index... pitchId ASC, date ASC"
         const snapshot = await bookingsCollection
             .where('pitchId', '==', pitchId)
             .get();
@@ -175,11 +176,15 @@ class BookingService {
         let activeCount = 0;
         const weekDocs = [];
 
+        const mondayMillis = monday.getTime();
+        const sundayMillis = sunday.getTime();
+
         snapshot.forEach(doc => {
             const data = doc.data();
-            const d = getMillisFromDate(data.date);
-            // Filtere nach Woche
-            if (d >= monday.getTime() && d <= sunday.getTime()) {
+            const docDateMillis = getMillisFromDate(data.date);
+
+            // In-Memory Filter: Only consider bookings within the calculate week
+            if (docDateMillis >= mondayMillis && docDateMillis <= sundayMillis) {
                 weekDocs.push({ ref: doc.ref, ...data });
                 // Zähle aktive Buchungen
                 if (['confirmed', 'pending_away_confirm'].includes(data.status)) {
@@ -195,8 +200,6 @@ class BookingService {
 
         for (const doc of weekDocs) {
             // Wir ändern nur Slots, die "leer" sind (keine Teams zugeordnet) oder explizit "blocked" sind.
-            // Ignoriere aktive Buchungen (confirmed/pending) oder Wartung/Custom, falls relevant.
-
             const isControllable = (doc.status === 'available' || doc.status === 'blocked') &&
                 !doc.homeTeamId && !doc.awayTeamId;
 
@@ -228,7 +231,7 @@ class BookingService {
 
         if (updateCount > 0) {
             await batch.commit();
-            console.log(`[_syncPitchWeeklySlots] ${updateCount} Slots auf '${pitchData.name}' ${loopsReachedLimit ? 'GESPERRT' : 'FREIGEGEBEN'} (Limit: ${limit}, Aktiv: ${activeCount})`);
+            console.log(`[_syncPitchWeeklySlots] ${updateCount} Slots auf '${pitchData.name}' ${loopsReachedLimit ? 'GESPERRT' : 'FREIGEGEBEN'} (Limit: ${limit}, Aktiv: ${activeCount}, Woche: ${monday.toLocaleDateString()})`);
         }
     }
 
@@ -325,17 +328,23 @@ class BookingService {
 
             const batch = db.batch();
             let expiredCount = 0;
-            const pitchesAffected = new Set();
+            const weeksToSync = new Map(); // pitchId -> Set of weekStartMillis
 
             expiredSnapshot.forEach(doc => {
                 const data = doc.data();
                 const requestedAtMillis = getMillisFromDate(data.requestedAt);
                 const gameDateMillis = getMillisFromDate(data.date);
 
-                const isTimedOut = requestedAtMillis > 0 && (now - requestedAtMillis) > expiryMillis;
+                // FALLBACK: Wenn requestedAt fehlt, verwenden wir ein Sicherheitsdatum (7 Tage alt), 
+                // um sicherzustellen, dass alte "Geister-Buchungen" bereinigt werden.
+                const effectiveRequestedAt = requestedAtMillis > 0 ? requestedAtMillis : (now - (7 * 24 * 60 * 60 * 1000));
+
+                const isTimedOut = (now - effectiveRequestedAt) > expiryMillis;
                 const isPastGame = gameDateMillis > 0 && gameDateMillis < now;
 
                 if (isTimedOut || isPastGame) {
+                    const reason = isPastGame ? 'past_game_date' : (requestedAtMillis > 0 ? 'automated_timeout' : 'automated_timeout_fallback');
+
                     // Reset slot
                     const updateData = {
                         status: 'available',
@@ -344,7 +353,7 @@ class BookingService {
                         friendly: false,
                         isAvailable: true,
                         expiredAt: admin.firestore.FieldValue.serverTimestamp(),
-                        expiryReason: isPastGame ? 'past_game_date' : 'automated_timeout'
+                        expiryReason: reason
                     };
 
                     // Individuelle Buchungen werden gelöscht statt resettet
@@ -355,7 +364,46 @@ class BookingService {
                     }
 
                     expiredCount++;
-                    pitchesAffected.add(JSON.stringify({ pitchId: data.pitchId, date: data.date }));
+
+                    // Berechne Wochen-Start für diesen Slot, um nur 1x pro Woche/Platz zu syncen
+                    const d = new Date(gameDateMillis);
+                    const day = d.getDay();
+                    const diffToMonday = d.getDate() - day + (day === 0 ? -6 : 1);
+                    d.setDate(diffToMonday);
+                    d.setHours(0, 0, 0, 0);
+                    const weekStart = d.getTime();
+
+                    if (!weeksToSync.has(data.pitchId)) {
+                        weeksToSync.set(data.pitchId, new Set());
+                    }
+                    weeksToSync.get(data.pitchId).add(JSON.stringify({ weekStart, originalDate: data.date }));
+
+                    // NEU: Benachrichtigung senden, wenn eine Anfrage abläuft
+                    try {
+                        let teamIdToNotify = null;
+                        // Wenn Status pending_away_confirm war, hat das Heimteam gewartet -> Heimteam benachrichtigen
+                        if (data.status === 'pending_away_confirm' && data.homeTeamId) {
+                            teamIdToNotify = data.homeTeamId;
+                        }
+
+                        if (teamIdToNotify) {
+                            // Fetch names for nicer message? Or just generic.
+                            // To keep it simple and performant inside this loop (which runs often), use generic messages
+                            // or fetch cached. Here generic:
+                            const dateStr = data.date?.toDate ? data.date.toDate().toLocaleDateString('de-DE') : 'Unbekanntes Datum';
+
+                            // Using fire-and-forget for notifications here to not block the cleanup batch
+                            notificationService.notifyTeam(
+                                teamIdToNotify,
+                                'booking_expired',
+                                'Anfrage abgelaufen',
+                                `Deine Anfrage für das Spiel am ${dateStr} ist abgelaufen, da sie nicht rechtzeitig bestätigt wurde.`,
+                                { bookingId: doc.id, date: dateStr }
+                            ).catch(e => console.error('[cleanupExpiredRequests] Notification error:', e));
+                        }
+                    } catch (notifError) {
+                        console.error('[cleanupExpiredRequests] Error preparing notification:', notifError);
+                    }
                 }
             });
 
@@ -363,10 +411,12 @@ class BookingService {
                 await batch.commit();
                 console.log(`[cleanupExpiredRequests] ${expiredCount} Anfragen in Saison '${seasonData.name}' abgelaufen und zurückgesetzt.`);
 
-                // Sync Wochen-Limits für betroffene Plätze/Wochen
-                for (const pitchStr of pitchesAffected) {
-                    const { pitchId, date } = JSON.parse(pitchStr);
-                    await BookingService._syncPitchWeeklySlots(pitchId, date);
+                // Sync Wochen-Limits für betroffene Plätze/Wochen (Optimiert: Nur 1x pro Woche/Platz)
+                for (const [pitchId, uniqueWeeks] of weeksToSync.entries()) {
+                    for (const weekInfoStr of uniqueWeeks) {
+                        const { originalDate } = JSON.parse(weekInfoStr);
+                        await BookingService._syncPitchWeeklySlots(pitchId, originalDate);
+                    }
                 }
             }
         } catch (error) {
@@ -696,6 +746,25 @@ class BookingService {
             finalHomeTeamId = null;
             finalAwayTeamId = null;
             finalFriendly = false;
+
+            // NEU: Benachrichtigung senden, wenn Admin absagt
+            try {
+                // Sende an beide Teams, falls vorhanden
+                const teamsToNotify = [originalBooking.homeTeamId, originalBooking.awayTeamId].filter(id => id);
+                const dateStr = originalBooking.date?.toDate ? originalBooking.date.toDate().toLocaleDateString('de-DE') : 'Unbekanntes Date';
+
+                teamsToNotify.forEach(teamId => {
+                    notificationService.notifyTeam(
+                        teamId,
+                        'booking_cancelled', // Maps to gameCancellations setting
+                        'Spiel durch Admin abgesagt',
+                        `Das Spiel am ${dateStr} wurde durch einen Administrator abgesagt oder zurückgesetzt.`,
+                        { bookingId: bookingId, date: dateStr }
+                    ).catch(e => console.error('[adminUpdateBooking] Notification error:', e));
+                });
+            } catch (notifError) {
+                console.error('[adminUpdateBooking] Error preparing cancellation notification:', notifError);
+            }
         }
 
         const dataToUpdate = {

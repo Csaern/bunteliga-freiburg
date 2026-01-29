@@ -34,7 +34,7 @@ const getEmailConfig = async () => {
  * @param {string} text - Plain text body
  * @param {string} html - HTML body
  */
-const sendEmail = async ({ to, subject, text, html }) => {
+const sendEmail = async ({ to, subject, text, html, replyTo }) => {
     const config = await getEmailConfig();
 
     if (!config || !config.smtpHost) {
@@ -46,17 +46,24 @@ const sendEmail = async ({ to, subject, text, html }) => {
     // Verify connection before sending (optional, but good for stability)
     // await transporter.verify(); 
 
-    const info = await transporter.sendMail({
-        from: `"${config.senderName || 'Bunte Liga Admin'}" <${config.smtpUser}>`,
-        to: to,
-        replyTo: config.smtpUser,
-        subject: subject,
-        text: text,
-        html: html,
-    });
+    console.log(`[EmailService] Versuch, Email zu senden an: ${to} | Betreff: "${subject}"`);
 
-    console.log(`[EmailService] Email sent to ${to}. ID: ${info.messageId}`);
-    return info;
+    try {
+        const info = await transporter.sendMail({
+            from: `"${config.senderName || 'Bunte Liga Admin'}" <${config.smtpUser}>`,
+            to: to,
+            replyTo: replyTo || config.smtpUser,
+            subject: subject,
+            text: text,
+            html: html,
+        });
+
+        console.log(`[EmailService] ✅ Email erfolgreich gesendet an: ${to} | ID: ${info.messageId}`);
+        return info;
+    } catch (error) {
+        console.error(`[EmailService] ❌ Fehler beim Senden an ${to}:`, error);
+        throw error;
+    }
 };
 
 module.exports = {

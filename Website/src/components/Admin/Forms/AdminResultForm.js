@@ -290,8 +290,6 @@ const AdminResultForm = ({ initialData, teams, pitches, results = [], bookings =
                         mt: 1,
                         p: 1.5,
                         borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: theme.palette.info.main,
                         bgcolor: `rgba(${parseInt(theme.palette.info.main.slice(1, 3), 16)}, ${parseInt(theme.palette.info.main.slice(3, 5), 16)}, ${parseInt(theme.palette.info.main.slice(5, 7), 16)}, 0.1)`,
                         display: 'flex',
                         flexDirection: isMobile ? 'column' : 'row',
@@ -325,8 +323,6 @@ const AdminResultForm = ({ initialData, teams, pitches, results = [], bookings =
                         mt: 1,
                         p: 1,
                         borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: theme.palette.success.main,
                         bgcolor: `rgba(${parseInt(theme.palette.success.main.slice(1, 3), 16)}, ${parseInt(theme.palette.success.main.slice(3, 5), 16)}, ${parseInt(theme.palette.success.main.slice(5, 7), 16)}, 0.1)`,
                         textAlign: 'center'
                     }}>

@@ -379,7 +379,7 @@ const TeamManager = () => {
                 </form>
             </AppModal>
 
-            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
+            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: 'none' }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>

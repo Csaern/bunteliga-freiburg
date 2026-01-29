@@ -238,8 +238,6 @@ const AdminDashboard = () => {
             to={link}
             onClick={onClick}
             sx={{
-              border: '1px solid',
-              borderColor: theme.palette.divider,
               color: color || theme.palette.primary.main,
               '&:hover': {
                 backgroundColor: `${color || theme.palette.primary.main}1A`,
@@ -330,8 +328,6 @@ const AdminDashboard = () => {
             elevation={0}
             sx={{
               p: 1.5,
-              border: '1px solid',
-              borderColor: theme.palette.divider,
               borderRadius: '16px',
               backgroundColor: 'transparent',
             }}
@@ -350,8 +346,6 @@ const AdminDashboard = () => {
                       sx: {
                         bgcolor: theme.palette.background.paper,
                         color: theme.palette.text.primary,
-                        border: '1px solid',
-                        borderColor: theme.palette.divider,
                       }
                     }}
                   >
@@ -389,7 +383,7 @@ const AdminDashboard = () => {
                 </Typography>
               )}
             </Box>
-            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
+            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: 'none' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>

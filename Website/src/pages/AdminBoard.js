@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, } from "firebase/firestore";
-import { db } from "../firebase";
 import { useAuth } from '../context/AuthProvider';
 import { Container, Box, Typography, Paper, CircularProgress, useMediaQuery, useTheme } from '@mui/material';
 import * as seasonApi from '../services/seasonApiService';
+import * as teamApi from '../services/teamApiService';
+import * as userApi from '../services/userApiService';
+import * as bookingApi from '../services/bookingApiService';
+import * as resultApi from '../services/resultApiService';
 
 import BookingManager from '../components/Admin/BookingManager';
 import UserManager from '../components/Admin/UserManager';
@@ -14,7 +16,6 @@ import PitchManager from '../components/Admin/PitchManager';
 import GeneralSettings from '../components/Admin/GeneralSettings';
 
 const AdminBoard = ({ initialTab = 'bookings' }) => {
-    // HINWEIS: Der 'pitches'-State wird hier nicht mehr benötigt.
     const [teams, setTeams] = useState([]);
     const [bookings, setBookings] = useState([]);
     const [users, setUsers] = useState([]);
@@ -23,13 +24,9 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
     const [currentSeason, setCurrentSeason] = useState(null);
     const [loading, setLoading] = useState(true);
 
-
     const { isAdmin, currentUser } = useAuth();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
-
-
 
     useEffect(() => {
         if (isAdmin) {
@@ -39,50 +36,41 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
         }
     }, [isAdmin]);
 
-
-
     const fetchData = async () => {
         try {
             setLoading(true);
-            const usersCollection = collection(db, "users");
-            const teamsCollection = collection(db, "teams");
-            const bookingsCollection = collection(db, "bookings");
-            // HINWEIS: Die Abfrage für 'pitches' wird entfernt.
-            const seasonsCollection = query(collection(db, "seasons"));
-            const resultsCollection = collection(db, "results");
 
+            // 1. Zuerst die aktive Saison laden, da andere Daten davon abhängen können
+            const activeSeason = await seasonApi.getActiveSeason().catch(() => null);
+            setCurrentSeason(activeSeason);
+
+            // 2. Alle anderen Basis-Daten parallel über die API laden
             const [
-                usersSnapshot,
-                teamsSnapshot,
-                bookingsSnapshot,
-                seasonsSnapshot,
-                resultsSnapshot,
-                activeSeasonData
+                usersData,
+                teamsData,
+                seasonsData
             ] = await Promise.all([
-                getDocs(usersCollection),
-                getDocs(teamsCollection),
-                getDocs(bookingsCollection),
-                getDocs(seasonsCollection),
-                getDocs(resultsCollection),
-                seasonApi.getActiveSeason().catch(() => null) // Lade aktive Saison über API
+                userApi.getAllUsers().catch(() => []),
+                teamApi.getAllTeams().catch(() => []),
+                seasonApi.getAllSeasons().catch(() => [])
             ]);
-
-            const usersData = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const teamsData = teamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const bookingsData = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // HINWEIS: Das Setzen des 'pitches'-State wird entfernt.
-            const seasonsData = seasonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const resultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
             setUsers(usersData);
             setTeams(teamsData);
-            setBookings(bookingsData);
             setSeasons(seasonsData);
-            setResults(resultsData);
 
-            // KORREKTUR: Verwende die aktive Saison von der API (status === 'active')
-            // statt nach isCurrent zu suchen
-            setCurrentSeason(activeSeasonData);
+            // 3. Saison-spezifische Daten laden (nur wenn eine Saison aktiv ist)
+            if (activeSeason) {
+                const [
+                    bookingsData,
+                    resultsData
+                ] = await Promise.all([
+                    bookingApi.getBookingsForSeason(activeSeason.id).catch(() => []),
+                    resultApi.getResultsForSeason(activeSeason.id).catch(() => [])
+                ]);
+                setBookings(bookingsData);
+                setResults(resultsData);
+            }
 
         } catch (err) {
             console.error("Fehler beim Laden der Admin-Daten:", err);
@@ -130,6 +118,7 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
             case 'pitches':
                 return <PitchManager teams={teams} />;
             case 'general':
+            case 'website':
                 return <GeneralSettings />;
             default:
                 return null;
@@ -139,14 +128,8 @@ const AdminBoard = ({ initialTab = 'bookings' }) => {
 
 
     return (
-        <Container maxWidth="lg" sx={{ px: isMobile ? 1 : 2 }}>
-            <Paper sx={{
-                p: { xs: 1, sm: 2 },
-                backgroundColor: 'transparent', // Hintergrund transparent machen
-                boxShadow: 'none' // Schatten entfernen
-            }}>
-                {renderActiveTab()}
-            </Paper>
+        <Container maxWidth="lg" sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 3 }}>
+            {renderActiveTab()}
         </Container>
     );
 };

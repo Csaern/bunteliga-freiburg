@@ -7,3 +7,7 @@ export const getSettings = async (key) => {
 export const updateSettings = async (key, data) => {
     return await apiClient(`/api/website/settings/${key}`, 'PUT', data);
 };
+
+export const sendContactForm = async (data) => {
+    return await publicApiClient('/api/website/contact', 'POST', data);
+};

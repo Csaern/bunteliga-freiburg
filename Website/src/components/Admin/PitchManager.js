@@ -313,7 +313,7 @@ const PitchManager = ({ teams }) => {
                                         helperText="Wie viele Spiele dürfen hier pro Woche stattfinden?"
                                     />
 
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2, border: '1px solid', borderColor: theme.palette.divider, borderRadius: 1 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2, borderRadius: 1 }}>
                                         {/* Styling für Switch angepasst: Grün wenn aktiv, wie Friendly-Toggle */}
                                         <FormControlLabel
                                             control={
@@ -435,7 +435,7 @@ const PitchManager = ({ teams }) => {
                 </form>
             </AppModal>
 
-            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
+            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: 'none' }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>

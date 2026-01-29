@@ -164,7 +164,7 @@ const AboutUsManagement = () => {
                     <Typography color="text.secondary" align="center">Keine Abschnitte vorhanden.</Typography>
                 )}
                 {sections.map((section, index) => (
-                    <Accordion key={section.id || index} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', '&:before': { display: 'none' } }}>
+                    <Accordion key={section.id || index} disableGutters elevation={0} sx={{ borderColor: 'divider', '&:before': { display: 'none' } }}>
                         <AccordionSummary
                             expandIcon={<ExpandMore />}
                             aria-controls={`panel${index}-content`}

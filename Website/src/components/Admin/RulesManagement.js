@@ -46,7 +46,7 @@ const defaultGameRules = [
 
 const RuleSection = ({ title, type, rulesList, editState, loading, currentTheme, isMobile, onAdd, onEdit, onSave, onCancel, onDelete, onUpdateField, onFocusField }) => {
     const desktopView = (
-        <TableContainer component={Paper} sx={{ backgroundColor: 'background.paper', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+        <TableContainer component={Paper} sx={{ backgroundColor: 'background.paper', boxShadow: 'none' }}>
             <Table size="small">
                 <TableHead>
                     <TableRow sx={{ backgroundColor: 'action.hover' }}>
@@ -152,7 +152,7 @@ const RuleSection = ({ title, type, rulesList, editState, loading, currentTheme,
                 const displayData = isEditing ? editState.data : item;
 
                 return (
-                    <Paper key={`${type}-${index}`} sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', background: 'rgba(255,255,255,0.02)' }}>
+                    <Paper key={`${type}-${index}`} sx={{ p: 2, borderRadius: 2, boxShadow: 'none', background: 'rgba(255,255,255,0.02)' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                             <Box sx={{ flexGrow: 1 }}>
                                 {isEditing ? (
@@ -396,7 +396,7 @@ const RulesManagement = () => {
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
-            <Box sx={{ mb: 3, p: 2, bgcolor: 'rgba(0, 169, 157, 0.05)', borderRadius: 2, border: '1px solid', borderColor: 'rgba(0, 169, 157, 0.2)' }}>
+            <Box sx={{ mb: 3, p: 2, bgcolor: 'rgba(0, 169, 157, 0.05)', borderRadius: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontFamily: 'comfortaa', color: currentTheme.palette.primary.main, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1, fontSize: isMobile ? '0.8rem' : '0.875rem' }}>
                     <InfoIcon fontSize="small" /> Platzhalter (Klick zum Einfügen):
                 </Typography>

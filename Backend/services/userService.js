@@ -10,7 +10,10 @@ const teamsCollection = db.collection('teams');
  * @returns {object} Der neu erstellte Benutzer.
  */
 async function createUser(userData) {
-  const { email, password, teamId, isAdmin, displayName } = userData;
+  const { email, password: providedPassword, teamId, isAdmin, displayName } = userData;
+
+  // Wenn kein Passwort übergeben wird, generiere ein zufälliges
+  const password = providedPassword || Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
 
   // 1. Benutzer in Firebase Authentication erstellen
   const userRecord = await admin.auth().createUser({
@@ -41,6 +44,52 @@ async function createUser(userData) {
 
   await db.collection('users').doc(userRecord.uid).set(userDocData);
 
+  // 4. Einladungs-Email senden (Passwort-Reset-Link)
+  try {
+    // Generiere den Link
+    const firebaseLink = await admin.auth().generatePasswordResetLink(email);
+    const urlObj = new URL(firebaseLink);
+    const params = urlObj.search;
+    const websiteUrl = process.env.WEBSITE_URL || 'http://localhost:3000';
+    // Append name to URL for display on the reset page
+    const link = `${websiteUrl}/reset-password${params}&name=${encodeURIComponent(displayName || 'User')}`;
+
+    // Sende die Email
+    await emailService.sendEmail({
+      to: email,
+      subject: 'Willkommen bei der Bunten Liga Freiburg - Account einrichten',
+      html: `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                <div style="background-color: #00A99D; padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 24px;">Willkommen!</h1>
+                </div>
+                <div style="padding: 30px 20px;">
+                    <p style="font-size: 16px; margin-bottom: 20px;">Hallo ${displayName || 'User'},</p>
+                    <p style="font-size: 16px; line-height: 1.5; margin-bottom: 20px;">
+                        Ein Administrator hat einen Account für dich bei der Bunten Liga Freiburg erstellt.
+                    </p>
+                    <p style="font-size: 16px; line-height: 1.5; margin-bottom: 30px;">
+                        Bitte klicke auf den untenstehenden Button, um dein Passwort festzulegen und deinen Account zu aktivieren.
+                    </p>
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <a href="${link}" style="background-color: #00A99D; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Account einrichten</a>
+                    </div>
+                    <p style="font-size: 14px; color: #777; margin-bottom: 0;">
+                        Falls der Button nicht funktioniert, nutze diesen Link:<br>
+                        <a href="${link}" style="color: #00A99D;">${link}</a>
+                    </p>
+                </div>
+                <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #888;">
+                    &copy; ${new Date().getFullYear()} Bunte Liga Freiburg
+                </div>
+            </div>
+        `
+    });
+  } catch (emailError) {
+    console.error("Fehler beim Senden der Einladungs-Email:", emailError);
+    // Wir werfen keinen Fehler hier, damit der User trotzdem erstellt bleibt.
+  }
+
   return userDocData;
 }
 
@@ -50,7 +99,7 @@ async function createUser(userData) {
  * @param {object} updates - Enthält teamId, isAdmin.
  */
 async function updateUser(uid, updates) {
-  const { teamId, isAdmin } = updates;
+  const { teamId, isAdmin, displayName } = updates;
 
   // 1. Custom Claims aktualisieren
   const user = await admin.auth().getUser(uid);
@@ -69,14 +118,23 @@ async function updateUser(uid, updates) {
     await admin.auth().setCustomUserClaims(uid, newClaims);
   }
 
-  // 2. Firestore-Dokument aktualisieren
-  const userDocRef = db.collection('users').doc(uid);
-  await userDocRef.update({
-    teamId: teamId || null, // Stellt sicher, dass null statt "" gespeichert wird
+  const firestoreUpdates = {
+    teamId: teamId || null,
     isAdmin: !!isAdmin,
     role: isAdmin ? 'admin' : (teamId ? 'team' : 'user'),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  };
+
+  // Wenn displayName aktualisiert werden soll
+  if (displayName !== undefined) {
+    firestoreUpdates.displayName = displayName;
+    // Auch in Auth aktualisieren
+    await admin.auth().updateUser(uid, { displayName: displayName });
+  }
+
+  // 2. Firestore-Dokument aktualisieren
+  const userDocRef = db.collection('users').doc(uid);
+  await userDocRef.update(firestoreUpdates);
 }
 
 /**
@@ -84,7 +142,32 @@ async function updateUser(uid, updates) {
  * @param {string} uid - Die UID des zu löschenden Benutzers.
  */
 async function deleteUser(uid) {
-  // Führe beide Löschoperationen parallel aus
+  // 1. Benutzerdaten abrufen (für die E-Mail)
+  try {
+    const user = await admin.auth().getUser(uid);
+    const email = user.email;
+
+    // 2. Abschieds-Email senden
+    await emailService.sendEmail({
+      to: email,
+      subject: 'Dein Account wurde gelöscht - Bunte Liga Freiburg',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+            <p>Hallo,</p>
+            <p>dein Account bei der <strong>Bunten Liga Freiburg</strong> wurde soeben gelöscht.</p>
+            <p>Alle deine personenbezogenen Daten wurden aus unserem System entfernt.</p>
+            <p>Falls das ein Versehen war oder du Fragen hast, antworte bitte auf diese Email.</p>
+            <br>
+            <p>Beste Grüße,<br>Dein Bunte Liga Admin Team</p>
+        </div>
+      `
+    });
+  } catch (error) {
+    console.error(`Fehler beim Senden der Lösch-Bestätigung an User ${uid}:`, error);
+    // Wir machen trotzdem weiter mit der Löschung
+  }
+
+  // 3. Führe beide Löschoperationen parallel aus
   await Promise.all([
     admin.auth().deleteUser(uid),
     db.collection('users').doc(uid).delete()

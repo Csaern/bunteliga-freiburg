@@ -197,7 +197,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                     </Typography>
                 )}
             </Box>
-            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider, mb: 5 }}>
+            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: 'none', mb: 5 }}>
                 <Table size="small">
                     <TableHead><TableRow sx={{ backgroundColor: theme.palette.action.hover }}><StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Datum</StyledTableCell><StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Details</StyledTableCell></TableRow></TableHead>
                     <TableBody>
@@ -325,7 +325,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                 )}
             </AppModal>
 
-            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, border: '1px solid', borderColor: theme.palette.divider }}>
+            <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: 'none' }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>

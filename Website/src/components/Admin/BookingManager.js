@@ -412,6 +412,7 @@ const BookingManager = ({ currentSeason }) => {
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 1 }}>
                         <Button
                             onClick={handleCloseModal}
+                            type="button"
                             sx={{ color: theme.palette.text.secondary }}
                         >
                             {modalMode === 'view' ? 'Schließen' : 'Abbrechen'}
@@ -422,6 +423,7 @@ const BookingManager = ({ currentSeason }) => {
                                 <Button
                                     variant="outlined"
                                     color="error"
+                                    type="button"
                                     onClick={() => setShowDeleteConfirm(true)}
                                 >
                                     Löschen
@@ -431,7 +433,12 @@ const BookingManager = ({ currentSeason }) => {
                             {modalMode === 'view' ? (
                                 <Button
                                     variant="contained"
-                                    onClick={() => setModalMode('edit')}
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setModalMode('edit');
+                                    }}
                                     sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
                                 >
                                     Bearbeiten
@@ -749,13 +756,13 @@ const BookingManager = ({ currentSeason }) => {
 
             {
                 filteredBookings.length === 0 ? (
-                    <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', border: '1px solid', borderColor: theme.palette.divider }}>
+                    <Paper sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', boxShadow: 'none' }}>
                         <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'comfortaa' }}>
                             {searchTerm ? 'Keine passenden Buchungen gefunden.' : 'Keine Buchungen für die aktuelle Saison vorhanden.'}
                         </Typography>
                     </Paper>
                 ) : (
-                    <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: theme.shape.borderRadius, border: `1px solid ${theme.palette.divider}`, mb: 5 }}>
+                    <TableContainer component={Paper} sx={{ backgroundColor: theme.palette.background.paper, borderRadius: theme.shape.borderRadius, boxShadow: 'none', mb: 5 }}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>

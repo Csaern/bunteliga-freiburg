@@ -24,6 +24,23 @@ router.post('/', checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
+
+/**
+ * Persönliche Einstellungen aktualisieren (Eingeloggt)
+ * PUT /api/users/settings
+ * WICHTIG: Muss VOR /:uid definiert sein!
+ */
+router.put('/settings', checkAuth, async (req, res) => {
+    try {
+        const uid = req.user.uid;
+        const settings = req.body;
+        const result = await userService.updateUserSettings(uid, settings);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
 // NEU: Einen Benutzer aktualisieren (NUR ADMINS)
 router.put('/:uid', checkAuth, checkAdmin, async (req, res) => {
     try {
@@ -98,19 +115,5 @@ router.post('/change-password', checkAuth, async (req, res) => {
     }
 });
 
-/**
- * Persönliche Einstellungen aktualisieren (Eingeloggt)
- * PUT /api/users/settings
- */
-router.put('/settings', checkAuth, async (req, res) => {
-    try {
-        const uid = req.user.uid;
-        const settings = req.body;
-        const result = await userService.updateUserSettings(uid, settings);
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
 
 module.exports = router;

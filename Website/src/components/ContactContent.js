@@ -20,6 +20,9 @@ import {
     useMediaQuery,
     Container,
     Grid,
+    Snackbar,
+    Alert,
+    CircularProgress,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -132,6 +135,8 @@ const ContactContent = () => {
         subject: '',
         message: '',
     });
+    const [submitting, setSubmitting] = React.useState(false);
+    const [notification, setNotification] = React.useState({ open: false, message: '', severity: 'info' });
 
     const handleChange = (event) => {
         const { name, value } = event.target;
@@ -141,11 +146,23 @@ const ContactContent = () => {
         }));
     };
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
-        console.log('Formulardaten:', formData);
-        setFormData({ recipient: '', name: '', email: '', subject: '', message: '' });
-        alert('Nachricht gesendet (simuliert)!');
+        setSubmitting(true);
+        try {
+            await websiteApi.sendContactForm(formData);
+            setNotification({ open: true, message: 'Nachricht erfolgreich gesendet!', severity: 'success' });
+            setFormData({ recipient: '', name: '', email: '', subject: '', message: '' });
+        } catch (error) {
+            console.error(error);
+            setNotification({ open: true, message: error.message || 'Fehler beim Senden der Nachricht.', severity: 'error' });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleCloseNotification = () => {
+        setNotification({ ...notification, open: false });
     };
 
     const formFieldStyles = {
@@ -453,13 +470,19 @@ const ContactContent = () => {
                                             },
                                         }}
                                     >
-                                        Nachricht senden
+                                        {submitting ? <CircularProgress size={24} color="inherit" /> : 'Nachricht senden'}
                                     </Button>
                                 </Box>
                             </Box>
                         </InfoSection>
                     </Grid>
                 </Grid>
+
+                <Snackbar open={notification.open} autoHideDuration={6000} onClose={handleCloseNotification}>
+                    <Alert onClose={handleCloseNotification} severity={notification.severity} sx={{ width: '100%' }}>
+                        {notification.message}
+                    </Alert>
+                </Snackbar>
             </Box>
         </Container>
     );

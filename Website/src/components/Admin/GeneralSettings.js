@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Tabs, Tab, useTheme, TextField, Button, Checkbox, FormControlLabel, Paper, Alert, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Box, Typography, Tabs, Tab, useTheme, TextField, Button, Checkbox, FormControlLabel, Paper, Alert, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import WebsiteManager from './WebsiteManager';
 import * as systemApiService from '../../services/systemApiService';
 
@@ -18,7 +19,8 @@ const EmailSettings = () => {
         smtpUser: '',
         smtpPassword: '',
         smtpSecure: false,
-        senderName: 'Bunte Liga Admin'
+        senderName: 'Bunte Liga Admin',
+        contactEmail: '' // New field for Contact Form Recipient
     });
 
     useEffect(() => {
@@ -114,91 +116,123 @@ const EmailSettings = () => {
             )}
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <TextField
-                    label="SMTP Host"
-                    name="smtpHost"
-                    value={formData.smtpHost}
-                    onChange={handleChange}
-                    fullWidth
-                    size="small"
-                    sx={inputStyle}
-                    placeholder="smtp.example.com"
-                />
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <TextField
-                        label="SMTP Port"
-                        name="smtpPort"
-                        type="number"
-                        value={formData.smtpPort}
-                        onChange={handleChange}
-                        fullWidth
-                        size="small"
-                        sx={inputStyle}
-                    />
-                    <Box>
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    name="smtpSecure"
-                                    checked={formData.smtpSecure}
-                                    onChange={handleChange}
-                                    sx={{ color: theme.palette.primary.main, '&.Mui-checked': { color: theme.palette.primary.main } }}
-                                />
-                            }
-                            label="Secure (SSL/TLS)"
-                            sx={{ color: theme.palette.text.primary, whiteSpace: 'nowrap' }}
-                        />
-                        <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mt: -0.5, ml: 3.5 }}>
-                            (Aktivieren für Port 465, deaktivieren für 587/STARTTLS)
-                        </Typography>
-                    </Box>
-                </Box>
-                <TextField
-                    label="Benutzername / Email"
-                    name="smtpUser"
-                    value={formData.smtpUser}
-                    onChange={handleChange}
-                    fullWidth
-                    size="small"
-                    sx={inputStyle}
-                />
-                <TextField
-                    label="Passwort"
-                    name="smtpPassword"
-                    type="password"
-                    value={formData.smtpPassword}
-                    onChange={handleChange}
-                    fullWidth
-                    size="small"
-                    sx={inputStyle}
-                />
-                <TextField
-                    label="Absender Name"
-                    name="senderName"
-                    value={formData.senderName}
-                    onChange={handleChange}
-                    fullWidth
-                    size="small"
-                    sx={inputStyle}
-                    helperText="Der Name, der als Absender angezeigt wird"
-                />
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                    <Button
-                        variant="outlined"
-                        onClick={handleTestClick}
-                        disabled={testing || !formData.smtpHost}
-                        sx={{ color: theme.palette.primary.main, borderColor: theme.palette.primary.main }}
-                    >
-                        {testing ? <CircularProgress size={24} /> : 'Verbindung testen'}
-                    </Button>
+                {/* Accordion 1: SMTP Configuration */}
+                <Accordion defaultExpanded sx={{ backgroundColor: theme.palette.background.paper, boxShadow: 'none', '&:before': { display: 'none' }, border: `1px solid ${theme.palette.divider}`, borderRadius: '4px !important' }}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: theme.palette.action.hover }}>
+                        <Typography sx={{ fontFamily: 'comfortaa', fontWeight: 'bold' }}>SMTP Konfiguration</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+                        <TextField
+                            label="SMTP Host"
+                            name="smtpHost"
+                            value={formData.smtpHost}
+                            onChange={handleChange}
+                            fullWidth
+                            size="small"
+                            sx={inputStyle}
+                            placeholder="smtp.example.com"
+                        />
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                            <TextField
+                                label="SMTP Port"
+                                name="smtpPort"
+                                type="number"
+                                value={formData.smtpPort}
+                                onChange={handleChange}
+                                fullWidth
+                                size="small"
+                                sx={inputStyle}
+                            />
+                            <Box>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            name="smtpSecure"
+                                            checked={formData.smtpSecure}
+                                            onChange={handleChange}
+                                            sx={{ color: theme.palette.primary.main, '&.Mui-checked': { color: theme.palette.primary.main } }}
+                                        />
+                                    }
+                                    label="Secure (SSL/TLS)"
+                                    sx={{ color: theme.palette.text.primary, whiteSpace: 'nowrap' }}
+                                />
+                                <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mt: -0.5, ml: 3.5 }}>
+                                    (Aktivieren für Port 465, deaktivieren für 587/STARTTLS)
+                                </Typography>
+                            </Box>
+                        </Box>
+                        <TextField
+                            label="Benutzername / Email"
+                            name="smtpUser"
+                            value={formData.smtpUser}
+                            onChange={handleChange}
+                            fullWidth
+                            size="small"
+                            sx={inputStyle}
+                        />
+                        <TextField
+                            label="Passwort"
+                            name="smtpPassword"
+                            type="password"
+                            value={formData.smtpPassword}
+                            onChange={handleChange}
+                            fullWidth
+                            size="small"
+                            sx={inputStyle}
+                        />
+                        <TextField
+                            label="Absender Name"
+                            name="senderName"
+                            value={formData.senderName}
+                            onChange={handleChange}
+                            fullWidth
+                            size="small"
+                            sx={inputStyle}
+                            helperText="Der Name, der als Absender angezeigt wird"
+                        />
+                        <Button
+                            variant="outlined"
+                            onClick={handleTestClick}
+                            disabled={testing || !formData.smtpHost}
+                            sx={{ color: theme.palette.primary.main, borderColor: theme.palette.primary.main, alignSelf: 'flex-start', mt: 1 }}
+                        >
+                            {testing ? <CircularProgress size={24} /> : 'Verbindung testen'}
+                        </Button>
+                    </AccordionDetails>
+                </Accordion>
+
+                {/* Accordion 2: Contact Form Configuration */}
+                <Accordion sx={{ backgroundColor: theme.palette.background.paper, boxShadow: 'none', '&:before': { display: 'none' }, border: `1px solid ${theme.palette.divider}`, borderRadius: '4px !important' }}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: theme.palette.action.hover }}>
+                        <Typography sx={{ fontFamily: 'comfortaa', fontWeight: 'bold' }}>Kontaktformular Einstellungen</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 1 }}>
+                            An welche E-Mail-Adresse sollen Nachrichten aus dem Kontaktformular gesendet werden?
+                        </Typography>
+                        <TextField
+                            label="Empfänger-Email für Kontaktanfragen"
+                            name="contactEmail"
+                            value={formData.contactEmail || ''}
+                            onChange={handleChange}
+                            fullWidth
+                            size="small"
+                            sx={inputStyle}
+                            type="email"
+                            placeholder="kontakt@bunteliga-freiburg.de"
+                        />
+                    </AccordionDetails>
+                </Accordion>
+
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                     <Button
                         variant="contained"
                         onClick={handleSave}
                         disabled={saving}
-                        sx={{ bgcolor: theme.palette.primary.main, '&:hover': { bgcolor: theme.palette.primary.dark } }}
+                        sx={{ bgcolor: theme.palette.primary.main, '&:hover': { bgcolor: theme.palette.primary.dark }, minWidth: 150 }}
                     >
-                        {saving ? <CircularProgress size={24} color="inherit" /> : 'Speichern'}
+                        {saving ? <CircularProgress size={24} color="inherit" /> : 'Einstellungen speichern'}
                     </Button>
                 </Box>
             </Box>

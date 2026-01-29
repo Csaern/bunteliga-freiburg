@@ -62,12 +62,13 @@ async function reportResult(bookingId, resultData) {
     try {
       const opponentTeamId = result.homeTeamId === result.reportedByTeamId ? result.awayTeamId : result.homeTeamId;
       const reportingTeamName = result.homeTeamId === result.reportedByTeamId ? result.homeTeamName : result.awayTeamName;
+      const matchPairing = `${result.homeTeamName} vs ${result.awayTeamName}`;
 
       await notificationService.notifyTeam(
         opponentTeamId,
         'result_reported',
         'Ergebnis eingetragen',
-        `${reportingTeamName} hat ein Ergebnis (${result.homeScore}:${result.awayScore}) für euer Spiel gemeldet. Bitte bestätigen.`,
+        `${reportingTeamName} hat ein Ergebnis (${result.homeScore}:${result.awayScore}) für das Spiel ${matchPairing} gemeldet. Bitte bestätigen.`,
         { resultId: result.id, bookingId, homeScore: result.homeScore, awayScore: result.awayScore }
       );
     } catch (e) {
@@ -137,12 +138,14 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
       try {
         const actingTeamDoc = await teamsCollection.doc(actingTeamId).get();
         const actingTeamName = actingTeamDoc.exists ? actingTeamDoc.data().name : 'Der Gegner';
+        const data = resultDoc.data();
+        const matchPairing = `${data.homeTeamName} vs ${data.awayTeamName}`;
 
         await notificationService.notifyTeam(
-          resultDoc.data().reportedByTeamId,
+          data.reportedByTeamId,
           'result_rejected',
           'Ergebnis abgelehnt',
-          `${actingTeamName} hat das Ergebnis für euer Spiel abgelehnt.`,
+          `${actingTeamName} hat das Ergebnis für das Spiel ${matchPairing} abgelehnt.`,
           { resultId, actingTeamId, actingTeamName }
         );
       } catch (e) {
@@ -165,12 +168,13 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
       const actingTeamDoc = await teamsCollection.doc(actingTeamId).get();
       const actingTeamName = actingTeamDoc.exists ? actingTeamDoc.data().name : 'Der Gegner';
       const data = resultDoc.data();
+      const matchPairing = `${data.homeTeamName} vs ${data.awayTeamName}`;
 
       await notificationService.notifyTeam(
         data.reportedByTeamId,
         'result_confirmed',
         'Ergebnis bestätigt',
-        `${actingTeamName} hat das Ergebnis (${data.homeScore}:${data.awayScore}) bestätigt.`,
+        `${actingTeamName} hat das Ergebnis (${data.homeScore}:${data.awayScore}) für das Spiel ${matchPairing} bestätigt.`,
         { resultId, actingTeamId, actingTeamName, homeScore: data.homeScore, awayScore: data.awayScore }
       );
     } catch (e) {

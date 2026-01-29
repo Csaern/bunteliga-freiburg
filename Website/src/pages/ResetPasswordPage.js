@@ -103,9 +103,26 @@ const ResetPasswordPage = () => {
                 )}
 
                 {email && !success && (
-                    <Typography variant="body2" sx={{ mb: 3, color: theme.palette.text.secondary, textAlign: 'center' }}>
-                        Neues Passwort vergeben für:<br /><strong>{email}</strong>
-                    </Typography>
+                    <Box sx={{ width: '100%', mb: 2 }}>
+                        <TextField
+                            label="Email"
+                            value={email}
+                            fullWidth
+                            disabled
+                            variant="outlined"
+                            size="small"
+                            sx={{ mb: 2, ...inputStyle }}
+                        />
+                        <TextField
+                            label="Name"
+                            value={searchParams.get('name') || 'Benutzer'}
+                            fullWidth
+                            disabled
+                            variant="outlined"
+                            size="small"
+                            sx={{ ...inputStyle }}
+                        />
+                    </Box>
                 )}
 
                 {!success && !error && (

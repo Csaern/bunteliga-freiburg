@@ -37,8 +37,6 @@ const WebsiteManager = () => {
                     sx={{
                         borderRadius: '16px !important',
                         overflow: 'hidden',
-                        border: '1px solid',
-                        borderColor: 'divider',
                         background: 'background.paper',
                         boxShadow: 'none',
                         '&:before': { display: 'none' }
@@ -61,8 +59,6 @@ const WebsiteManager = () => {
                     sx={{
                         borderRadius: '16px !important',
                         overflow: 'hidden',
-                        border: '1px solid',
-                        borderColor: 'divider',
                         background: 'background.paper',
                         boxShadow: 'none',
                         '&:before': { display: 'none' }
@@ -85,8 +81,6 @@ const WebsiteManager = () => {
                     sx={{
                         borderRadius: '16px !important',
                         overflow: 'hidden',
-                        border: '1px solid',
-                        borderColor: 'divider',
                         background: 'background.paper',
                         boxShadow: 'none',
                         '&:before': { display: 'none' }
@@ -109,8 +103,6 @@ const WebsiteManager = () => {
                     sx={{
                         borderRadius: '16px !important',
                         overflow: 'hidden',
-                        border: '1px solid',
-                        borderColor: 'divider',
                         background: 'background.paper',
                         boxShadow: 'none',
                         '&:before': { display: 'none' }
@@ -133,8 +125,6 @@ const WebsiteManager = () => {
                     sx={{
                         borderRadius: '16px !important',
                         overflow: 'hidden',
-                        border: '1px solid',
-                        borderColor: 'divider',
                         background: 'background.paper',
                         boxShadow: 'none',
                         '&:before': { display: 'none' }
