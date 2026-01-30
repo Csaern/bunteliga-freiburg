@@ -49,17 +49,30 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 function TabPanel(props) {
-    const { children, value, index, ...other } = props;
+    const { children, value, index, style, ...other } = props;
     return (
         <div
             role="tabpanel"
             hidden={value !== index}
             id={`user-settings-tabpanel-${index}`}
             aria-labelledby={`user-settings-tab-${index}`}
+            style={{
+                ...style,
+                flex: value === index ? 1 : 0,
+                display: value === index ? 'flex' : 'none',
+                flexDirection: 'column',
+                minHeight: 0
+            }}
             {...other}
         >
             {value === index && (
-                <Box sx={{ py: 3 }}>
+                <Box sx={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0,
+                    py: 1
+                }}>
                     {children}
                 </Box>
             )}
@@ -94,8 +107,20 @@ const UserSettingsModal = ({ open, onClose }) => {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
+    const [passwordExpanded, setPasswordExpanded] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [notifLoading, setNotifLoading] = useState(false);
+
+    // Initial fetch when opening modal if tab is 0
+    React.useEffect(() => {
+        if (open && tabValue === 0) {
+            fetchNotifications();
+            // Initialize email prefs from context
+            if (settings?.emailNotifications) {
+                setEmailPrefs(settings.emailNotifications);
+            }
+        }
+    }, [open, tabValue, settings]);
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
@@ -103,7 +128,7 @@ const UserSettingsModal = ({ open, onClose }) => {
         setSuccess(false);
         setSettingsError('');
         setSettingsSuccess(false);
-        if (newValue === 1) {
+        if (newValue === 0) {
             fetchNotifications();
             // Initialize email prefs from context
             if (settings?.emailNotifications) {
@@ -233,6 +258,7 @@ const UserSettingsModal = ({ open, onClose }) => {
         setSettingsError('');
         setSettingsSuccess(false);
         setEmailSettingsExpanded(false);
+        setPasswordExpanded(false);
         setShowPassword(false);
         setTabValue(0);
         onClose();
@@ -244,13 +270,13 @@ const UserSettingsModal = ({ open, onClose }) => {
             onClose={handleClose}
             title="Benutzereinstellungen"
             maxWidth="sm"
-            minHeight="500px"
+            minHeight="600px"
             actions={
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', px: 1 }}>
                     <Button onClick={handleClose} sx={{ color: theme.palette.text.secondary }}>
                         Zurück
                     </Button>
-                    {tabValue === 1 && notifications.length > 0 && (
+                    {tabValue === 0 && notifications.length > 0 && (
                         <Button
                             variant="contained"
                             startIcon={<MarkEmailReadIcon />}
@@ -293,267 +319,326 @@ const UserSettingsModal = ({ open, onClose }) => {
                         }
                     }}
                 >
-                    <Tab icon={<PersonIcon sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' } }} />} iconPosition="start" label="Allgemein" />
                     <Tab icon={<NotificationsIcon sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' } }} />} iconPosition="start" label="Benachrichtigungen" />
+                    <Tab icon={<PersonIcon sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' } }} />} iconPosition="start" label="Allgemein" />
                 </Tabs>
             </Box>
 
-            <TabPanel value={tabValue} index={0}>
-                <Box sx={{ mb: 4 }}>
-                    <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, mb: 1, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        Benutzerkonto
-                    </Typography>
-                    <Box sx={{
-                        p: 2,
-                        borderRadius: 2,
-                        bgcolor: alpha(theme.palette.primary.main, 0.05),
-                        border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
-                    }}>
-                        <Typography sx={{ fontWeight: 'bold' }}>{currentUser?.displayName || 'Benutzer'}</Typography>
-                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>{currentUser?.email}</Typography>
-                    </Box>
-                </Box>
-
-                <Divider sx={{ my: 3 }} />
-
-                <Box component="form" onSubmit={handlePasswordChange}>
-                    <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, mb: 2, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        Passwort ändern
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <input type="text" name="username" autoComplete="username" style={{ display: 'none' }} readOnly />
-
-                        <TextField
-                            margin="dense"
-                            label="Aktuelles Passwort"
-                            type={showPassword ? 'text' : 'password'}
-                            fullWidth
-                            variant="outlined"
-                            name="current-password"
-                            autoComplete="current-password"
-                            value={passwordData.oldPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
-                            disabled={loading}
-                            size="small"
-                        />
-                        <TextField
-                            margin="dense"
-                            label="Neues Passwort"
-                            type={showPassword ? 'text' : 'password'}
-                            fullWidth
-                            variant="outlined"
-                            name="new-password"
-                            autoComplete="new-password"
-                            value={passwordData.newPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                            disabled={loading}
-                            size="small"
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" tabIndex={-1}>
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <TextField
-                            margin="dense"
-                            label="Neues Passwort bestätigen"
-                            type={showPassword ? 'text' : 'password'}
-                            fullWidth
-                            variant="outlined"
-                            name="confirm-password"
-                            autoComplete="new-password"
-                            value={passwordData.confirmPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                            disabled={loading}
-                            size="small"
-                        />
-
-                        {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
-                        {success && <Alert severity="success" sx={{ mt: 1 }}>Passwort erfolgreich geändert!</Alert>}
-
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={loading}
-                            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LockIcon />}
-                            sx={{ mt: 1, py: 1, borderRadius: 2, fontWeight: 'bold' }}
-                        >
-                            Passwort aktualisieren
-                        </Button>
-                    </Box>
-                </Box>
-
-                <Divider sx={{ my: 4 }} />
-
-                <Button
-                    fullWidth
-                    variant="outlined"
-                    color="error"
-                    onClick={handleLogout}
-                    startIcon={<LogoutIcon />}
-                    sx={{
-                        py: 1.5,
-                        borderRadius: 2,
-                        fontWeight: 'bold',
-                        borderStyle: 'dashed',
-                        '&:hover': {
-                            borderStyle: 'solid',
-                            bgcolor: alpha(theme.palette.error.main, 0.05)
-                        }
-                    }}
-                >
-                    Abmelden
-                </Button>
-            </TabPanel>
-
-            <TabPanel value={tabValue} index={1}>
-                <Typography variant="subtitle2" sx={{
-                    color: theme.palette.text.secondary,
-                    mb: 2,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                }}>
-                    <NotificationsIcon fontSize="small" /> Kürzliche Aktivitäten
-                </Typography>
-
-                {notifLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
-                        <CircularProgress />
-                    </Box>
-                ) : notifications.length === 0 ? (
-                    <Box sx={{ textAlign: 'center', py: 5 }}>
-                        <DraftsIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 2 }} />
-                        <Typography sx={{ color: theme.palette.text.secondary }}>
-                            Keine ungelesenen Benachrichtigungen.
-                        </Typography>
-                    </Box>
-                ) : (
-                    <List sx={{ width: '100%', bgcolor: 'background.paper', p: 0 }}>
-                        {notifications.map((notif, index) => (
-                            <React.Fragment key={notif.id}>
-                                <ListItem
-                                    alignItems="flex-start"
-                                    onClick={() => markAsRead(notif.id)}
-                                    sx={{
-                                        borderRadius: 2,
-                                        mb: 1,
-                                        cursor: 'pointer',
-                                        '&:hover': {
-                                            bgcolor: alpha(theme.palette.primary.main, 0.05)
-                                        },
-                                        transition: 'background-color 0.2s'
-                                    }}
-                                >
-                                    <ListItemAvatar>
-                                        <Avatar sx={{ bgcolor: alpha(theme.palette.background.paper, 0.1), border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                                            {getNotifIcon(notif.type)}
-                                        </Avatar>
-                                    </ListItemAvatar>
-                                    <ListItemText
-                                        primary={
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                                    {notif.title}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                                    {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleString('de-DE', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Vor kurzem'}
-                                                </Typography>
-                                            </Box>
-                                        }
-                                        secondary={
-                                            <Typography
-                                                variant="body2"
-                                                sx={{ color: theme.palette.text.secondary, mt: 0.5 }}
-                                            >
-                                                {notif.message}
-                                            </Typography>
-                                        }
-                                    />
-                                </ListItem>
-                                {index < notifications.length - 1 && <Divider variant="inset" component="li" />}
-                            </React.Fragment>
-                        ))}
-                    </List>
-                )}
-
-                <Divider sx={{ my: 4 }} />
-
-                {/* E-Mail-Benachrichtigungseinstellungen (Aufklappbar) */}
-                <Box>
-                    <Button
-                        fullWidth
-                        onClick={() => setEmailSettingsExpanded(!emailSettingsExpanded)}
-                        sx={{
-                            justifyContent: 'space-between',
-                            textTransform: 'none',
-                            color: theme.palette.text.primary,
-                            py: 1.5,
-                            px: 1,
-                            '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.05) }
-                        }}
-                    >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <EmailIcon sx={{ color: theme.palette.secondary.main }} />
-                            <Typography variant="body1" sx={{ fontWeight: 'bold', fontFamily: 'Comfortaa' }}>
-                                E-Mail-Einstellungen
+            <Box sx={{
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                px: { xs: 1.5, sm: 3 }, // Reduced for mobile
+                pb: 2
+            }}>
+                <TabPanel value={tabValue} index={1}>
+                    <Box sx={{ flex: 1, overflowY: 'auto', py: 1, pr: { xs: 1, sm: 1.5 } }}>
+                        <Box sx={{ mb: 4 }}>
+                            <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, mb: 1, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                Benutzerkonto
                             </Typography>
+                            <Box sx={{
+                                p: 2,
+                                borderRadius: 2,
+                                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+                            }}>
+                                <Typography sx={{ fontWeight: 'bold' }}>{currentUser?.displayName || 'Benutzer'}</Typography>
+                                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>{currentUser?.email}</Typography>
+                            </Box>
                         </Box>
-                        {emailSettingsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                    </Button>
 
-                    <Collapse in={emailSettingsExpanded}>
-                        <Box sx={{
-                            mt: 1,
-                            p: 2,
-                            borderRadius: 2,
-                            bgcolor: alpha(theme.palette.secondary.main, 0.03),
-                            border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
-                        }}>
-                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, mb: 2, display: 'block' }}>
-                                Wähle aus, bei welchen Ereignissen du zusätzlich eine E-Mail erhalten möchtest.
-                            </Typography>
+                        <Divider sx={{ my: 3 }} />
 
-                            <FormGroup>
-                                <FormControlLabel
-                                    control={<Switch checked={emailPrefs.gameRequests} onChange={() => handleEmailPrefToggle('gameRequests')} color="secondary" size="small" />}
-                                    label={<Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Spielanfragen (Neue, Zusagen, Absagen)</Typography>}
-                                />
-                                <FormControlLabel
-                                    control={<Switch checked={emailPrefs.gameResults} onChange={() => handleEmailPrefToggle('gameResults')} color="secondary" size="small" />}
-                                    label={<Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Ergebnisse (Meldungen & Bestätigungen)</Typography>}
-                                />
-                                <FormControlLabel
-                                    control={<Switch checked={emailPrefs.gameCancellations} onChange={() => handleEmailPrefToggle('gameCancellations')} color="secondary" size="small" />}
-                                    label={<Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Herausforderungen & Absagen</Typography>}
-                                />
-                            </FormGroup>
-
-                            {settingsError && <Alert severity="error" sx={{ mt: 2 }} size="small">{settingsError}</Alert>}
-                            {settingsSuccess && <Alert severity="success" sx={{ mt: 2 }} size="small">Einstellungen gespeichert!</Alert>}
-
+                        <Box>
                             <Button
                                 fullWidth
-                                variant="contained"
-                                color="secondary"
-                                onClick={saveEmailSettings}
-                                disabled={settingsLoading}
-                                sx={{ mt: 2, borderRadius: 2, fontWeight: 'bold', py: 1 }}
-                                startIcon={settingsLoading ? <CircularProgress size={16} color="inherit" /> : null}
+                                onClick={() => setPasswordExpanded(!passwordExpanded)}
+                                sx={{
+                                    justifyContent: 'space-between',
+                                    textTransform: 'none',
+                                    color: theme.palette.text.primary,
+                                    py: 1,
+                                    px: 1,
+                                    borderRadius: 2,
+                                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) }
+                                }}
                             >
-                                Einstellungen speichern
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <LockIcon sx={{ color: theme.palette.primary.main }} />
+                                    <Typography variant="body1" sx={{ fontWeight: 'bold', fontFamily: 'Comfortaa' }}>
+                                        Passwort ändern
+                                    </Typography>
+                                </Box>
+                                {passwordExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                             </Button>
+
+                            <Collapse in={passwordExpanded}>
+                                <Box component="form" onSubmit={handlePasswordChange} sx={{
+                                    mt: 1,
+                                    p: 2,
+                                    borderRadius: 2,
+                                    bgcolor: alpha(theme.palette.primary.main, 0.03),
+                                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                                }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <input type="text" name="username" autoComplete="username" style={{ display: 'none' }} readOnly />
+
+                                        <TextField
+                                            margin="dense"
+                                            label="Aktuelles Passwort"
+                                            type={showPassword ? 'text' : 'password'}
+                                            fullWidth
+                                            variant="outlined"
+                                            name="current-password"
+                                            autoComplete="current-password"
+                                            value={passwordData.oldPassword}
+                                            onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                                            disabled={loading}
+                                            size="small"
+                                        />
+                                        <TextField
+                                            margin="dense"
+                                            label="Neues Passwort"
+                                            type={showPassword ? 'text' : 'password'}
+                                            fullWidth
+                                            variant="outlined"
+                                            name="new-password"
+                                            autoComplete="new-password"
+                                            value={passwordData.newPassword}
+                                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                            disabled={loading}
+                                            size="small"
+                                            InputProps={{
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" tabIndex={-1}>
+                                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                        <TextField
+                                            margin="dense"
+                                            label="Neues Passwort bestätigen"
+                                            type={showPassword ? 'text' : 'password'}
+                                            fullWidth
+                                            variant="outlined"
+                                            name="confirm-password"
+                                            autoComplete="new-password"
+                                            value={passwordData.confirmPassword}
+                                            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                            disabled={loading}
+                                            size="small"
+                                        />
+
+                                        {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+                                        {success && <Alert severity="success" sx={{ mt: 1 }}>Passwort erfolgreich geändert!</Alert>}
+
+                                        <Button
+                                            type="submit"
+                                            variant="contained"
+                                            disabled={loading}
+                                            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LockIcon />}
+                                            sx={{ mt: 1, py: 1, borderRadius: 2, fontWeight: 'bold' }}
+                                        >
+                                            Passwort aktualisieren
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            </Collapse>
                         </Box>
-                    </Collapse>
-                </Box>
-            </TabPanel>
+
+                        <Divider sx={{ my: 4 }} />
+
+                        <Button
+                            fullWidth
+                            variant="outlined"
+                            color="error"
+                            onClick={handleLogout}
+                            startIcon={<LogoutIcon />}
+                            sx={{
+                                py: 1.5,
+                                borderRadius: 2,
+                                fontWeight: 'bold',
+                                borderStyle: 'dashed',
+                                '&:hover': {
+                                    borderStyle: 'solid',
+                                    bgcolor: alpha(theme.palette.error.main, 0.05)
+                                }
+                            }}
+                        >
+                            Abmelden
+                        </Button>
+                    </Box>
+                </TabPanel>
+
+                <TabPanel value={tabValue} index={0}>
+                    <Box sx={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minHeight: 0
+                    }}>
+                        <Typography variant="subtitle2" sx={{
+                            color: theme.palette.text.secondary,
+                            mb: 1.5,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            flexShrink: 0,
+                            pt: 1
+                        }}>
+                            <NotificationsIcon fontSize="small" /> Kürzliche Aktivitäten
+                        </Typography>
+
+                        <Box sx={{
+                            flexGrow: 1,
+                            overflowY: 'auto',
+                            minHeight: 0,
+                            pl: 0.5,
+                            pr: { xs: 1, sm: 1.5 }, // Space for scrollbar
+                            mb: 1,
+                            height: '100%'
+                        }}>
+                            {notifLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : notifications.length === 0 ? (
+                                <Box sx={{ textAlign: 'center', py: 5 }}>
+                                    <DraftsIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 2 }} />
+                                    <Typography sx={{ color: theme.palette.text.secondary }}>
+                                        Keine ungelesenen Benachrichtigungen.
+                                    </Typography>
+                                </Box>
+                            ) : (
+                                <List sx={{ width: '100%', bgcolor: 'background.paper', p: 0 }}>
+                                    {notifications.map((notif, index) => (
+                                        <React.Fragment key={notif.id}>
+                                            <ListItem
+                                                alignItems="flex-start"
+                                                onClick={() => markAsRead(notif.id)}
+                                                sx={{
+                                                    borderRadius: 2,
+                                                    mb: 1,
+                                                    cursor: 'pointer',
+                                                    '&:hover': {
+                                                        bgcolor: alpha(theme.palette.primary.main, 0.05)
+                                                    },
+                                                    transition: 'background-color 0.2s'
+                                                }}
+                                            >
+                                                <ListItemAvatar>
+                                                    <Avatar sx={{ bgcolor: alpha(theme.palette.background.paper, 0.1), border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                                                        {getNotifIcon(notif.type)}
+                                                    </Avatar>
+                                                </ListItemAvatar>
+                                                <ListItemText
+                                                    primary={
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                                                {notif.title}
+                                                            </Typography>
+                                                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                                                                {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleString('de-DE', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Vor kurzem'}
+                                                            </Typography>
+                                                        </Box>
+                                                    }
+                                                    secondary={
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{ color: theme.palette.text.secondary, mt: 0.5 }}
+                                                        >
+                                                            {notif.message}
+                                                        </Typography>
+                                                    }
+                                                />
+                                            </ListItem>
+                                            {index < notifications.length - 1 && <Divider variant="inset" component="li" />}
+                                        </React.Fragment>
+                                    ))}
+                                </List>
+                            )}
+                        </Box>
+
+                        <Divider sx={{ my: 1, opacity: 0.6, flexShrink: 0 }} />
+
+                        {/* E-Mail-Benachrichtigungseinstellungen (Festhaltend unten) */}
+                        <Box sx={{ mt: 1, flexShrink: 0 }}>
+                            <Button
+                                fullWidth
+                                onClick={() => setEmailSettingsExpanded(!emailSettingsExpanded)}
+                                sx={{
+                                    justifyContent: 'space-between',
+                                    textTransform: 'none',
+                                    color: theme.palette.text.primary,
+                                    py: 1,
+                                    px: 1,
+                                    borderRadius: 2,
+                                    '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.05) }
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <EmailIcon sx={{ color: theme.palette.secondary.main }} />
+                                    <Typography variant="body1" sx={{ fontWeight: 'bold', fontFamily: 'Comfortaa' }}>
+                                        E-Mail-Einstellungen
+                                    </Typography>
+                                </Box>
+                                {emailSettingsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                            </Button>
+
+                            <Collapse in={emailSettingsExpanded}>
+                                <Box sx={{
+                                    mt: 1,
+                                    p: 2,
+                                    borderRadius: 2,
+                                    bgcolor: alpha(theme.palette.secondary.main, 0.03),
+                                    border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
+                                }}>
+                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, mb: 1, display: 'block' }}>
+                                        Wähle aus, bei welchen Ereignissen du zusätzlich eine E-Mail erhalten möchtest.
+                                    </Typography>
+
+                                    <FormGroup>
+                                        <FormControlLabel
+                                            control={<Switch checked={emailPrefs.gameRequests} onChange={() => handleEmailPrefToggle('gameRequests')} color="secondary" size="small" />}
+                                            label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>Spielanfragen (Neue, Zusagen, Absagen)</Typography>}
+                                        />
+                                        <FormControlLabel
+                                            control={<Switch checked={emailPrefs.gameResults} onChange={() => handleEmailPrefToggle('gameResults')} color="secondary" size="small" />}
+                                            label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>Ergebnisse (Meldungen & Bestätigungen)</Typography>}
+                                        />
+                                        <FormControlLabel
+                                            control={<Switch checked={emailPrefs.gameCancellations} onChange={() => handleEmailPrefToggle('gameCancellations')} color="secondary" size="small" />}
+                                            label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>Herausforderungen & Absagen</Typography>}
+                                        />
+                                    </FormGroup>
+
+                                    {settingsError && <Alert severity="error" sx={{ mt: 1.5 }} size="small">{settingsError}</Alert>}
+                                    {settingsSuccess && <Alert severity="success" sx={{ mt: 1.5 }} size="small">Einstellungen gespeichert!</Alert>}
+
+                                    <Button
+                                        fullWidth
+                                        variant="contained"
+                                        color="secondary"
+                                        onClick={saveEmailSettings}
+                                        disabled={settingsLoading}
+                                        sx={{ mt: 1.5, borderRadius: 2, fontWeight: 'bold', py: 0.8 }}
+                                        startIcon={settingsLoading ? <CircularProgress size={16} color="inherit" /> : null}
+                                    >
+                                        Einstellungen speichern
+                                    </Button>
+                                </Box>
+                            </Collapse>
+                        </Box>
+                    </Box>
+                </TabPanel>
+            </Box>
         </AppModal>
     );
 };

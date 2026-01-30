@@ -181,6 +181,9 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
       console.error('Error sending result confirmed notification:', e);
     }
 
+    // 4. Globaler Broadcast (Tabelle & Ergebnisse neu laden)
+    notificationService.broadcastUpdate('results_updated');
+
     return { message: 'Ergebnis erfolgreich bestätigt.' };
   }
 
@@ -368,6 +371,9 @@ async function adminOverrideResult(resultId, scores, adminUid) {
     console.error('Error sending admin result override notification:', e);
   }
 
+  // Globaler Broadcast (Tabelle & Ergebnisse neu laden)
+  notificationService.broadcastUpdate('results_updated');
+
   return { message: 'Ergebnis wurde durch Admin final festgelegt.' };
 }
 
@@ -502,6 +508,9 @@ async function adminCreateResult(resultData, adminUid) {
 
     return { id: newResultRef.id, ...finalResultData };
   });
+
+  // Globaler Broadcast
+  notificationService.broadcastUpdate('results_updated');
 }
 
 /**
@@ -559,6 +568,9 @@ async function adminDeleteResult(resultId) {
     }
     transaction.delete(resultRef);
   });
+
+  // Globaler Broadcast
+  notificationService.broadcastUpdate('results_updated');
 }
 
 /**

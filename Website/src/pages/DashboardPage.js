@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthProvider';
+import { useNotifications } from '../context/NotificationContext';
 import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import DynamicFixtureList from '../components/DynamicFixtureList';
 import TeamSettings from '../components/TeamSettings';
@@ -29,6 +30,7 @@ import HandshakeIcon from '@mui/icons-material/Handshake'; // Added for friendly
 // Removed CheckIcon/CloseIcon -> Standardized on CheckCircleIcon/CancelIcon as per request
 
 const DashboardPage = () => {
+  console.log('DashboardPage Render Start');
   const { currentUser, teamId, isAdmin } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -96,9 +98,10 @@ const DashboardPage = () => {
 
 
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!currentUser) return;
-    setLoading(true);
+    console.log(`[Dashboard] fetchData (silent=${silent}) called at`, new Date().toLocaleTimeString());
+    if (!silent) setLoading(true);
     try {
       const activeSeason = await seasonApi.getActiveSeason();
       setCurrentSeason(activeSeason);
@@ -164,6 +167,22 @@ const DashboardPage = () => {
       setLoading(false);
     }
   }, [currentUser, teamId]);
+
+  // NEU: Socket integration for real-time updates via Context
+  const { lastNotification } = useNotifications();
+
+  useEffect(() => {
+    if (lastNotification) {
+      console.log('✅ [Dashboard] Notification received! Timestamp:', lastNotification);
+      console.log('⏳ [Dashboard] Creating 500ms refresh timer...');
+
+      const timer = setTimeout(() => {
+        console.log('🔄 [Dashboard] Timer fired! Calling fetchData(true) for silent refresh...');
+        fetchData(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [lastNotification, fetchData]);
 
   useEffect(() => {
     if (!currentUser) {

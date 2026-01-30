@@ -233,19 +233,17 @@ function Header() {
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           {currentUser && (
             <IconButton onClick={() => { setOpenSettings(true); handleDrawerToggle(); }} color="inherit" sx={{ ml: 1 }}>
-              <Badge badgeContent={unreadCount} color="error">
-                <Avatar sx={{
-                  width: 32,
-                  height: 32,
-                  fontSize: '0.9rem',
-                  bgcolor: theme.palette.secondary.main,
-                  color: theme.palette.common.white,
-                  fontFamily: 'Comfortaa',
-                  fontWeight: 'bold'
-                }}>
-                  {getInitials(currentUser)}
-                </Avatar>
-              </Badge>
+              <Avatar sx={{
+                width: 32,
+                height: 32,
+                fontSize: '0.9rem',
+                bgcolor: theme.palette.secondary.main,
+                color: theme.palette.common.white,
+                fontFamily: 'Comfortaa',
+                fontWeight: 'bold'
+              }}>
+                {getInitials(currentUser)}
+              </Avatar>
             </IconButton>
           )}
           <IconButton sx={{ ml: 1 }} onClick={colorMode.toggleColorMode} color="inherit">
@@ -469,28 +467,26 @@ function Header() {
               </IconButton>
 
               {currentUser ? (
-                <Tooltip title="Einstellungen">
+                <Tooltip title="Einstellungen & Benachrichtigungen">
                   <IconButton onClick={() => setOpenSettings(true)} color="inherit">
-                    <Badge badgeContent={unreadCount} color="error">
-                      <Avatar sx={{
-                        width: 40,
-                        height: 40,
-                        fontSize: '1rem',
-                        bgcolor: theme.palette.secondary.main,
-                        color: theme.palette.common.white,
-                        fontFamily: 'Comfortaa',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        border: `2px solid ${alpha(theme.palette.common.white, 0.2)}`,
-                        '&:hover': {
-                          border: `2px solid ${theme.palette.secondary.main}`,
-                          transform: 'scale(1.05)'
-                        },
-                        transition: 'all 0.2s ease-in-out'
-                      }}>
-                        {getInitials(currentUser)}
-                      </Avatar>
-                    </Badge>
+                    <Avatar sx={{
+                      width: 40,
+                      height: 40,
+                      fontSize: '1rem',
+                      bgcolor: theme.palette.secondary.main,
+                      color: theme.palette.common.white,
+                      fontFamily: 'Comfortaa',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      border: `2px solid ${alpha(theme.palette.common.white, 0.2)}`,
+                      '&:hover': {
+                        border: `2px solid ${theme.palette.secondary.main}`,
+                        transform: 'scale(1.05)'
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}>
+                      {getInitials(currentUser)}
+                    </Avatar>
                   </IconButton>
                 </Tooltip>
               ) : (

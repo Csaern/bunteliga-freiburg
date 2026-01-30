@@ -1078,7 +1078,7 @@ class BookingService {
                     if (pDoc.exists) pitchName = pDoc.data().name;
                 }
 
-                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateObj = new Date(getMillisFromDate(bookingData.date));
                 const dateStr = dateObj.toLocaleDateString('de-DE');
                 const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
@@ -1086,7 +1086,7 @@ class BookingService {
                     awayTeamId,
                     'new_booking_request',
                     'Neue Spielanfrage',
-                    `${homeTeamName} möchte am ${dateStr} um ${timeStr} Uhr gegen euch spielen (@ ${pitchName}).`,
+                    `${homeTeamName} hat eine Spielanfrage am ${dateStr} um ${timeStr} Uhr (@ ${pitchName}) an euch gesendet.`,
                     { bookingId, homeTeamId, homeTeamName, date: bookingData.date, pitchName, time: timeStr }
                 );
             } catch (e) {
@@ -1162,15 +1162,15 @@ class BookingService {
                     if (pDoc.exists) pitchName = pDoc.data().name;
                 }
 
-                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateObj = new Date(getMillisFromDate(bookingData.date));
                 const dateStr = dateObj.toLocaleDateString('de-DE');
                 const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
                 await notificationService.notifyTeam(
                     bookingData.homeTeamId,
                     'booking_confirmed',
-                    'Spiel bestätigt',
-                    `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} um ${timeStr} Uhr angenommen.`,
+                    'Anfrage angenommen',
+                    `${awayTeamName} hat eure Spielanfrage am ${dateStr} um ${timeStr} Uhr angenommen.`,
                     { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date, pitchName, time: timeStr }
                 );
             } catch (e) {
@@ -1179,6 +1179,9 @@ class BookingService {
 
             // 3. NEU: Automatische Synchronisierung der freien Slots
             await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
+
+            // 4. NEU: Globalen Broadcast für Spielplan-Aktualisierung
+            notificationService.broadcastUpdate('fixtures_updated');
 
             return { message: 'Spiel bestätigt!' };
         }
@@ -1249,7 +1252,7 @@ class BookingService {
                     if (pDoc.exists) pitchName = pDoc.data().name;
                 }
 
-                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateObj = new Date(getMillisFromDate(bookingData.date));
                 const dateStr = dateObj.toLocaleDateString('de-DE');
                 const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
@@ -1257,7 +1260,7 @@ class BookingService {
                     bookingData.homeTeamId,
                     'booking_denied',
                     'Anfrage abgelehnt',
-                    `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} abgelehnt.`,
+                    `${awayTeamName} hat eure Spielanfrage am ${dateStr} um ${timeStr} Uhr abgelehnt.`,
                     { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date, reason, pitchName, time: timeStr }
                 );
             } catch (e) {
@@ -1372,7 +1375,7 @@ class BookingService {
                     if (pDoc.exists) pitchName = pDoc.data().name;
                 }
 
-                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateObj = new Date(getMillisFromDate(bookingData.date));
                 const dateStr = dateObj.toLocaleDateString('de-DE');
                 const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
@@ -1390,6 +1393,9 @@ class BookingService {
 
         // 3. NEU: Automatische Synchronisierung der freien Slots
         await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
+
+        // 4. NEU: Globaler Broadcast
+        notificationService.broadcastUpdate('fixtures_updated');
 
         return result;
     }
@@ -1426,29 +1432,10 @@ class BookingService {
         // Konvertiere Firestore Timestamp zu Date für Formatierung
         let gameDate;
         try {
-            if (typeof bookingData.date.toDate === 'function') {
-                const dateObj = bookingData.date.toDate();
-                if (dateObj instanceof Date && !isNaN(dateObj.valueOf())) {
-                    gameDate = dateObj;
-                } else {
-                    throw new Error('toDate() hat kein gültiges Date-Objekt zurückgegeben');
-                }
-            } else if (bookingData.date instanceof Date && !isNaN(bookingData.date.valueOf())) {
-                gameDate = bookingData.date;
-            } else if (typeof bookingData.date._seconds === 'number') {
-                gameDate = new Date(bookingData.date._seconds * 1000);
-                if (isNaN(gameDate.valueOf())) {
-                    throw new Error('Ungültiges Datum aus _seconds');
-                }
-            } else {
-                gameDate = new Date(bookingData.date);
-                if (isNaN(gameDate.valueOf())) {
-                    throw new Error('Ungültiges Datum');
-                }
-            }
+            gameDate = new Date(getMillisFromDate(bookingData.date));
         } catch (e) {
             console.error('Fehler bei Datumskonvertierung:', e, bookingData.date);
-            gameDate = null; // Setze auf null, damit die Formatierung sicher ist
+            gameDate = null;
         }
 
         let gameDateStr = 'Unbekannt';
@@ -1627,7 +1614,8 @@ class BookingService {
                 const pitchName = pitch.name || 'Unbekannter Platz';
 
                 // Format Date/Time
-                const dateObj = new Date(date);
+                // Format Date/Time
+                const dateObj = new Date(getMillisFromDate(date));
                 const dateStr = dateObj.toLocaleDateString('de-DE');
                 // time ist hier ein String "HH:mm" aus dem Input
 
@@ -1660,8 +1648,13 @@ class BookingService {
      */
     static async adminCancelBooking(bookingId, reason, adminUid) {
         const bookingRef = bookingsCollection.doc(bookingId);
-        const bookingDoc = await bookingRef.get(); // Added missing bookingDoc fetch
-        if (bookingDoc.exists && bookingDoc.data().isCustom) {
+        const bookingDoc = await bookingRef.get();
+        if (!bookingDoc.exists) {
+            throw new Error('Buchung nicht gefunden.');
+        }
+
+        const bookingData = bookingDoc.data();
+        if (bookingData.isCustom) {
             await bookingRef.delete();
             return { message: 'Individuelle Buchung wurde durch Admin gelöscht.' };
         }
@@ -1680,7 +1673,8 @@ class BookingService {
         const teamsToNotify = [bookingData.homeTeamId, bookingData.awayTeamId].filter(Boolean);
         for (const teamId of teamsToNotify) {
             try {
-                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+                const dateObj = new Date(getMillisFromDate(bookingData.date));
+                const dateStr = dateObj.toLocaleDateString('de-DE');
                 await notificationService.notifyTeam(
                     teamId,
                     'admin_booking_cancelled',
@@ -1694,7 +1688,10 @@ class BookingService {
         }
 
         // 3. NEU: Automatische Synchronisierung der freien Slots
-        await BookingService._syncPitchWeeklySlots(bookingDoc.data().pitchId, bookingDoc.data().date);
+        await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
+
+        // 4. NEU: Globaler Broadcast
+        notificationService.broadcastUpdate('fixtures_updated');
 
         return { message: 'Spiel wurde durch Admin erfolgreich storniert.' };
     }

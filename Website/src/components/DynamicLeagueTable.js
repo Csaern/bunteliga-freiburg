@@ -23,6 +23,7 @@ import { db } from '../firebase';
 import { API_BASE_URL } from '../services/apiClient';
 import * as seasonApiService from '../services/seasonApiService';
 import * as bookingApiService from '../services/bookingApiService';
+import { useNotifications } from '../context/NotificationContext';
 
 const TeamLogo = ({ team, isMobile }) => {
   const theme = useTheme();
@@ -182,6 +183,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
   const [isSimulated, setIsSimulated] = useState(false);
   const [rankingCriteria, setRankingCriteria] = useState(['points', 'goalDifference', 'goalsScored']);
   const [seasonMetadata, setSeasonMetadata] = useState(null);
+  const { lastGlobalUpdate } = useNotifications();
 
   const loadTableData = useCallback(async () => {
     if (!seasonId) return;
@@ -225,6 +227,14 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
   useEffect(() => {
     loadTableData();
   }, [loadTableData]);
+
+  // Global Update Listener
+  useEffect(() => {
+    if (lastGlobalUpdate && lastGlobalUpdate.type === 'results_updated') {
+      console.log('🔄 [DynamicLeagueTable] Global results update detected. Refreshing...');
+      loadTableData();
+    }
+  }, [lastGlobalUpdate, loadTableData]);
 
   const Wrapper = disableContainer ? Box : Container;
   const wrapperProps = disableContainer ? { sx: { my: 4 } } : { maxWidth: maxWidth || "xl", sx: { my: 4, px: isMobile ? 1 : 2 } };

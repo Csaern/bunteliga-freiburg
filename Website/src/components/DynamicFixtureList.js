@@ -31,6 +31,7 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import * as seasonApiService from '../services/seasonApiService';
 import GameDetailsModal from './Modals/GameDetailsModal';
+import { useNotifications } from '../context/NotificationContext';
 
 const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   const theme = useTheme();
@@ -75,6 +76,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   const [reportForm, setReportForm] = useState({ homeScore: '', awayScore: '' });
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [hoveredFixtureId, setHoveredFixtureId] = useState(null);
+  const { lastGlobalUpdate } = useNotifications();
 
   // Robust date normalization for Firestore Timestamp, {_seconds, _nanoseconds}, or ISO string
   // Firestore Timestamps werden als {_seconds, _nanoseconds} serialisiert, wenn sie über JSON gesendet werden
@@ -366,6 +368,22 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   useEffect(() => {
     loadFixtures();
   }, [loadFixtures]);
+
+  // Global Update Listener
+  useEffect(() => {
+    if (lastGlobalUpdate) {
+      if (lastGlobalUpdate.type === 'results_updated' && showType === 'results') {
+        console.log('🔄 [DynamicFixtureList] Global results update detected. Refreshing results...');
+        loadFixtures();
+      } else if (lastGlobalUpdate.type === 'fixtures_updated' && showType === 'upcoming') {
+        console.log('🔄 [DynamicFixtureList] Global fixtures update detected. Refreshing fixtures...');
+        loadFixtures();
+      } else if (lastGlobalUpdate.type === 'results_updated' && (showType === 'all' || !showType)) {
+        console.log('🔄 [DynamicFixtureList] Global update detected. Refreshing all...');
+        loadFixtures();
+      }
+    }
+  }, [lastGlobalUpdate, loadFixtures, showType]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Datum unbekannt';

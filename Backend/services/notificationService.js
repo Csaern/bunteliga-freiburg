@@ -5,6 +5,7 @@ const notificationsCollection = db.collection('notifications');
 const teamsCollection = db.collection('teams');
 const fs = require('fs');
 const path = require('path');
+const config = require('../config');
 
 // Ensure logs directory exists
 const logDir = path.join(__dirname, '../logs');
@@ -49,7 +50,40 @@ async function createNotification(teamId, type, title, message, relatedData = {}
     };
 
     const docRef = await notificationsCollection.add(notificationData);
+
+    // Emit real-time event via Socket.IO
+    if (io) {
+        // Emit to the specific team room
+        console.log(`[NotificationService] Sending event 'notification' to room: '${teamId}'`);
+
+        // Debug: Check if room exists and has members
+        const clients = io.sockets.adapter.rooms.get(teamId);
+        const memberCount = clients ? clients.size : 0;
+        console.log(`[NotificationService] Room '${teamId}' has ${memberCount} members`);
+
+        io.to(teamId).emit('notification', { id: docRef.id, ...notificationData });
+        console.log(`[NotificationService] Emitted socket event to team ${teamId}`);
+    }
+
     return { id: docRef.id, ...notificationData };
+}
+
+let io = null;
+
+function initSocket(socketIoInstance) {
+    io = socketIoInstance;
+    console.log('[NotificationService] Socket.IO initialized');
+}
+
+/**
+ * Broadcasts a global update signal to all connected clients.
+ * Used for refreshing tables or fixture lists globally.
+ */
+function broadcastUpdate(type) {
+    if (io) {
+        io.emit('global_update', { type, timestamp: Date.now() });
+        console.log(`[NotificationService] 🌐 Broadcasted global_update: ${type}`);
+    }
 }
 
 /**
@@ -112,7 +146,7 @@ async function sendEmailNotification(teamId, type, title, message, relatedData =
 
         // --- Build Rich HTML Content ---
         // --- Build Rich HTML Content ---
-        const dashboardUrl = `${process.env.WEBSITE_URL || 'http://localhost:3000'}/dashboard`;
+        const dashboardUrl = `${config.websiteUrl}/dashboard`;
 
         let introText = '';
         let detailsHtml = '';
@@ -121,7 +155,11 @@ async function sendEmailNotification(teamId, type, title, message, relatedData =
         const getDateStr = (d) => {
             if (!d) return 'Unbekannt';
             try {
-                const dateObj = d.toDate ? d.toDate() : new Date(d);
+                let dateObj;
+                if (d && typeof d.toDate === 'function') dateObj = d.toDate();
+                else if (d && d._seconds) dateObj = new Date(d._seconds * 1000);
+                else dateObj = new Date(d);
+
                 if (isNaN(dateObj.getTime())) return 'Ungültiges Datum';
                 return dateObj.toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             } catch (e) {
@@ -133,7 +171,11 @@ async function sendEmailNotification(teamId, type, title, message, relatedData =
             if (time) return time + ' Uhr';
             if (date) {
                 try {
-                    const dateObj = date.toDate ? date.toDate() : new Date(date);
+                    let dateObj;
+                    if (date && typeof date.toDate === 'function') dateObj = date.toDate();
+                    else if (date && date._seconds) dateObj = new Date(date._seconds * 1000);
+                    else dateObj = new Date(date);
+
                     if (!isNaN(dateObj.getTime())) {
                         return dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
                     }
@@ -178,8 +220,8 @@ async function sendEmailNotification(teamId, type, title, message, relatedData =
         }
 
         // 1. Booking Details (Anfrage, Bestätigung, Storno, etc.)
-        // 1. Booking Details (Anfrage, Bestätigung, Storno, etc.)
-        if (relatedData.bookingId || type.includes('booking')) {
+        // Wir zeigen diese Details NUR, wenn es kein Ergebis-Event ist (da dort das Ergebnis-Widget reicht)
+        if ((relatedData.bookingId || type.includes('booking')) && !type.includes('result')) {
             const dateStr = getDateStr(relatedData.date);
             const timeStr = getTimeStr(relatedData.time, relatedData.date);
             const pitchDisplay = relatedData.pitchName || 'Unbekannter Platz';
@@ -361,5 +403,7 @@ module.exports = {
     getUnreadNotificationsForTeam,
     markAsRead,
     markAllAsReadForTeam,
+    initSocket,
+    broadcastUpdate
 };
 
