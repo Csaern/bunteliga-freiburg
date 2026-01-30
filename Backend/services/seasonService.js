@@ -236,7 +236,7 @@ async function evaluateSeason(seasonId, adminUid) {
     const seasonTeams = (seasonData.teams || []).filter(team => team.status !== 'inactive');
 
     if (seasonTeams.length > 0) {
-        const eligibleTeams = await determineEligibleTeams(seasonId, seasonTeams);
+        const eligibleTeams = await determineEligibleTeams(seasonId, seasonTeams, seasonData);
         if (eligibleTeams.length > 0) {
             await applySeasonStatsToAllTimeTable(seasonId, seasonData, seasonTeams);
         }
@@ -252,8 +252,16 @@ async function evaluateSeason(seasonId, adminUid) {
     return { message: 'Saison erfolgreich abgerechnet.' };
 }
 
-async function determineEligibleTeams(seasonId, activeTeams) {
-    const minGames = Math.ceil(activeTeams.length / 2);
+async function determineEligibleTeams(seasonId, activeTeams, seasonData) {
+    // Berechnung der Hälfte der Spiele (abgerundet)
+    // 20 Teams -> 19 Spiele (Hinrunde) -> 9.5 -> 9 Spiele nötig
+    // 19 Teams -> 18 Spiele (Hinrunde) -> 9 Spiele nötig
+    const isDoubleRound = seasonData.playMode === 'double_round_robin';
+    const multiplier = isDoubleRound ? 2 : 1;
+    const maxGamesPerTeam = Math.max(0, (activeTeams.length - 1) * multiplier);
+    const minGames = Math.floor(maxGamesPerTeam / 2);
+
+    console.log(`[DetermineEligible] Teams: ${activeTeams.length}, Mode: ${seasonData.playMode}, MaxGames: ${maxGamesPerTeam}, MinGames: ${minGames}`);
     const validGameCount = {};
     activeTeams.forEach(team => { validGameCount[team.id] = 0; });
 

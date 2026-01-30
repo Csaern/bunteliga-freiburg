@@ -12,6 +12,7 @@ import * as seasonApi from '../services/seasonApiService';
 import * as teamApi from '../services/teamApiService';
 import * as bookingApi from '../services/bookingApiService';
 import * as resultApi from '../services/resultApiService';
+import * as pitchApi from '../services/pitchApiService';
 import { getRequestExpiryInfo } from '../components/Helpers/dateUtils';
 import { StyledTableCell } from '../components/Helpers/tableUtils';
 
@@ -41,6 +42,7 @@ const DashboardPage = () => {
   const [pendingMyResults, setPendingMyResults] = useState([]);
   const [notificationBookings, setNotificationBookings] = useState([]); // NEU: Fehlende Ergebnisse
   const [teamsMap, setTeamsMap] = useState({});
+  const [pitchesMap, setPitchesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentSeason, setCurrentSeason] = useState(null);
   const [showTeamSettings, setShowTeamSettings] = useState(false);
@@ -100,6 +102,11 @@ const DashboardPage = () => {
     try {
       const activeSeason = await seasonApi.getActiveSeason();
       setCurrentSeason(activeSeason);
+
+      // NEU: Plätze laden für die Anzeige in "Ausstehende Aktionen"
+      const pitchesArr = await pitchApi.getAllPitchesPublic().catch(() => []);
+      const pMap = pitchesArr.reduce((acc, p) => { acc[p.id] = p.name; return acc; }, {});
+      setPitchesMap(pMap);
 
       const teamsArr = await teamApi.getTeamsForActiveSeason().catch(() => []);
       const map = teamsArr.reduce((acc, t) => { acc[t.id] = { name: t.name, logoUrl: t.logoUrl, logoUrlLight: t.logoUrlLight, logoColor: t.logoColor }; return acc; }, {});
@@ -346,8 +353,12 @@ const DashboardPage = () => {
         isHome: isHome,
         label: 'Spielanfrage',
         icon: <EventIcon sx={{ color: theme.palette.primary.main }} />,
+        isHome: isHome,
+        label: 'Spielanfrage',
+        icon: <EventIcon sx={{ color: theme.palette.primary.main }} />,
         expiry: getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays),
-        friendly: booking.friendly
+        friendly: booking.friendly,
+        pitchName: pitchesMap[booking.pitchId] || 'Unbekannter Platz' // NEU
       });
     });
 
@@ -382,8 +393,12 @@ const DashboardPage = () => {
         isHome: isHome,
         label: 'Gesendet',
         icon: <AccessTimeIcon sx={{ color: theme.palette.text.secondary }} />,
+        isHome: isHome,
+        label: 'Gesendet',
+        icon: <AccessTimeIcon sx={{ color: theme.palette.text.secondary }} />,
         expiry: getRequestExpiryInfo(booking, currentSeason?.requestExpiryDays),
-        friendly: booking.friendly
+        friendly: booking.friendly,
+        pitchName: pitchesMap[booking.pitchId] || 'Unbekannter Platz' // NEU
       });
     });
 
@@ -411,7 +426,7 @@ const DashboardPage = () => {
       return (a.date || 0) - (b.date || 0);
     });
 
-  }, [notificationBookings, pendingGameRequests, pendingResults, pendingMyRequests, pendingMyResults, currentSeason, theme, teamsMap, teamId]);
+  }, [notificationBookings, pendingGameRequests, pendingResults, pendingMyRequests, pendingMyResults, currentSeason, theme, teamsMap, teamId, pitchesMap]);
 
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
@@ -629,6 +644,12 @@ const DashboardPage = () => {
                             <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem' }}>
                               {action.date ? action.date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
                               {action.date && ` ${action.date.toTimeString().slice(0, 5)}`}
+                              {/* NEU: Platz anzeigen bei Requests */}
+                              {action.pitchName && (
+                                <Box component="span" sx={{ color: theme.palette.text.secondary, ml: 1, fontStyle: 'italic' }}>
+                                  @ {action.pitchName}
+                                </Box>
+                              )}
                             </Typography>
 
                             {action.score && (
@@ -698,7 +719,7 @@ const DashboardPage = () => {
 
         {/* League Table */}
         <Grid>
-          <DynamicLeagueTable title="AKTUELLE TABELLE" form={false} seasonId={currentSeason?.id} userTeamId={teamId} disableContainer={true} />
+          <DynamicLeagueTable title="AKTUELLE TABELLE" form={false} seasonId={currentSeason?.id} userTeamId={teamId} disableContainer={true} enableSimulation={true} />
         </Grid>
 
         {/* Past Games */}

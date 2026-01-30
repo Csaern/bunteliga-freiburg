@@ -59,3 +59,9 @@ export const getAllSeasonsPublic = async () => {
 export const getSeasonByIdPublic = async (seasonId) => {
     return publicApiClient(`/api/seasons/public/${seasonId}`, 'GET');
 };
+
+// Tabelle einer Saison (öffentlich)
+export const getTablePublic = async (seasonId, simulated = false) => {
+    const query = simulated ? '?simulated=true' : '';
+    return publicApiClient(`/api/seasons/public/${seasonId}/table${query}`, 'GET');
+};

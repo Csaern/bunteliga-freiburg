@@ -25,8 +25,8 @@ const upload = multer({ storage: storage });
 router.get('/public', async (req, res) => {
     try {
         const pitches = await pitchService.getAllPitches();
-        // Gib nur verifizierte und nicht archivierte Plätze zurück
-        const verified = pitches.filter(p => p.isVerified && !p.isArchived);
+        // Gib alle verifizierten und unverifizierten Plätze zurück (für Anzeige), solange nicht archiviert
+        const verified = pitches.filter(p => !p.isArchived);
         res.status(200).json(verified);
     } catch (error) {
         res.status(500).json({ message: error.message });

@@ -78,6 +78,18 @@ router.get('/public/:id', async (req, res) => {
     }
 });
 
+// Tabelle abrufen (ÖFFENTLICH)
+router.get('/public/:id/table', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const simulated = req.query.simulated === 'true';
+        const table = await tableService.calculateTable(id, simulated);
+        res.status(200).json(table);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // Die aktuell aktive Saison abrufen (authentifiziert)
 // WICHTIG: Diese Route muss VOR der allgemeinen '/:id' Route stehen.
 router.get('/active', checkAuth, async (req, res) => {

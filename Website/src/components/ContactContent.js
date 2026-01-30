@@ -348,13 +348,16 @@ const ContactContent = () => {
                                     </Typography>
                                 </Box>
                                 {qrValue && (
-                                    <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: `1px solid ${theme.palette.divider}`, alignSelf: { xs: 'center', md: 'auto' } }}>
+                                    <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: `1px solid ${theme.palette.divider}`, alignSelf: { xs: 'center', md: 'auto' }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                         <QRCode
                                             value={qrValue}
                                             size={120}
                                             style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                                             viewBox={`0 0 256 256`}
                                         />
+                                        <Typography variant="caption" sx={{ mt: 1, color: 'text.secondary', fontSize: '0.7rem', textAlign: 'center' }}>
+                                            Mit Banking-App scannen
+                                        </Typography>
                                     </Box>
                                 )}
                             </Box>

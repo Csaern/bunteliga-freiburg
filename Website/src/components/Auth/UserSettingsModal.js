@@ -464,7 +464,7 @@ const UserSettingsModal = ({ open, onClose }) => {
                                                     {notif.title}
                                                 </Typography>
                                                 <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                                    {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('de-DE') : 'Vor kurzem'}
+                                                    {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleString('de-DE', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Vor kurzem'}
                                                 </Typography>
                                             </Box>
                                         }

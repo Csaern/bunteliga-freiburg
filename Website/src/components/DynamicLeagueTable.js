@@ -16,6 +16,8 @@ import {
   Chip,
   Container,
   useMediaQuery,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import { db } from '../firebase';
 import { API_BASE_URL } from '../services/apiClient';
@@ -171,212 +173,54 @@ const FormDisplay = ({ formArray }) => {
   );
 };
 
-const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disableContainer = false }) => {
+const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disableContainer = false, enableSimulation = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:1020px)'); // Switch to mobile layout below 1020px
   const navigate = useNavigate();
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSimulated, setIsSimulated] = useState(false);
   const [rankingCriteria, setRankingCriteria] = useState(['points', 'goalDifference', 'goalsScored']);
+  const [seasonMetadata, setSeasonMetadata] = useState(null);
 
   const loadTableData = useCallback(async () => {
+    if (!seasonId) return;
+
     try {
-      // Wenn seasonId vorhanden ist, lade die Saison-Daten, um die registrierten Teams zu erhalten
-      let seasonTeams = [];
-      let activeTeamIds = [];
-      if (seasonId) {
-        try {
-          // Versuche zuerst die aktive Saison zu laden (falls es die aktive ist)
-          const activeSeason = await seasonApiService.getActiveSeasonPublic();
-          if (activeSeason && activeSeason.id === seasonId && activeSeason.teams) {
-            seasonTeams = activeSeason.teams;
-            // Nur aktive Teams berücksichtigen
-            activeTeamIds = seasonTeams
-              .filter(t => t.status === 'active')
-              .map(t => t.id || t.teamId)
-              .filter(Boolean);
-          } else {
-            // Falls nicht die aktive Saison, lade die Saison direkt aus Firestore
-            const seasonDoc = await getDoc(doc(db, 'seasons', seasonId));
-            if (seasonDoc.exists()) {
-              const seasonData = seasonDoc.data();
-              if (seasonData.rankingCriteria && seasonData.rankingCriteria.length > 0) {
-                setRankingCriteria(seasonData.rankingCriteria);
-              }
-              if (seasonData.teams && Array.isArray(seasonData.teams)) {
-                seasonTeams = seasonData.teams;
-                // Nur aktive Teams berücksichtigen
-                activeTeamIds = seasonTeams
-                  .filter(t => t.status === 'active')
-                  .map(t => {
-                    // Unterstütze sowohl {id, name} als auch {teamId, name} Format
-                    return t.id || t.teamId;
-                  })
-                  .filter(Boolean);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Fehler beim Laden der Saison-Daten:', error);
-        }
-      }
+      setLoading(true);
 
-      // Teams laden
+      // 0. Saison-Metadaten laden (für What-If Button Sichtbarkeit)
+      const seasonMeta = await seasonApiService.getSeasonByIdPublic(seasonId);
+      setSeasonMetadata(seasonMeta);
+
+      // 1. Berechnete und sortierte Tabelle vom Backend laden
+      const fetchedTable = await seasonApiService.getTablePublic(seasonId, isSimulated);
+
+      // 2. Teams laden, um Logos und Details zu ergänzen
       const teamsSnap = await getDocs(collection(db, 'teams'));
-      let teams = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const teamsMap = {};
+      teamsSnap.docs.forEach(doc => {
+        teamsMap[doc.id] = doc.data();
+      });
 
-      // Nur aktive Teams anzeigen, die für die Saison registriert sind
-      if (seasonId && activeTeamIds.length > 0) {
-        teams = teams.filter(team => activeTeamIds.includes(team.id));
-      } else if (seasonId && seasonTeams.length > 0) {
-        // Fallback: Falls keine Status-Informationen vorhanden, alle Teams der Saison anzeigen
-        const allTeamIds = seasonTeams.map(t => t.id || t.teamId).filter(Boolean);
-        teams = teams.filter(team => allTeamIds.includes(team.id));
-      }
-
-      // Ergebnisse für die aktuelle Saison laden
-      let resultsQuery = collection(db, 'results');
-      if (seasonId) {
-        resultsQuery = query(collection(db, 'results'), where('seasonId', '==', seasonId));
-      }
-      const resultsSnap = await getDocs(resultsQuery);
-      let results = resultsSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(result => result.status === 'confirmed' && result.isValid !== false); // Nur bestätigte und gültige Ergebnisse
-
-      // Freundschaftsspiele nicht in die Wertung aufnehmen:
-      // Wenn ein Ergebnis an eine Buchung gekoppelt ist und diese Buchung als "friendly" markiert ist,
-      // wird dieses Ergebnis für die Tabelle ignoriert.
-      if (seasonId) {
-        try {
-          const seasonBookings = await bookingApiService.getPublicBookingsForSeason(seasonId);
-          const friendlyBookingIds = new Set(
-            (seasonBookings || [])
-              .filter(b => b.friendly)
-              .map(b => b.id)
-          );
-
-          results = results.filter(result => {
-            if (!result.bookingId) {
-              // Freie Ergebnisse (ohne Buchung) zählen weiter für die Tabelle
-              return true;
-            }
-            return !friendlyBookingIds.has(result.bookingId);
-          });
-        } catch (error) {
-          console.error('Fehler beim Laden der Buchungen für Freundschaftsspiel-Filter:', error);
-          // Fallback: Wenn die Buchungen nicht geladen werden können, lieber alle Ergebnisse zählen,
-          // damit die Tabelle nicht leer ist.
-        }
-      }
-
-      // Tabellendaten berechnen
-      const teamStats = {};
-
-      // Initialisiere nur die Teams, die für die Saison registriert sind
-      teams.forEach(team => {
-        teamStats[team.id] = {
-          teamId: team.id,
-          name: team.name,
-          logoColor: team.logoColor || '#666666',
-          logoUrl: team.logoUrl, // Logo-URL hinzufügen
-          logoUrlLight: team.logoUrlLight,
-          description: team.description,
-          foundedYear: team.foundedYear,
-          played: 0,
-          won: 0,
-          drawn: 0,
-          lost: 0,
-          goalsFor: 0,
-          goalsAgainst: 0,
-          points: 0,
-          form: []
+      // 3. Daten mergen
+      const enrichedTable = fetchedTable.map(row => {
+        const teamInfo = teamsMap[row.teamId] || {};
+        return {
+          ...row,
+          logoUrl: teamInfo.logoUrl,
+          logoUrlLight: teamInfo.logoUrlLight,
+          logoColor: teamInfo.logoColor || '#666666',
         };
       });
 
-      // Verarbeite Ergebnisse
-      results.forEach(result => {
-        const homeTeam = teamStats[result.homeTeamId];
-        const awayTeam = teamStats[result.awayTeamId];
-
-        if (homeTeam && awayTeam) {
-          // Spiele erhöhen
-          homeTeam.played++;
-          awayTeam.played++;
-
-          // Tore hinzufügen
-          homeTeam.goalsFor += result.homeScore;
-          homeTeam.goalsAgainst += result.awayScore;
-          awayTeam.goalsFor += result.awayScore;
-          awayTeam.goalsAgainst += result.homeScore;
-
-          // Ergebnis bestimmen
-          if (result.homeScore > result.awayScore) {
-            // Heim-Sieg
-            homeTeam.won++;
-            homeTeam.points += 2; // 2 Punkte für Sieg
-            homeTeam.form.push('S');
-            awayTeam.lost++;
-            awayTeam.form.push('N');
-          } else if (result.homeScore < result.awayScore) {
-            // Auswärts-Sieg
-            awayTeam.won++;
-            awayTeam.points += 2; // 2 Punkte für Sieg
-            awayTeam.form.push('S');
-            homeTeam.lost++;
-            homeTeam.form.push('N');
-          } else {
-            // Unentschieden
-            homeTeam.drawn++;
-            homeTeam.points += 1; // 1 Punkt für Unentschieden
-            homeTeam.form.push('U');
-            awayTeam.drawn++;
-            awayTeam.points += 1; // 1 Punkt für Unentschieden
-            awayTeam.form.push('U');
-          }
-        }
-      });
-
-      // In Array umwandeln und sortieren
-      const sortedTeams = Object.values(teamStats)
-        .sort((a, b) => {
-          for (const criteria of rankingCriteria) {
-            let comparison = 0;
-            switch (criteria) {
-              case 'points':
-                comparison = b.points - a.points;
-                break;
-              case 'goalDifference':
-                comparison = (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
-                break;
-              case 'goalsScored':
-                comparison = b.goalsFor - a.goalsFor;
-                break;
-              case 'headToHead':
-                // H2H is complex, fallback to name for stability if other criteria are equal
-                comparison = 0;
-                break;
-              default:
-                comparison = 0;
-            }
-            if (comparison !== 0) return comparison;
-          }
-          // Alphabetisch nach Namen als letzter Fallback
-          return a.name.localeCompare(b.name);
-        })
-        .map((team, index) => ({
-          rank: index + 1,
-          ...team,
-          goalDifference: team.goalsFor - team.goalsAgainst
-        }));
-
-      setTableData(sortedTeams);
+      setTableData(enrichedTable);
     } catch (error) {
       console.error('Fehler beim Laden der Tabellendaten:', error);
     } finally {
       setLoading(false);
     }
-  }, [seasonId, rankingCriteria]);
+  }, [seasonId, isSimulated]);
 
   useEffect(() => {
     loadTableData();
@@ -410,6 +254,9 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
     );
   }
 
+  // Check ob Button angezeigt werden soll: Saison muss aktiv sein und noch nicht abgerechnet UND Simulation explizit erlaubt
+  const showWhatIf = enableSimulation && seasonMetadata && seasonMetadata.status === 'active' && !seasonMetadata.evaluated;
+
   return (
     <Wrapper {...wrapperProps}>
       <Typography
@@ -427,6 +274,26 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
       >
         {title}
       </Typography>
+
+      {showWhatIf && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isSimulated}
+                onChange={(e) => setIsSimulated(e.target.checked)}
+                color="primary"
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}>
+                What if?
+              </Typography>
+            }
+          />
+        </Box>
+      )}
+
       <TableContainer
         component={Paper}
         sx={{

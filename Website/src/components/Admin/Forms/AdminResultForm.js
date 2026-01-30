@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, FormControl, InputLabel, Select, MenuItem, Divider, useTheme, Typography, useMediaQuery } from '@mui/material';
 
-const AdminResultForm = ({ initialData, teams, pitches, results = [], bookings = [], season, onSubmit, onCancel, onEdit, mode = 'create' }) => {
+const AdminResultForm = ({ initialData, teams, pitches, results = [], bookings = [], season, onSubmit, mode = 'create' }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const isReadOnly = mode === 'view';
@@ -152,7 +152,7 @@ const AdminResultForm = ({ initialData, teams, pitches, results = [], bookings =
     };
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form id="admin-result-form" onSubmit={handleSubmit}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
                 {/* Termin & Ort */}
@@ -342,34 +342,11 @@ const AdminResultForm = ({ initialData, teams, pitches, results = [], bookings =
                     </Box>
                 )}
 
-                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1 }}>
-                    <Button variant="outlined" onClick={onCancel} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
-                        Abbrechen
-                    </Button>
 
-                    {mode === 'view' && onEdit && (
-                        <Button
-                            variant="contained"
-                            onClick={onEdit}
-                            sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
-                        >
-                            Bearbeiten
-                        </Button>
-                    )}
-
-                    {mode !== 'view' && (
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
-                        >
-                            Speichern
-                        </Button>
-                    )}
-                </Box>
             </Box>
         </form>
     );
 };
+
 
 export default AdminResultForm;

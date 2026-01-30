@@ -102,11 +102,21 @@ const GameDetailsModal = ({ open, onClose, fixture, teams, pitches, handleReport
 
     // Determine Location and Google Maps Link
     let locationName = fixture?.location || 'Unbekannt';
-    if (!fixture?.location && fixture?.pitchId && pitches) {
+    let mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName + ' Freiburg')}`;
+
+    if (fixture?.pitchId && pitches) {
         const pitch = pitches.find(p => p.id === fixture.pitchId);
-        if (pitch) locationName = pitch.name;
+        if (pitch) {
+            locationName = pitch.name;
+            if (pitch.mapUrl) {
+                mapsLink = pitch.mapUrl;
+            } else if (pitch.address) {
+                mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pitch.address)}`;
+            } else {
+                mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pitch.name + ' Freiburg')}`;
+            }
+        }
     }
-    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName + ' Freiburg')}`;
 
     useEffect(() => {
         if (open && fixture?.homeTeamId && fixture?.awayTeamId) {

@@ -34,6 +34,7 @@ const BookingOverview = () => {
   const [submitting, setSubmitting] = useState(false);
   const [isFriendlyGame, setIsFriendlyGame] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFreeOnly, setShowFreeOnly] = useState(true);
 
   const inputStyle = {
     '& label.Mui-focused': { color: theme.palette.primary.main },
@@ -236,8 +237,13 @@ const BookingOverview = () => {
   const upcomingBookings = (data.bookings || []).filter((booking) => {
     try {
       const bookingDate = new Date(booking.date);
-      // Check if pitch is in the loaded (official) pitches list
-      const isOfficialPitch = data.pitches?.some(p => p.id === booking.pitchId);
+      // Check if pitch is in the loaded (official) pitches list AND is verified
+      const isOfficialPitch = data.pitches?.some(p => p.id === booking.pitchId && p.isVerified);
+
+      const isAvailable = booking.status === 'available' || (booking.isAvailable === true && !booking.homeTeamId && !booking.awayTeamId);
+
+      if (showFreeOnly && !isAvailable) return false;
+
       return bookingDate >= now && isOfficialPitch;
     } catch {
       return false;
@@ -296,7 +302,7 @@ const BookingOverview = () => {
         Spielplan & Reservierung
       </Typography>
 
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         <TextField
           fullWidth
           variant="outlined"
@@ -318,6 +324,21 @@ const BookingOverview = () => {
             ),
           }}
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={showFreeOnly}
+              onChange={(e) => setShowFreeOnly(e.target.checked)}
+              sx={{
+                color: theme.palette.primary.main,
+                '&.Mui-checked': {
+                  color: theme.palette.primary.main,
+                },
+              }}
+            />
+          }
+          label={<Typography sx={{ fontFamily: 'Comfortaa', color: theme.palette.text.primary, fontSize: '0.8rem' }}>Freie Slots</Typography>}
+        />
       </Box>
 
       {sortedPitchIds.length === 0 ? (
@@ -334,7 +355,7 @@ const BookingOverview = () => {
 
             return (
               <Box key={pitchId} sx={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
-                <Accordion defaultExpanded={false} sx={{ width: '100%' }}>
+                <Accordion defaultExpanded={!!searchTerm} key={pitchId + (searchTerm ? '-expanded' : '')} sx={{ width: '100%' }}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: theme.palette.background.paper, borderBottom: `1px solid ${theme.palette.divider}` }}>
                     <Typography variant="h6" sx={{ color: theme.palette.primary.main, fontWeight: 700, fontFamily: 'comfortaa', textTransform: 'uppercase' }}>
                       {pitchName}

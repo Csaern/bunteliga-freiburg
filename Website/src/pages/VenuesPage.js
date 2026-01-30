@@ -123,7 +123,8 @@ const VenuesPage = () => {
           getPublicPitches(),
           websiteApi.getSettings('about-us')
         ]);
-        setVenues(venuesData);
+        // Filter out unverified/team-owned pitches for this public display
+        setVenues(venuesData.filter(v => v.isVerified));
         if (aboutUsData && Array.isArray(aboutUsData.sections)) {
           setAboutUsSections(aboutUsData.sections);
         }

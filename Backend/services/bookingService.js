@@ -625,9 +625,35 @@ class BookingService {
     }
 
     /**
+     * NEU: Prüft, ob ein Datum innerhalb der Saison liegt.
+     * @private
+     */
+    static async _validateSeasonDate(seasonId, date) {
+        const seasonDoc = await seasonsCollection.doc(seasonId).get();
+        if (!seasonDoc.exists) throw new Error('Saison nicht gefunden.');
+        const season = seasonDoc.data();
+
+        if (!season.startDate || !season.endDate) return;
+
+        const startMillis = getMillisFromDate(season.startDate);
+        // Ende des Tages für das Enddatum (inklusiv)
+        const endMillis = getMillisFromDate(season.endDate) + (24 * 60 * 60 * 1000) - 1;
+        const dateMillis = getMillisFromDate(date);
+
+        if (dateMillis < startMillis || dateMillis > endMillis) {
+            const sStart = new Date(startMillis).toLocaleDateString('de-DE');
+            const sEnd = new Date(endMillis).toLocaleDateString('de-DE');
+            throw new Error(`Das Datum liegt außerhalb der Saisonlaufzeit (${sStart} - ${sEnd}).`);
+        }
+    }
+
+    /**
      * Admin erstellt eine einzelne, spezifische Buchung.
      */
     static async adminCreateBooking(bookingData, user) {
+        // 0. Saison-Zeitraum validieren
+        await BookingService._validateSeasonDate(bookingData.seasonId, bookingData.date);
+
         // 1. Kollisionsprüfung für den Zeitslot
         const collisionCheck = await BookingService.checkSingleSlot({
             ...bookingData,
@@ -660,6 +686,7 @@ class BookingService {
         };
         const docRef = await bookingsCollection.add(newBooking);
 
+        console.log(`[adminCreateBooking] Success: Booking ${docRef.id} created by Admin ${user.uid} (Pitch: ${bookingData.pitchId}, Date: ${bookingData.date})`);
         return { id: docRef.id, ...newBooking };
     }
 
@@ -888,6 +915,14 @@ class BookingService {
 
     static async bulkCreateAvailableSlots(data, user) {
         const { seasonId, slotsToCreate } = data;
+
+        // 0. Saison-Daten für Validierung laden
+        const seasonDoc = await seasonsCollection.doc(seasonId).get();
+        if (!seasonDoc.exists) throw new Error('Saison nicht gefunden.');
+        const season = seasonDoc.data();
+        const sStart = getMillisFromDate(season.startDate);
+        const sEnd = getMillisFromDate(season.endDate) + (24 * 60 * 60 * 1000) - 1;
+
         const batch = db.batch();
 
         // Use a set to track unique keys for syncing (PitchId + Date)
@@ -926,6 +961,14 @@ class BookingService {
             }
 
             const firestoreDate = admin.firestore.Timestamp.fromDate(dateObj);
+
+            // NEU: Prüfung gegen Saisonlaufzeit
+            if (season.startDate && season.endDate) {
+                const dMillis = dateObj.getTime();
+                if (dMillis < sStart || dMillis > sEnd) {
+                    throw new Error(`Das Datum ${dateObj.toLocaleDateString('de-DE')} liegt außerhalb der Saisonlaufzeit.`);
+                }
+            }
 
             const newBooking = {
                 seasonId,
@@ -1027,14 +1070,24 @@ class BookingService {
             try {
                 const homeTeamDoc = await teamsCollection.doc(homeTeamId).get();
                 const homeTeamName = homeTeamDoc.exists ? homeTeamDoc.data().name : 'Ein Team';
-                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                // Fetch Pitch Name
+                let pitchName = 'Unbekannter Platz';
+                if (bookingData.pitchId) {
+                    const pDoc = await pitchesCollection.doc(bookingData.pitchId).get();
+                    if (pDoc.exists) pitchName = pDoc.data().name;
+                }
+
+                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateStr = dateObj.toLocaleDateString('de-DE');
+                const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
                 await notificationService.notifyTeam(
                     awayTeamId,
                     'new_booking_request',
                     'Neue Spielanfrage',
-                    `${homeTeamName} möchte am ${dateStr} gegen euch spielen.`,
-                    { bookingId, homeTeamId, homeTeamName, date: bookingData.date }
+                    `${homeTeamName} möchte am ${dateStr} um ${timeStr} Uhr gegen euch spielen (@ ${pitchName}).`,
+                    { bookingId, homeTeamId, homeTeamName, date: bookingData.date, pitchName, time: timeStr }
                 );
             } catch (e) {
                 console.error('Error sending notification for booking request:', e);
@@ -1044,6 +1097,7 @@ class BookingService {
         // 4. NEU: Automatische Synchronisierung der freien Slots
         await BookingService._syncPitchWeeklySlots(bookingData.pitchId, bookingData.date);
 
+        console.log(`[requestBookingSlot] Success: Booking ${bookingId} requested by ${requestingUserId} (Home: ${homeTeamId}, Away: ${awayTeamId})`);
         return { message: 'Buchung erfolgreich angefragt.' };
     }
 
@@ -1100,14 +1154,24 @@ class BookingService {
             try {
                 const awayTeamDoc = await teamsCollection.doc(bookingData.awayTeamId).get();
                 const awayTeamName = awayTeamDoc.exists ? awayTeamDoc.data().name : 'Das Auswärtsteam';
-                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                // Fetch Pitch Name
+                let pitchName = 'Unbekannter Platz';
+                if (bookingData.pitchId) {
+                    const pDoc = await pitchesCollection.doc(bookingData.pitchId).get();
+                    if (pDoc.exists) pitchName = pDoc.data().name;
+                }
+
+                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateStr = dateObj.toLocaleDateString('de-DE');
+                const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
                 await notificationService.notifyTeam(
                     bookingData.homeTeamId,
                     'booking_confirmed',
                     'Spiel bestätigt',
-                    `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} angenommen.`,
-                    { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date }
+                    `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} um ${timeStr} Uhr angenommen.`,
+                    { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date, pitchName, time: timeStr }
                 );
             } catch (e) {
                 console.error('Error sending notification for booking confirmation:', e);
@@ -1121,7 +1185,43 @@ class BookingService {
 
         if (action === 'deny') {
             // NEU: Wenn es eine individuelle Buchung ist, wird sie gelöscht.
+            // NEU: Wenn es eine individuelle Buchung ist, wird sie gelöscht.
             if (bookingData.isCustom) {
+                // Vor dem Löschen benachrichtigen!
+                try {
+                    const awayTeamDoc = await teamsCollection.doc(bookingData.awayTeamId).get();
+                    const awayTeamName = awayTeamDoc.exists ? awayTeamDoc.data().name : 'Das Auswärtsteam';
+
+                    let pitchName = 'Unbekannter Platz';
+                    if (bookingData.pitchId) {
+                        const pDoc = await pitchesCollection.doc(bookingData.pitchId).get();
+                        if (pDoc.exists) pitchName = pDoc.data().name;
+                    }
+
+                    const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                    const dateStr = dateObj.toLocaleDateString('de-DE');
+                    // time is stored as string in custom bookings usually, or we formatting it from date
+                    const timeStr = bookingData.time || dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+                    await notificationService.notifyTeam(
+                        bookingData.homeTeamId,
+                        'booking_denied',
+                        'Anfrage abgelehnt',
+                        `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} abgelehnt.`,
+                        {
+                            bookingId,
+                            awayTeamId: bookingData.awayTeamId,
+                            awayTeamName,
+                            date: bookingData.date,
+                            reason,
+                            pitchName,
+                            time: timeStr
+                        }
+                    );
+                } catch (e) {
+                    console.error('[respondToBookingRequest] Notification error (custom deny):', e);
+                }
+
                 await bookingRef.delete();
                 return { message: 'Anfrage abgelehnt. Die individuelle Buchung wurde gelöscht.' };
             }
@@ -1141,14 +1241,24 @@ class BookingService {
             try {
                 const awayTeamDoc = await teamsCollection.doc(bookingData.awayTeamId).get();
                 const awayTeamName = awayTeamDoc.exists ? awayTeamDoc.data().name : 'Das Auswärtsteam';
-                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                // Fetch Pitch Name
+                let pitchName = 'Unbekannter Platz';
+                if (bookingData.pitchId) {
+                    const pDoc = await pitchesCollection.doc(bookingData.pitchId).get();
+                    if (pDoc.exists) pitchName = pDoc.data().name;
+                }
+
+                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateStr = dateObj.toLocaleDateString('de-DE');
+                const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
                 await notificationService.notifyTeam(
                     bookingData.homeTeamId,
                     'booking_denied',
                     'Anfrage abgelehnt',
                     `${awayTeamName} hat die Anfrage für das Spiel am ${dateStr} abgelehnt.`,
-                    { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date, reason }
+                    { bookingId, awayTeamId: bookingData.awayTeamId, awayTeamName, date: bookingData.date, reason, pitchName, time: timeStr }
                 );
             } catch (e) {
                 console.error('Error sending notification for booking denial:', e);
@@ -1186,7 +1296,45 @@ class BookingService {
         }
 
         // NEU: Wenn es eine individuelle Buchung ist, wird sie gelöscht.
+        // NEU: Wenn es eine individuelle Buchung ist, wird sie gelöscht.
         if (bookingData.isCustom) {
+            // Benachrichtigung vor dem Löschen
+            const opponentTeamId = bookingData.homeTeamId === cancellingTeamId ? bookingData.awayTeamId : bookingData.homeTeamId;
+            if (opponentTeamId) {
+                try {
+                    const cancellingTeamDoc = await teamsCollection.doc(cancellingTeamId).get();
+                    const cancellingTeamName = cancellingTeamDoc.exists ? cancellingTeamDoc.data().name : 'Ein Team';
+
+                    let pitchName = 'Unbekannter Platz';
+                    if (bookingData.pitchId) {
+                        const pDoc = await pitchesCollection.doc(bookingData.pitchId).get();
+                        if (pDoc.exists) pitchName = pDoc.data().name;
+                    }
+
+                    const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                    const dateStr = dateObj.toLocaleDateString('de-DE');
+                    const timeStr = bookingData.time || dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+                    await notificationService.notifyTeam(
+                        opponentTeamId,
+                        'booking_cancelled', // Or create a new type if 'withdrawn' needs different text, but cancelled is fine
+                        'Spiel abgesagt',
+                        `${cancellingTeamName} hat das Spiel am ${dateStr} um ${timeStr} Uhr abgesagt.`,
+                        {
+                            bookingId,
+                            cancellingTeamId,
+                            cancellingTeamName,
+                            date: bookingData.date,
+                            reason,
+                            pitchName,
+                            time: timeStr
+                        }
+                    );
+                } catch (e) {
+                    console.error('[initiateCancellation] Notification error (custom cancel):', e);
+                }
+            }
+
             await bookingRef.delete();
             return { message: 'Spiel abgesagt. Die individuelle Buchung wurde gelöscht.' };
         }
@@ -1216,14 +1364,24 @@ class BookingService {
             try {
                 const cancellingTeamDoc = await teamsCollection.doc(cancellingTeamId).get();
                 const cancellingTeamName = cancellingTeamDoc.exists ? cancellingTeamDoc.data().name : 'Ein Team';
-                const dateStr = bookingData.date.toDate ? bookingData.date.toDate().toLocaleDateString('de-DE') : new Date(bookingData.date).toLocaleDateString('de-DE');
+
+                // Fetch Pitch Name
+                let pitchName = 'Unbekannter Platz';
+                if (bookingData.pitchId) {
+                    const pDoc = await pitchesCollection.doc(bookingData.pitchId).get();
+                    if (pDoc.exists) pitchName = pDoc.data().name;
+                }
+
+                const dateObj = bookingData.date.toDate ? bookingData.date.toDate() : new Date(bookingData.date);
+                const dateStr = dateObj.toLocaleDateString('de-DE');
+                const timeStr = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
                 await notificationService.notifyTeam(
                     opponentTeamId,
                     'booking_cancelled',
                     'Spiel abgesagt',
-                    `${cancellingTeamName} hat das Spiel am ${dateStr} abgesagt.`,
-                    { bookingId, cancellingTeamId, cancellingTeamName, date: bookingData.date, reason }
+                    `${cancellingTeamName} hat das Spiel am ${dateStr} um ${timeStr} Uhr abgesagt.`,
+                    { bookingId, cancellingTeamId, cancellingTeamName, date: bookingData.date, reason, pitchName, time: timeStr }
                 );
             } catch (e) {
                 console.error('Error sending notification for booking cancellation:', e);
@@ -1421,6 +1579,17 @@ class BookingService {
             throw new Error('Buchungen sind in dieser Saison nicht (mehr) möglich.');
         }
 
+        // NEU: Datum prüfen
+        const season = seasonDoc.data();
+        if (season.startDate && season.endDate) {
+            const sStart = getMillisFromDate(season.startDate);
+            const sEnd = getMillisFromDate(season.endDate) + (24 * 60 * 60 * 1000) - 1;
+            const bDate = new Date(date).getTime();
+            if (bDate < sStart || bDate > sEnd) {
+                throw new Error('Das Datum liegt außerhalb der Saisonlaufzeit.');
+            }
+        }
+
         const newBookingData = {
             ...bookingData,
             date: new Date(date), // Convert string to Date object
@@ -1436,11 +1605,53 @@ class BookingService {
         const firestoreObject = newBooking.toFirestoreObject();
         firestoreObject.createdAt = admin.firestore.FieldValue.serverTimestamp();
 
+        // FIX: Manuell hinzufügen, da das Booking-Model diese Felder (noch) nicht unterstützt
+        if (newBookingData.requestedAt) firestoreObject.requestedAt = newBookingData.requestedAt;
+        if (newBookingData.requestedBy) firestoreObject.requestedBy = newBookingData.requestedBy;
+
         const docRef = await bookingsCollection.add(firestoreObject);
 
         // 3. NEU: Automatische Synchronisierung der freien Slots
         await BookingService._syncPitchWeeklySlots(pitchId, date);
 
+        // 4. NEU: Benachrichtigung an den Gegner (falls vorhanden)
+        if (awayTeamId) {
+            try {
+                // Fetch Names
+                const [homeTeamDoc, awayTeamDoc] = await Promise.all([
+                    teamsCollection.doc(homeTeamId).get(),
+                    teamsCollection.doc(awayTeamId).get()
+                ]);
+                const homeTeamName = homeTeamDoc.exists ? homeTeamDoc.data().name : 'Heimteam';
+                const awayTeamName = awayTeamDoc.exists ? awayTeamDoc.data().name : 'Auswärtsteam';
+                const pitchName = pitch.name || 'Unbekannter Platz';
+
+                // Format Date/Time
+                const dateObj = new Date(date);
+                const dateStr = dateObj.toLocaleDateString('de-DE');
+                // time ist hier ein String "HH:mm" aus dem Input
+
+                await notificationService.notifyTeam(
+                    awayTeamId,
+                    'new_booking_request',
+                    'Neue Spielanfrage',
+                    `${homeTeamName} möchte ein Spiel gegen euch bestreiten.`,
+                    {
+                        bookingId: docRef.id,
+                        homeTeamId,
+                        homeTeamName,
+                        awayTeamName,
+                        date: dateObj,
+                        time: time,
+                        pitchName
+                    }
+                );
+            } catch (e) {
+                console.error('[createCustomBooking] Notification error:', e);
+            }
+        }
+
+        console.log(`[createCustomBooking] Success: Custom booking ${docRef.id} created by ${user.uid} (Home: ${homeTeamId}, Away: ${awayTeamId}, Date: ${date})`);
         return { id: docRef.id, ...firestoreObject };
     }
 

@@ -69,7 +69,7 @@ async function reportResult(bookingId, resultData) {
         'result_reported',
         'Ergebnis eingetragen',
         `${reportingTeamName} hat ein Ergebnis (${result.homeScore}:${result.awayScore}) für das Spiel ${matchPairing} gemeldet. Bitte bestätigen.`,
-        { resultId: result.id, bookingId, homeScore: result.homeScore, awayScore: result.awayScore }
+        { resultId: result.id, bookingId, homeScore: result.homeScore, awayScore: result.awayScore, homeTeamName: result.homeTeamName, awayTeamName: result.awayTeamName, bookingDate: result.date }
       );
     } catch (e) {
       console.error('Error sending result reported notification:', e);
@@ -146,7 +146,7 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
           'result_rejected',
           'Ergebnis abgelehnt',
           `${actingTeamName} hat das Ergebnis für das Spiel ${matchPairing} abgelehnt.`,
-          { resultId, actingTeamId, actingTeamName }
+          { resultId, actingTeamId, actingTeamName, homeTeamName: data.homeTeamName, awayTeamName: data.awayTeamName }
         );
       } catch (e) {
         console.error('Error sending result rejected notification:', e);
@@ -175,7 +175,7 @@ async function handleResultAction(resultId, actingTeamId, actingUserId, action, 
         'result_confirmed',
         'Ergebnis bestätigt',
         `${actingTeamName} hat das Ergebnis (${data.homeScore}:${data.awayScore}) für das Spiel ${matchPairing} bestätigt.`,
-        { resultId, actingTeamId, actingTeamName, homeScore: data.homeScore, awayScore: data.awayScore }
+        { resultId, actingTeamId, actingTeamName, homeScore: data.homeScore, awayScore: data.awayScore, homeTeamName: data.homeTeamName, awayTeamName: data.awayTeamName }
       );
     } catch (e) {
       console.error('Error sending result confirmed notification:', e);

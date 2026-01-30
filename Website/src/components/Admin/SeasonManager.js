@@ -211,7 +211,10 @@ const SeasonManager = () => {
                         }
                     });
 
-                    const minGames = Math.ceil(activeTeams.length / 2);
+                    const isDoubleRound = season.playMode === 'double_round_robin';
+                    const multiplier = isDoubleRound ? 2 : 1;
+                    const maxGamesPerTeam = Math.max(0, (activeTeams.length - 1) * multiplier);
+                    const minGames = Math.floor(maxGamesPerTeam / 2);
                     const teamsBelowMin = activeTeams
                         .filter(team => gamesPerTeam[team.id] < minGames)
                         .map(team => ({
@@ -481,9 +484,9 @@ const SeasonManager = () => {
                                             onChange={handleFormChange}
                                             MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}
                                         >
-                                            <MenuItem value="points">Punkte</MenuItem>
                                             <MenuItem value="goalDifference">Tordifferenz</MenuItem>
                                             <MenuItem value="goalsScored">Erzielte Tore</MenuItem>
+                                            <MenuItem value="gamesPlayed">Gespielte Spiele</MenuItem>
                                             <MenuItem value="headToHead">Direkter Vergleich</MenuItem>
                                         </Select>
                                     </FormControl>

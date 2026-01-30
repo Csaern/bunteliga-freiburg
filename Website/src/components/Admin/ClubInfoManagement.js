@@ -245,7 +245,7 @@ const ClubInfoManagement = () => {
                     <Grid item xs={12} sm={4}>
                         <TextField
                             fullWidth
-                            label="Bankname"
+                            label="Kontoinhaber"
                             variant="outlined"
                             value={formData.bankDetails.name}
                             onChange={(e) => handleChange('bankDetails', 'name', e.target.value)}

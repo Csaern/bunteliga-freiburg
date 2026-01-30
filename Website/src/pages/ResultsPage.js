@@ -110,6 +110,7 @@ const ResultsPage = () => {
           title={`Liga-Tabelle`}
           form={true}
           seasonId={selectedSeasonId}
+          enableSimulation={true}
         />
       </Box>
 
