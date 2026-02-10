@@ -217,7 +217,7 @@ const AdminBookingForm = ({
                         onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
                         MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}
                     >
-                        <MenuItem value={90}>90 Minuten</MenuItem>
+                        <MenuItem value={105}>105 Minuten</MenuItem>
                         <MenuItem value={120}>120 Minuten</MenuItem>
                     </Select>
                 </FormControl>

@@ -654,7 +654,7 @@ const BookingManager = ({ currentSeason }) => {
                                                     onChange={(e) => setBulkFormData({ ...bulkFormData, timeInterval: parseInt(e.target.value) })}
                                                     MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, ...scrollbarStyle } } }}
                                                 >
-                                                    <MenuItem value={90}>90 Minuten</MenuItem>
+                                                    <MenuItem value={105}>105 Minuten</MenuItem>
                                                     <MenuItem value={120} disabled={!canSelect120}>
                                                         120 Minuten
                                                     </MenuItem>
