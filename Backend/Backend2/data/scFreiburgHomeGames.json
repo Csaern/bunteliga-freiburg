@@ -1,0 +1,90 @@
+{
+  "lastUpdated": "2026-03-22T08:23:21.487Z",
+  "games": [
+    {
+      "date": "2025-08-23",
+      "opponent": "FC Augsburg",
+      "datetime": "2025-08-23T15:30:00"
+    },
+    {
+      "date": "2025-09-13",
+      "opponent": "VfB Stuttgart",
+      "datetime": "2025-09-13T15:30:00"
+    },
+    {
+      "date": "2025-09-28",
+      "opponent": "TSG Hoffenheim",
+      "datetime": "2025-09-28T15:30:00"
+    },
+    {
+      "date": "2025-10-19",
+      "opponent": "Eintracht Frankfurt",
+      "datetime": "2025-10-19T15:30:00"
+    },
+    {
+      "date": "2025-11-09",
+      "opponent": "FC St. Pauli",
+      "datetime": "2025-11-09T15:30:00"
+    },
+    {
+      "date": "2025-11-30",
+      "opponent": "1. FSV Mainz 05",
+      "datetime": "2025-11-30T19:30:00"
+    },
+    {
+      "date": "2025-12-14",
+      "opponent": "Borussia Dortmund",
+      "datetime": "2025-12-14T15:30:00"
+    },
+    {
+      "date": "2026-01-10",
+      "opponent": "Hamburger SV",
+      "datetime": "2026-01-10T15:30:00"
+    },
+    {
+      "date": "2026-01-25",
+      "opponent": "1. FC Köln",
+      "datetime": "2026-01-25T17:30:00"
+    },
+    {
+      "date": "2026-02-07",
+      "opponent": "SV Werder Bremen",
+      "datetime": "2026-02-07T15:30:00"
+    },
+    {
+      "date": "2026-02-22",
+      "opponent": "Borussia Mönchengladbach",
+      "datetime": "2026-02-22T15:30:00"
+    },
+    {
+      "date": "2026-03-07",
+      "opponent": "Bayer 04 Leverkusen",
+      "datetime": "2026-03-07T15:30:00"
+    },
+    {
+      "date": "2026-03-15",
+      "opponent": "1. FC Union Berlin",
+      "datetime": "2026-03-15T17:30:00"
+    },
+    {
+      "date": "2026-04-04",
+      "opponent": "FC Bayern München",
+      "datetime": "2026-04-04T15:30:00"
+    },
+    {
+      "date": "2026-04-19",
+      "opponent": "1. FC Heidenheim 1846",
+      "datetime": "2026-04-19T15:30:00"
+    },
+    {
+      "date": "2026-05-02",
+      "opponent": "VfL Wolfsburg",
+      "datetime": "2026-05-02T15:30:00"
+    },
+    {
+      "date": "2026-05-16",
+      "opponent": "RB Leipzig",
+      "datetime": "2026-05-16T15:30:00"
+    }
+  ]
+}

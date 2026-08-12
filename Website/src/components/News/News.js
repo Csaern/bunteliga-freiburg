@@ -158,7 +158,7 @@ const NewsCarousel = () => {
   const isLastNews = activeIndex === newsData.length - 1;
 
   return (
-    <Container maxWidth="xl" sx={{ my: 2, px: { xs: 1, sm: 2 } }}>
+    <Container maxWidth="xl" sx={{ pt: { xs: 4, sm: 6 }, pb: 2, px: { xs: 1, sm: 2 } }}>
       <Typography
         variant={isMobile ? 'h4' : 'h3'}
         sx={{
@@ -186,9 +186,9 @@ const NewsCarousel = () => {
           },
 
           display: 'flex',
-          alignItems: 'stretch',
+          alignItems: 'flex-start',
           justifyContent: 'center',
-          minHeight: '220px',
+          minHeight: 'auto',
         }}
       >
         <NewsCard

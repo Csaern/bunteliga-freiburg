@@ -61,3 +61,11 @@ export const uploadTeamLogo = async (teamId, formData, type = 'dark') => {
 export const getTeamStats = async (teamId, seasonId) => {
   return publicApiClient(`/api/teams/${teamId}/stats/${seasonId}`, 'GET');
 };
+
+export const addCaptainToTeam = async (teamId, userId) => {
+  return apiClient(`/api/teams/${teamId}/captains`, 'POST', { userId });
+};
+
+export const removeCaptainFromTeam = async (teamId, userId) => {
+  return apiClient(`/api/teams/${teamId}/captains/${userId}`, 'DELETE');
+};

@@ -42,6 +42,7 @@ const replacePlaceholders = (text, season) => {
           case 'goalDifference': return 'Tordifferenz';
           case 'goalsScored': return 'erzielte Tore';
           case 'headToHead': return 'Direkter Vergleich';
+          case 'gamesPlayed': return 'gespielte Spiele';
           default: return c;
         }
       }).join(', ')

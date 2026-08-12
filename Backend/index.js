@@ -28,6 +28,10 @@ const newsRoutes = require('./routes/newsRoutes');
 const websiteRoutes = require('./routes/websiteRoutes');
 const systemRoutes = require('./routes/systemRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const historyRoutes = require('./routes/historyRoutes');
+const scFreiburgRoutes = require('./routes/scFreiburgRoutes');
+const matchRoutes = require('./routes/matchRoutes');
+const holidayRoutes = require('./routes/holidayRoutes');
 
 
 const db = getFirestore();
@@ -59,9 +63,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 // --- Routen-Definitionen ---
 
 // Öffentliche Routen
-app.get('/', (req, res) => {
-  res.send('Dein Node.js Server läuft!');
-});
+// Öffentliche Routen
+// app.get('/', (req, res) => {
+//   res.send('Dein Node.js Server läuft!');
+// });
 
 // Geschützte Routen hier einbinden
 // Alle Anfragen an '/api/seasons' werden an unseren neuen, sicheren Router weitergeleitet.
@@ -75,6 +80,21 @@ app.use('/api/news', newsRoutes); // NEU: News-Routen registrieren
 app.use('/api/website', websiteRoutes); // NEU: Website-Routen registrieren
 app.use('/api/system', systemRoutes); // NEU: System-Routen registrieren
 app.use('/api/notifications', notificationRoutes); // NEU: Benachrichtigungen registrieren
+app.use('/api/history', historyRoutes); // NEU: Historien-Statistiken registrieren
+app.use('/api/scfreiburg', scFreiburgRoutes); // NEU: SC Freiburg Heimspiele
+app.use('/api/matches', matchRoutes); // NEU: Isolierte Spielanfragen
+app.use('/api/holidays', holidayRoutes); // NEU: Feiertage & Schulferien BW
+
+// --- FRONTEND SERVING (Plesk Deployment) ---
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, 'public')));
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+// In Express 5, '*' is not supported as a path. Use implicit match or regex.
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 
 // 5. Den Server starten

@@ -133,7 +133,11 @@ async function sendEmailNotification(teamId, type, title, message, relatedData =
         const usersToNotify = [];
         usersSnapshot.forEach(doc => {
             const user = doc.data();
-            const prefs = user.emailNotifications || {};
+            // Check nested settings object first, fallback to root level
+            const prefs = (user.settings && user.settings.emailNotifications) 
+                ? user.settings.emailNotifications 
+                : (user.emailNotifications || {});
+                
             const isEnabled = (prefs[settingKey] !== false);
             if (user.email && isEnabled) {
                 usersToNotify.push(user.email);

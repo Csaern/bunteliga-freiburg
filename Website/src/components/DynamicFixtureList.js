@@ -61,7 +61,7 @@ const StyledTableCell = ({ children, sx, align, hideOnMobile, ...props }) => {
   );
 };
 
-const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId, maxWidth, disableContainer = false }) => {
+const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all', userTeamId, maxWidth, disableContainer = false, paginate = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { teamId, isAdmin } = useAuth();
@@ -77,6 +77,15 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [hoveredFixtureId, setHoveredFixtureId] = useState(null);
   const { lastGlobalUpdate } = useNotifications();
+  const [visibleDateRangeStart, setVisibleDateRangeStart] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  });
+  const [visibleLimit, setVisibleLimit] = useState(5);
+
+  const handleLoadMore = () => {
+    setVisibleLimit(prev => prev + 5);
+  };
 
   // Robust date normalization for Firestore Timestamp, {_seconds, _nanoseconds}, or ISO string
   // Firestore Timestamps werden als {_seconds, _nanoseconds} serialisiert, wenn sie über JSON gesendet werden
@@ -351,6 +360,14 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
         }));
       }
 
+      if (showType === 'all') {
+        allFixtures.sort((a, b) => {
+          const da = normalizeToDate(a.date);
+          const db = normalizeToDate(b.date);
+          return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+        });
+      }
+
       // 8. Limits
       if (!userTeamId) {
         if (showType === 'results') allFixtures = allFixtures.slice(0, 5);
@@ -385,7 +402,19 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     }
   }, [lastGlobalUpdate, loadFixtures, showType]);
 
+  const getMonthYear = (dateString) => {
+    if (!dateString) return 'Unbekannt';
+    const date = normalizeToDate(dateString);
+    if (!date || isNaN(date.getTime())) {
+      const parsed = new Date(dateString);
+      if (isNaN(parsed.getTime())) return 'Unbekannt';
+      return parsed.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    }
+    return date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  };
+
   const formatDate = (dateString) => {
+    const options = { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' };
     if (!dateString) return 'Datum unbekannt';
     const date = normalizeToDate(dateString);
     if (!date || isNaN(date.getTime())) {
@@ -394,9 +423,9 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       if (isNaN(parsed.getTime())) {
         return 'Datum unbekannt';
       }
-      return parsed.toLocaleDateString('de-DE');
+      return parsed.toLocaleDateString('de-DE', options).replace(',', '');
     }
-    return date.toLocaleDateString('de-DE');
+    return date.toLocaleDateString('de-DE', options).replace(',', '');
   };
 
   const getWeekday = (dateString) => {
@@ -479,7 +508,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     return (
       <Wrapper {...wrapperProps}>
         <Typography
-          variant={isMobile ? 'h4' : 'h3'}
+          variant={isMobile ? 'h6' : 'h5'}
           sx={{
             mb: isMobile ? 1.5 : 3,
             mt: 2,
@@ -500,12 +529,70 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
     );
   }
 
+  let actualVisibleStart = visibleDateRangeStart;
+  
+  if (showType === 'all') {
+      let tempFiltered = fixtures.filter(f => {
+          const d = normalizeToDate(f.date);
+          return !d || d.getTime() >= visibleDateRangeStart;
+      });
+      
+      if (tempFiltered.length < 5 && fixtures.length > 5) {
+          const firstId = tempFiltered.length > 0 ? tempFiltered[0].id : null;
+          let startIndex = fixtures.length;
+          if (firstId) {
+              startIndex = fixtures.findIndex(f => f.id === firstId);
+          }
+          const adjustedStartIndex = Math.max(0, Math.min(startIndex, fixtures.length - 5));
+          const earliestForcedGame = fixtures[adjustedStartIndex];
+          const earlyDate = normalizeToDate(earliestForcedGame.date);
+          if (earlyDate) {
+              actualVisibleStart = earlyDate.getTime();
+          }
+      } else if (fixtures.length <= 5 && fixtures.length > 0) {
+          const earlyDate = normalizeToDate(fixtures[0].date);
+          if (earlyDate) {
+              actualVisibleStart = earlyDate.getTime();
+          } else {
+              actualVisibleStart = 0;
+          }
+      }
+  }
+
+  const filteredFixtures = (() => {
+    let list = showType === 'all' ? fixtures.filter(f => {
+      const d = normalizeToDate(f.date);
+      return !d || d.getTime() >= actualVisibleStart;
+    }) : fixtures;
+
+    if (paginate) {
+      list = list.slice(0, visibleLimit);
+    }
+    return list;
+  })();
+
+  const hasEarlierGames = showType === 'all' && fixtures.some(f => {
+    const d = normalizeToDate(f.date);
+    return d && d.getTime() < actualVisibleStart;
+  });
+
+  const loadEarlierGames = () => {
+    const hiddenFixtures = fixtures.filter(f => {
+      const d = normalizeToDate(f.date);
+      return d && d.getTime() < actualVisibleStart;
+    });
+    if (hiddenFixtures.length > 0) {
+      const maxHiddenDate = new Date(Math.max(...hiddenFixtures.map(f => normalizeToDate(f.date).getTime())));
+      setVisibleDateRangeStart(new Date(maxHiddenDate.getFullYear(), maxHiddenDate.getMonth(), 1).getTime());
+    }
+  };
+
   // NEU: Empty State Handling
   if (fixtures.length === 0) {
     return (
       <Wrapper {...wrapperProps}>
         <Typography
-          variant={isMobile ? 'h6' : 'h4'}
+          variant={isMobile ? 'h6' : 'h5'}
           sx={{
             mb: isMobile ? 1.5 : 3,
             mt: 2,
@@ -534,7 +621,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
   return (
     <Wrapper {...wrapperProps}>
       <Typography
-        variant={isMobile ? 'h5' : 'h3'}
+        variant={isMobile ? 'h6' : 'h5'}
         sx={{
           mb: isMobile ? 1.5 : 3,
           mt: 2,
@@ -548,43 +635,68 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
       >
         {title}
       </Typography>
+
+      {hasEarlierGames && (
+        <Box 
+          onClick={loadEarlierGames}
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            mb: 1, 
+            cursor: 'pointer', 
+            '&:hover': { opacity: 0.7 } 
+          }}
+        >
+          <Typography 
+            color="primary" 
+            sx={{ 
+                fontFamily: 'Comfortaa', 
+                textTransform: 'none', 
+                fontWeight: 'bold',
+                fontSize: isMobile ? '0.8rem' : '0.9rem'
+            }}
+          >
+            ↑ frühere Spiele
+          </Typography>
+        </Box>
+      )}
+
       <TableContainer
         component={Paper}
         sx={{
           backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.divider}`,
+          border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.25)' : '1px solid rgba(0,0,0,0.2)',
           overflowX: 'auto',
         }}
       >
         <Table aria-label="Spielplan Tabelle" size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: theme.palette.action.hover, height: rowHeight / 1.5 }}>
-              {details && (
-                <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: isMobile ? '25%' : '12%' }}>
-                  {isMobile ? 'Datum/Zeit' : 'Datum'}
-                </StyledTableCell>
-              )}
-              {details && (
-                <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '11%' }} hideOnMobile={true}>
-                  Uhrzeit
-                </StyledTableCell>
-              )}
-              {details && (
-                <StyledTableCell sx={{ width: '2%', p: 0 }} hideOnMobile={true}></StyledTableCell>
-              )}
-
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Heim</StyledTableCell>
-              <StyledTableCell align="center" sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: '15%' }}></StyledTableCell>
-              <StyledTableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, width: details ? (isMobile ? '30%' : '25%') : '42.5%', textAlign: 'center' }}>Auswärts</StyledTableCell>
-
-            </TableRow>
-          </TableHead>
+          <colgroup>
+            {details && <col style={{ width: isMobile ? '25%' : '12%' }} />}
+            {details && !isMobile && <col style={{ width: '11%' }} />}
+            {details && !isMobile && <col style={{ width: '2%' }} />}
+            <col style={{ width: details ? (isMobile ? '30%' : '25%') : '42.5%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: details ? (isMobile ? '30%' : '25%') : '42.5%' }} />
+          </colgroup>
           <TableBody>
-            {fixtures.map((fixture) => {
+            {filteredFixtures.map((fixture, index) => {
+              const currentMonth = getMonthYear(fixture.date);
+              const previousMonth = index > 0 ? getMonthYear(filteredFixtures[index - 1].date) : null;
+              const showMonthHeader = currentMonth !== previousMonth && currentMonth !== 'Unbekannt';
+
               return (
 
                 <React.Fragment key={fixture.id}>
+                  {showMonthHeader && (
+                    <TableRow sx={{ backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+                      <TableCell colSpan={details ? (isMobile ? 4 : 6) : 3} sx={{ py: isMobile ? 0.5 : 1.5, px: 2, borderBottom: `2px solid ${theme.palette.primary.main}` }}>
+                        <Typography variant="subtitle2" sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold', color: theme.palette.primary.main, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {currentMonth}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
                   <TableRow
                     onClick={() => handleFixtureClick(fixture)}
                     onMouseEnter={() => setHoveredFixtureId(fixture.id)}
@@ -598,11 +710,11 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                     }}
                   >
                     {details && (
-                      <StyledTableCell sx={{ pl: isMobile ? 0.2 : 3, verticalAlign: 'middle', borderBottom: isMobile ? undefined : 'none' }}>
+                      <StyledTableCell sx={{ pl: isMobile ? 0.2 : 3, verticalAlign: 'middle', borderBottom: 'none' }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'center' : 'flex-start', textAlign: isMobile ? 'center' : 'left' }}>
                           {!isMobile && (
                             <React.Fragment>
-                              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: '1rem', fontWeight: 'bold', lineHeight: 1.2 }}>
+                              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: '0.9rem', fontWeight: 600, lineHeight: 1.2 }}>
                                 {formatDate(fixture.date)}
                               </Typography>
                             </React.Fragment>
@@ -610,7 +722,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
 
                           {isMobile && (
                             <React.Fragment>
-                              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: '0.75rem', fontWeight: 'bold', lineHeight: 1.2 }}>
+                              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontSize: '0.7rem', fontWeight: 600, lineHeight: 1.2 }}>
                                 {formatDate(fixture.date)}
                               </Typography>
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mt: 0.5 }}>
@@ -647,7 +759,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                       </StyledTableCell>
                     )}
 
-                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} sx={{}}>
+                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} sx={{ borderBottom: (isMobile && details) ? 'none' : undefined }}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
                         <Avatar
                           variant="rounded"
@@ -675,7 +787,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                         </Typography>
                       </Box>
                     </StyledTableCell>
-                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} align="center" sx={{ fontWeight: 'bold' }}>
+                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} align="center" sx={{ fontWeight: 'bold', borderBottom: (isMobile && details) ? 'none' : undefined }}>
                       {fixture.isPast ? (
                         <Chip
                           label={`${fixture.homeScore} : ${fixture.awayScore}`}
@@ -695,7 +807,7 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
                         <Typography variant="caption" sx={{ color: theme.palette.text.disabled, fontSize: isMobile ? '0.65rem' : 'inherit' }}>vs.</Typography>
                       )}
                     </StyledTableCell>
-                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} sx={{}}>
+                    <StyledTableCell rowSpan={(!isMobile && details) ? 2 : 1} sx={{ borderBottom: (isMobile && details) ? 'none' : undefined }}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', height: '100%' }}>
                         <Avatar
                           variant="rounded"
@@ -752,6 +864,33 @@ const DynamicFixtureList = ({ title, details = true, seasonId, showType = 'all',
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Pagination Load More Button */}
+      {paginate && fixtures.length > visibleLimit && (
+        <Box 
+          onClick={handleLoadMore}
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            mt: 2, 
+            mb: 1, 
+            cursor: 'pointer', 
+            '&:hover': { opacity: 0.7 } 
+          }}
+        >
+          <Typography 
+            color="primary" 
+            sx={{ 
+                fontFamily: 'Comfortaa', 
+                textTransform: 'none', 
+                fontWeight: 'bold',
+                fontSize: isMobile ? '0.8rem' : '0.9rem'
+            }}
+          >
+            ↓ {showType === 'upcoming' ? 'weitere Spiele' : 'vorherige Ergebnisse'}
+          </Typography>
+        </Box>
+      )}
 
       {/* Modal für Spiel-Details */}
       <GameDetailsModal

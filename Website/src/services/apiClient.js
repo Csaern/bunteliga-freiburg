@@ -3,7 +3,7 @@ import { auth } from '../firebase';
 // KORREKTUR: Wir exportieren die URL, damit sie in der ganzen App verfügbar ist.
 export const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:3001'
-    : `https://api.${window.location.hostname}`; // Automatisch für Subdomain-Deploys
+    : window.location.origin; // In Production (Plesk) ist Backend = Frontend (gleiche Domain)
 
 /**
  * Ein zentraler Client für alle JSON-API-Anfragen.

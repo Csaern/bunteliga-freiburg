@@ -413,7 +413,7 @@ const BookingOverview = () => {
                                     <Box sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                         <Box sx={{ textAlign: 'center', pr: 2 }}>
-                                          <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE')}</Typography>
+                                          <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{new Date(booking.date).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</Typography>
                                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                             <Typography sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: theme.palette.text.primary }}>{timeRange}</Typography>
                                             <Typography sx={{ color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', fontSize: '0.8rem', userSelect: 'none' }}>F</Typography>
@@ -464,7 +464,7 @@ const BookingOverview = () => {
                                 <StyledTableCell align="center">
                                   <Box sx={{ width: '10px', height: '10px', bgcolor: statusConfig.color, borderRadius: '50%', boxShadow: `0 0 8px ${statusConfig.color}` }} title={statusConfig.label} />
                                 </StyledTableCell>
-                                <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE')}</StyledTableCell>
+                                <StyledTableCell>{new Date(booking.date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</StyledTableCell>
                                 <StyledTableCell>
                                   {timeRange}
                                   <Typography component="span" sx={{ ml: 1, color: booking.friendly ? '#FFD700' : 'transparent', fontWeight: 'bold', userSelect: 'none' }}>F</Typography>

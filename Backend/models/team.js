@@ -53,8 +53,8 @@ class Team {
     };
 
     // 4. Strukturelle Eigenschaften hinzufügen
-    // Der Ersteller wird automatisch zum ersten Kapitän des Teams.
-    this.captainIds = [createdBy];
+    // Bei der Neuerstellung bleibt die Liste der Kapitäne zunächst leer.
+    this.captainIds = [];
   }
 
   /**

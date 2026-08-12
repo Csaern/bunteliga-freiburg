@@ -4,6 +4,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import AppModal from '../Modals/AppModal';
 import { StyledTableCell, filterData } from '../Helpers/tableUtils';
 import * as userApiService from '../../services/userApiService';
+import * as teamApiService from '../../services/teamApiService';
 
 const StatusIndicator = ({ isAdmin }) => {
     const theme = useTheme();
@@ -21,7 +22,7 @@ const StatusIndicator = ({ isAdmin }) => {
     );
 };
 
-const UserManager = ({ teams, getTeamName }) => {
+const UserManager = ({ teams, getTeamName, fetchData: fetchParentData }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -51,7 +52,7 @@ const UserManager = ({ teams, getTeamName }) => {
     const [modalMode, setModalMode] = useState('view');
     const [selectedUser, setSelectedUser] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [formData, setFormData] = useState({ email: '', password: '', teamId: '', isAdmin: false, displayName: '' });
+    const [formData, setFormData] = useState({ email: '', password: '', teamId: '', isAdmin: false, displayName: '', teamRole: 'player' });
     const [searchTerm, setSearchTerm] = useState('');
 
     const fetchData = async () => {
@@ -74,6 +75,8 @@ const UserManager = ({ teams, getTeamName }) => {
 
     useEffect(() => {
         if (selectedUser) {
+            const userTeam = teams.find(t => t.id === selectedUser.teamId);
+            const isCaptain = userTeam && userTeam.captainIds && userTeam.captainIds.includes(selectedUser.uid);
             setFormData({
                 email: selectedUser.email || '',
                 displayName: selectedUser.displayName || '',
@@ -81,13 +84,14 @@ const UserManager = ({ teams, getTeamName }) => {
                 teamId: selectedUser.teamId || '',
                 isAdmin: selectedUser.isAdmin || false,
                 role: selectedUser.isAdmin ? 'admin' : 'user',
+                teamRole: isCaptain ? 'captain' : 'player',
             });
         }
-    }, [selectedUser]);
+    }, [selectedUser, teams]);
 
     const handleOpenCreateModal = () => {
         setSelectedUser(null);
-        setFormData({ email: '', password: '', teamId: '', isAdmin: false, displayName: '', role: 'user' });
+        setFormData({ email: '', password: '', teamId: '', isAdmin: false, displayName: '', role: 'user', teamRole: 'player' });
         setModalMode('create');
         setIsModalOpen(true);
     };
@@ -125,26 +129,48 @@ const UserManager = ({ teams, getTeamName }) => {
         if (e) e.preventDefault();
         try {
             if (modalMode === 'edit' && selectedUser) {
-                // BUG FIX: Include displayName in the update payload
+                // 1. Benutzerdaten aktualisieren
                 await userApiService.updateUser(selectedUser.id, {
                     teamId: formData.teamId || null,
                     isAdmin: formData.isAdmin,
-                    displayName: formData.displayName // Added this
+                    displayName: formData.displayName
                 });
+
+                // 2. Kapitän-Berechtigungen anpassen
+                const userTeam = teams.find(t => t.id === selectedUser.teamId);
+                const wasCaptain = userTeam && userTeam.captainIds && userTeam.captainIds.includes(selectedUser.uid);
+                const isNowCaptain = formData.teamRole === 'captain' && formData.teamId;
+
+                if (isNowCaptain && !wasCaptain) {
+                    await teamApiService.addCaptainToTeam(formData.teamId, selectedUser.uid);
+                } else if (!isNowCaptain && wasCaptain) {
+                    await teamApiService.removeCaptainFromTeam(selectedUser.teamId, selectedUser.uid);
+                }
+
+                // Falls das Team gewechselt wurde und der User im alten Team Kapitän war, dort entfernen
+                if (selectedUser.teamId && selectedUser.teamId !== formData.teamId && wasCaptain) {
+                    await teamApiService.removeCaptainFromTeam(selectedUser.teamId, selectedUser.uid);
+                }
+
                 setNotification({ open: true, message: 'Benutzer erfolgreich aktualisiert.', severity: 'success' });
             } else if (modalMode === 'create') {
-                // Simplified creation: No password handling here, backend generates it.
-                // Assuming backend now handles password generation and email sending if password is skipped/random
-                await userApiService.createUser({
+                // 1. Benutzer erstellen
+                const newUser = await userApiService.createUser({
                     email: formData.email,
-                    // password: password, // Removed/Handled by backend or service
-                    displayName: formData.displayName, // Now required
+                    displayName: formData.displayName,
                     teamId: formData.teamId || null,
                     isAdmin: formData.isAdmin,
                 });
+
+                // 2. Falls als Kapitän markiert und ein Team gewählt wurde, Kapitän-Status setzen
+                if (formData.teamRole === 'captain' && formData.teamId && newUser && newUser.uid) {
+                    await teamApiService.addCaptainToTeam(formData.teamId, newUser.uid);
+                }
+
                 setNotification({ open: true, message: `Benutzer erstellt. Einladungs-Email wurde versendet.`, severity: 'success' });
             }
-            fetchData();
+            await fetchData();
+            if (fetchParentData) await fetchParentData();
             handleCloseModal();
         } catch (err) {
             setNotification({ open: true, message: err.message || 'Ein Fehler ist aufgetreten.', severity: 'error' });
@@ -156,7 +182,8 @@ const UserManager = ({ teams, getTeamName }) => {
         try {
             await userApiService.deleteUser(selectedUser.id);
             setNotification({ open: true, message: 'Benutzer wurde vollständig gelöscht.', severity: 'success' });
-            fetchData();
+            await fetchData();
+            if (fetchParentData) await fetchParentData();
             handleCloseModal();
         } catch (err) {
             setNotification({ open: true, message: 'Fehler beim Löschen des Benutzers.', severity: 'error' });
@@ -272,6 +299,16 @@ const UserManager = ({ teams, getTeamName }) => {
                                 {teams.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
                             </Select>
                         </FormControl>
+
+                        {formData.teamId && (
+                            <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
+                                <InputLabel>Rolle im Team</InputLabel>
+                                <Select value={formData.teamRole || 'player'} label="Rolle im Team" onChange={(e) => setFormData({ ...formData, teamRole: e.target.value })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>
+                                    <MenuItem value="player">Spieler</MenuItem>
+                                    <MenuItem value="captain">Kapitän</MenuItem>
+                                </Select>
+                            </FormControl>
+                        )}
                         <FormControl size="small" fullWidth sx={inputStyle} disabled={modalMode === 'view'}>
                             <InputLabel>Rolle</InputLabel>
                             <Select value={formData.role} label="Rolle" onChange={(e) => setFormData({ ...formData, role: e.target.value, isAdmin: e.target.value === 'admin' })} MenuProps={{ PaperProps: { sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } } }}>

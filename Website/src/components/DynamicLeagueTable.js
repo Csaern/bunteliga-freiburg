@@ -174,7 +174,7 @@ const FormDisplay = ({ formArray }) => {
   );
 };
 
-const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disableContainer = false, enableSimulation = false }) => {
+const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disableContainer = false, enableSimulation = false, headerControls, miniTable = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:1020px)'); // Switch to mobile layout below 1020px
   const navigate = useNavigate();
@@ -216,7 +216,21 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
         };
       });
 
-      setTableData(enrichedTable);
+      if (miniTable && userTeamId) {
+          const userIndex = enrichedTable.findIndex(t => t.teamId === userTeamId);
+          if (userIndex !== -1) {
+              let start = Math.max(0, userIndex - 2);
+              let end = Math.min(enrichedTable.length, start + 5);
+              if (end - start < 5) {
+                  start = Math.max(0, end - 5);
+              }
+              setTableData(enrichedTable.slice(start, end));
+          } else {
+              setTableData(enrichedTable.slice(0, 5));
+          }
+      } else {
+          setTableData(enrichedTable);
+      }
     } catch (error) {
       console.error('Fehler beim Laden der Tabellendaten:', error);
     } finally {
@@ -237,16 +251,18 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
   }, [lastGlobalUpdate, loadTableData]);
 
   const Wrapper = disableContainer ? Box : Container;
-  const wrapperProps = disableContainer ? { sx: { my: 4 } } : { maxWidth: maxWidth || "xl", sx: { my: 4, px: isMobile ? 1 : 2 } };
+  const wrapperProps = disableContainer 
+    ? { sx: { my: { xs: 0, sm: 2 } } } 
+    : { maxWidth: maxWidth || "xl", sx: { my: { xs: 2, sm: 4 }, px: isMobile ? 1 : 2 } };
 
   if (loading) {
     return (
       <Wrapper {...wrapperProps}>
         <Typography
-          variant={isMobile ? 'h5' : 'h4'}
+          variant={isMobile ? 'h6' : 'h5'}
           sx={{
             mb: 2,
-            mt: 2,
+            mt: { xs: 0, sm: 2 },
             color: theme.palette.primary.main,
             fontWeight: 700,
             fontFamily: 'Comfortaa',
@@ -255,7 +271,11 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
             letterSpacing: '0.1em',
           }}
         >
-          {title}
+          {title} {miniTable && (
+            <Typography component="span" sx={{ fontSize: '0.5em', verticalAlign: 'middle', textDecoration: 'underline', cursor: 'pointer', ml: 1 }} onClick={() => navigate(`/tabelle`)}>
+                (Gesamte Tabelle)
+            </Typography>
+          )}
         </Typography>
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <Typography color="text.secondary">Lade Tabelle...</Typography>
@@ -270,37 +290,56 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
   return (
     <Wrapper {...wrapperProps}>
       <Typography
-        variant={isMobile ? 'h5' : 'h3'}
+        variant={isMobile ? 'h6' : 'h5'}
+        onClick={() => { if (miniTable) navigate(`/tabelle`); }}
         sx={{
           mb: 2,
-          mt: 2,
+          mt: { xs: 0, sm: 2 },
           color: theme.palette.primary.main,
           fontWeight: 700,
           fontFamily: 'Comfortaa',
           textAlign: 'center',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
+          cursor: miniTable ? 'pointer' : 'default',
+          '&:hover': miniTable ? { opacity: 0.8 } : {}
         }}
       >
         {title}
       </Typography>
 
-      {showWhatIf && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={isSimulated}
-                onChange={(e) => setIsSimulated(e.target.checked)}
-                color="primary"
-              />
-            }
-            label={
-              <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}>
-                What if?
-              </Typography>
-            }
-          />
+      {(showWhatIf || headerControls) && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          mb: 2, 
+          gap: { xs: 1.5, sm: 3 },
+          flexDirection: 'row',
+          flexWrap: 'wrap'
+        }}>
+          {headerControls && (
+            <Box>
+              {headerControls}
+            </Box>
+          )}
+
+          {showWhatIf && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isSimulated}
+                  onChange={(e) => setIsSimulated(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontFamily: 'Comfortaa', fontWeight: 'bold' }}>
+                  What if?
+                </Typography>
+              }
+            />
+          )}
         </Box>
       )}
 
@@ -332,7 +371,7 @@ const DynamicLeagueTable = ({ title, form, seasonId, userTeamId, maxWidth, disab
             {tableData.map((row) => (
               <TableRow
                 key={row.teamId}
-                onClick={() => navigate(`/team/${row.teamId}`)}
+                onClick={() => navigate(`/team/${row.teamId}?seasonId=${seasonId}`)}
                 sx={{
                   cursor: 'pointer',
                   transition: 'background-color 0.2s ease',

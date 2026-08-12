@@ -53,70 +53,77 @@ const ResultsPage = () => {
     return (
       <div>
         <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography color="text.secondary">Lade Ergebnisse...</Typography>
+          <Typography color="text.secondary">Lade Tabelle...</Typography>
         </Box>
       </div>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
+    <Container maxWidth="xl" sx={{ pt: { xs: 1.5, sm: 4 }, pb: 4, px: { xs: 1.5, sm: 3 } }}>
       {/* Season Selector und Liga-Tabelle */}
       <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-          {allSeasons.length > 0 && (
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>Saison</InputLabel>
-              <Select
-                value={selectedSeasonId || ''}
-                onChange={handleSeasonChange}
-                label="Saison"
-                sx={{
-                  color: 'text.primary',
-                  fontSize: '0.875rem',
-                  height: '36px',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'divider',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'action.hover',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'primary.main',
-                  },
-                  '& .MuiSelect-icon': {
-                    color: 'text.secondary',
-                  },
-                }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      bgcolor: 'background.paper',
-                      color: 'text.primary',
-                    },
-                  },
-                }}
-              >
-                {allSeasons.map((season) => (
-                  <MenuItem key={season.id} value={season.id}>
-                    {season.name} {season.status === 'active' ? '(Aktiv)' : ''}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-        </Box>
         <DynamicLeagueTable
           title={`Liga-Tabelle`}
           form={true}
           seasonId={selectedSeasonId}
           enableSimulation={true}
+          disableContainer={true}
+          headerControls={
+            allSeasons.length > 0 && (
+              <FormControl size="small" sx={{ minWidth: { xs: 140, sm: 200 } }}>
+                <InputLabel sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>Saison</InputLabel>
+                <Select
+                  value={selectedSeasonId || ''}
+                  onChange={handleSeasonChange}
+                  label="Saison"
+                  sx={{
+                    color: 'text.primary',
+                    fontSize: '0.875rem',
+                    height: '36px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'divider',
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'action.hover',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'text.secondary',
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        bgcolor: 'background.paper',
+                        color: 'text.primary',
+                      },
+                    },
+                  }}
+                >
+                  {allSeasons.map((season) => (
+                    <MenuItem 
+                      key={season.id} 
+                      value={season.id}
+                      sx={{
+                        color: season.status === 'active' ? '#FFD700' : 'inherit'
+                      }}
+                    >
+                      {season.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )
+          }
         />
       </Box>
 
       <DynamicFixtureList
         title="Alle Spiele"
-        details={false}
+        details={true}
         seasonId={selectedSeasonId}
         showType="all"
       />

@@ -8,6 +8,10 @@ import { API_BASE_URL } from '../../services/apiClient';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
 import ShieldIcon from '@mui/icons-material/Shield';
+import GroupIcon from '@mui/icons-material/Group';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import * as userApiService from '../../services/userApiService';
 
 const TabPanel = (props) => {
     const { children, value, index, ...other } = props;
@@ -46,6 +50,7 @@ const TeamManager = () => {
     };
 
     const [teams, setTeams] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState('create');
@@ -61,11 +66,15 @@ const TeamManager = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const teamsData = await teamApiService.getAllTeams();
+            const [teamsData, usersData] = await Promise.all([
+                teamApiService.getAllTeams(),
+                userApiService.getAllUsers()
+            ]);
             setTeams(teamsData);
+            setAllUsers(usersData);
         } catch (error) {
-            console.error("Fehler beim Laden der Teams:", error);
-            setNotification({ open: true, message: "Fehler beim Laden der Teams.", severity: 'error' });
+            console.error("Fehler beim Laden der Daten:", error);
+            setNotification({ open: true, message: "Fehler beim Laden der Daten.", severity: 'error' });
         } finally {
             setLoading(false);
         }
@@ -177,7 +186,44 @@ const TeamManager = () => {
         }
     };
 
+    const handleToggleCaptain = async (userId, isCurrentlyCaptain) => {
+        if (!selectedTeam) return;
+        try {
+            if (isCurrentlyCaptain) {
+                await teamApiService.removeCaptainFromTeam(selectedTeam.id, userId);
+                setNotification({ open: true, message: 'Kapitän erfolgreich entfernt.', severity: 'success' });
+            } else {
+                await teamApiService.addCaptainToTeam(selectedTeam.id, userId);
+                setNotification({ open: true, message: 'Kapitän erfolgreich ernannt.', severity: 'success' });
+            }
+
+            const updatedCaptainIds = isCurrentlyCaptain
+                ? (selectedTeam.captainIds || []).filter(id => id !== userId)
+                : [...(selectedTeam.captainIds || []), userId];
+
+            const updatedTeam = {
+                ...selectedTeam,
+                captainIds: updatedCaptainIds
+            };
+
+            setSelectedTeam(updatedTeam);
+            setTeams(prevTeams => prevTeams.map(t => t.id === selectedTeam.id ? updatedTeam : t));
+
+            // Sync die allUsers Liste, um die aktualisierten Rollen/Claims im State zu haben
+            const usersData = await userApiService.getAllUsers();
+            setAllUsers(usersData);
+        } catch (error) {
+            console.error("Fehler beim Ändern des Kapitänsstatus:", error);
+            setNotification({ open: true, message: error.message || 'Fehler beim Ändern des Kapitänsstatus.', severity: 'error' });
+        }
+    };
+
     const isReadOnly = modalMode === 'view';
+
+    const teamMembers = allUsers.filter(u => 
+        u.teamId === selectedTeam?.id || 
+        (selectedTeam?.captainIds && selectedTeam.captainIds.includes(u.uid))
+    );
 
     const searchableFields = [{ key: 'name' }, { key: 'contactPerson' }, { key: 'contactEmail' }];
     const filteredTeams = filterData(teams, searchTerm, searchableFields);
@@ -295,7 +341,8 @@ const TeamManager = () => {
                         indicatorColor="primary"
                         sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
                     >
-                        <Tab icon={<PersonOutlineIcon />} label="Allgemeine Daten" />
+                        <Tab icon={<PersonOutlineIcon />} label="Allgemein" />
+                        <Tab icon={<GroupIcon />} label="Mitglieder" />
                         <Tab icon={<PaletteOutlinedIcon />} label="Logos & Farben" />
                     </Tabs>
 
@@ -307,6 +354,71 @@ const TeamManager = () => {
                     </TabPanel>
 
                     <TabPanel value={activeTab} index={1}>
+                        {!selectedTeam ? (
+                            <Alert severity="info" sx={{ mt: 2 }}>
+                                Du kannst Mitglieder und Kapitäne verwalten, nachdem das Team erstellt wurde.
+                            </Alert>
+                        ) : (
+                            <TableContainer component={Paper} sx={{ backgroundColor: 'transparent', boxShadow: 'none', maxHeight: 300, overflow: 'auto' }}>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Name</StyledTableCell>
+                                            <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>E-Mail</StyledTableCell>
+                                            <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>Rolle</StyledTableCell>
+                                            <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: 'bold', width: '60px', textAlign: 'center' }}>Kapitän</StyledTableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {teamMembers.length === 0 ? (
+                                            <TableRow>
+                                                <StyledTableCell colSpan={4} align="center" sx={{ color: theme.palette.text.secondary }}>
+                                                    Keine Mitglieder für dieses Team gefunden.
+                                                </StyledTableCell>
+                                            </TableRow>
+                                        ) : (
+                                            teamMembers.map(member => {
+                                                const isCaptain = selectedTeam.captainIds && selectedTeam.captainIds.includes(member.uid);
+                                                const isIncorrectTeam = member.teamId !== selectedTeam.id;
+
+                                                return (
+                                                    <TableRow key={member.uid}>
+                                                        <StyledTableCell sx={{ color: theme.palette.text.primary, fontWeight: isCaptain ? 'bold' : 'normal' }}>
+                                                            {member.displayName || 'Kein Name'}
+                                                            {isIncorrectTeam && (
+                                                                <Typography variant="caption" color="error" sx={{ display: 'block', fontWeight: 'bold' }}>
+                                                                    {member.isAdmin ? 'Admin (Anderes/Kein Team)' : `Falsches Team (${member.teamName || 'Keines'})`}
+                                                                </Typography>
+                                                            )}
+                                                        </StyledTableCell>
+                                                        <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{member.email}</StyledTableCell>
+                                                        <StyledTableCell sx={{ color: theme.palette.text.secondary }}>
+                                                            {member.isAdmin ? 'Admin' : 'Mitglied'}
+                                                        </StyledTableCell>
+                                                        <StyledTableCell sx={{ textAlign: 'center' }}>
+                                                            <Button
+                                                                onClick={() => handleToggleCaptain(member.uid, isCaptain)}
+                                                                sx={{ minWidth: 0, p: 0.5 }}
+                                                                disabled={isReadOnly}
+                                                            >
+                                                                {isCaptain ? (
+                                                                    <StarIcon sx={{ color: '#FFD700' }} />
+                                                                ) : (
+                                                                    <StarBorderIcon sx={{ color: theme.palette.text.secondary }} />
+                                                                )}
+                                                            </Button>
+                                                        </StyledTableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+                    </TabPanel>
+
+                    <TabPanel value={activeTab} index={2}>
                         <TextField size="small" label="Logofarbe (Hex-Code)" fullWidth value={formData.logoColor} onChange={(e) => setFormData({ ...formData, logoColor: e.target.value })} sx={inputStyle} disabled={isReadOnly} />
 
                         {(modalMode === 'edit' || modalMode === 'view') && selectedTeam ? (

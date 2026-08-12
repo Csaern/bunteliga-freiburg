@@ -38,6 +38,7 @@ const DashboardPage = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Added isMobile check
 
   const [team, setTeam] = useState(null);
+  const [teamStats, setTeamStats] = useState(null);
   const [pendingGameRequests, setPendingGameRequests] = useState([]);
   const [pendingMyRequests, setPendingMyRequests] = useState([]);
   const [pendingResults, setPendingResults] = useState([]);
@@ -160,6 +161,27 @@ const DashboardPage = () => {
         // NEU: Spiele, für die noch kein Ergebnis gemeldet wurde (Vergangene, bestätigte Spiele)
         const needingResult = await bookingApi.getBookingsNeedingResultForMyTeam(activeSeason.id).catch(() => []);
         setNotificationBookings(needingResult);
+
+        // NEU: Team-Statistiken laden (Gespielte/Vereinbarte Spiele)
+        try {
+          const stats = await teamApi.getTeamStats(teamId, activeSeason.id);
+          const confirmedUpcoming = upcoming.filter(b => b.status === 'confirmed' && !b.friendly);
+          const gamesScheduled = stats.gamesPlayed + confirmedUpcoming.length + needingResult.filter(b => !b.friendly).length;
+
+          // Gesamtanzahl Pflichtspiele pro Team: (Teams - 1) * Runden
+          const teamCount = (activeSeason.teams || []).length;
+          const rounds = activeSeason.playMode === 'double_round_robin' ? 2 : 1;
+          const totalRequired = teamCount > 1 ? (teamCount - 1) * rounds : 0;
+
+          setTeamStats({
+            ...stats,
+            gamesScheduled,
+            totalRequired,
+            gamesToPlan: Math.max(0, totalRequired - gamesScheduled),
+          });
+        } catch (e) {
+          console.warn('Stats konnten nicht geladen werden:', e);
+        }
       }
     } catch (error) {
       console.error("Fehler beim Laden der Dashboard-Daten:", error);
@@ -589,6 +611,108 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
+        {/* Team Season Stats Overview */}
+        {teamStats && currentSeason && (
+          <Grid>
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 1.5, sm: 2 },
+                border: '1px solid',
+                borderColor: theme.palette.divider,
+                borderRadius: 4,
+                backgroundColor: theme.palette.background.paper,
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  textAlign: 'center',
+                  color: theme.palette.text.secondary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  mb: 1.5,
+                  fontFamily: 'Comfortaa',
+                  fontSize: '0.65rem',
+                }}
+              >
+                Saison-Übersicht — {currentSeason.name}
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: { xs: 1, md: 4 }, width: '100%' }}>
+
+                {/* Games Played X/Total */}
+                <Box sx={{ textAlign: 'center', flex: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
+                    <Typography variant={isMobile ? 'h5' : 'h4'} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.primary.main, lineHeight: 1 }}>
+                      {teamStats.gamesPlayed}
+                    </Typography>
+                    {teamStats.totalRequired > 0 && (
+                      <Typography variant="body2" sx={{ color: theme.palette.text.disabled, fontFamily: 'Comfortaa', lineHeight: 1 }}>
+                        /{teamStats.totalRequired}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', mt: 0.5, letterSpacing: '0.05em', fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
+                    {isMobile ? 'Gespielt' : 'Gespielte Spiele'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ width: '1px', height: 40, bgcolor: theme.palette.divider, alignSelf: 'center' }} />
+
+                {/* Games Scheduled X/Total */}
+                <Box sx={{ textAlign: 'center', flex: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
+                    <Typography variant={isMobile ? 'h5' : 'h4'} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.info.main, lineHeight: 1 }}>
+                      {teamStats.gamesScheduled}
+                    </Typography>
+                    {teamStats.totalRequired > 0 && (
+                      <Typography variant="body2" sx={{ color: theme.palette.text.disabled, fontFamily: 'Comfortaa', lineHeight: 1 }}>
+                        /{teamStats.totalRequired}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', mt: 0.5, letterSpacing: '0.05em', fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
+                    {isMobile ? 'Vereinbart' : 'Vereinbarte Spiele'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ width: '1px', height: 40, bgcolor: theme.palette.divider, alignSelf: 'center' }} />
+
+                {/* Games Still to Plan */}
+                <Box
+                  onClick={teamStats.gamesToPlan > 0 ? () => setIsCreateGameModalOpen(true) : undefined}
+                  sx={{
+                    textAlign: 'center',
+                    flex: 1,
+                    cursor: teamStats.gamesToPlan > 0 ? 'pointer' : 'default',
+                    borderRadius: 2,
+                    transition: 'background-color 0.15s ease',
+                    '&:hover': teamStats.gamesToPlan > 0 ? { backgroundColor: theme.palette.action.hover } : {},
+                    py: 0.5,
+                  }}
+                >
+                  <Typography
+                    variant={isMobile ? 'h5' : 'h4'}
+                    sx={{
+                      fontFamily: 'Comfortaa',
+                      fontWeight: 700,
+                      color: teamStats.gamesToPlan > 0 ? theme.palette.secondary.main : theme.palette.success.main,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {teamStats.gamesToPlan}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', mt: 0.5, letterSpacing: '0.05em', fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
+                    {isMobile ? 'Zu planen' : 'Noch zu planen'}
+                  </Typography>
+                </Box>
+
+              </Box>
+            </Paper>
+          </Grid>
+        )}
+
         {/* Pending Actions Table */}
         {allPendingActions.length > 0 && (
           <Grid>
@@ -733,17 +857,17 @@ const DashboardPage = () => {
 
         {/* Upcoming Games using DynamicFixtureList */}
         <Grid>
-          <DynamicFixtureList title="BEVORSTEHENDE SPIELE" details={true} seasonId={currentSeason?.id} showType="upcoming" userTeamId={teamId} disableContainer={true} />
-        </Grid>
-
-        {/* League Table */}
-        <Grid>
-          <DynamicLeagueTable title="AKTUELLE TABELLE" form={false} seasonId={currentSeason?.id} userTeamId={teamId} disableContainer={true} enableSimulation={true} />
+          <DynamicFixtureList title="NÄCHSTE SPIELE" details={true} seasonId={currentSeason?.id} showType="upcoming" userTeamId={teamId} disableContainer={true} paginate={true} />
         </Grid>
 
         {/* Past Games */}
         <Grid>
-          <DynamicFixtureList title="VERGANGENE SPIELE" details={false} seasonId={currentSeason?.id} showType="results" userTeamId={teamId} disableContainer={true} />
+          <DynamicFixtureList title="ERGEBNISSE" details={true} seasonId={currentSeason?.id} showType="results" userTeamId={teamId} disableContainer={true} paginate={true} />
+        </Grid>
+
+        {/* League Table at the bottom */}
+        <Grid>
+          <DynamicLeagueTable title="TABELLE" form={false} seasonId={currentSeason?.id} userTeamId={teamId} disableContainer={true} enableSimulation={false} miniTable={true} />
         </Grid>
       </Grid>
 

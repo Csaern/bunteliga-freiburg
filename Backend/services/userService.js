@@ -198,10 +198,7 @@ async function removeCaptainFromTeam(userId, teamId) {
     captainIds: admin.firestore.FieldValue.arrayRemove(userId)
   });
 
-  // 2. Entferne den Custom Claim, um die Berechtigungen zu entziehen
-  const { teamId: _, ...remainingClaims } = user.customClaims;
-  await admin.auth().setCustomUserClaims(userId, remainingClaims);
-
+  // Der Custom Claim (teamId) wird beibehalten, da der Benutzer weiterhin im Team bleibt.
   return { message: `Benutzer ${user.email} ist nicht länger Kapitän von Team ${teamId}.` };
 }
 

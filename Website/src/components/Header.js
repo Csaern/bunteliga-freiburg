@@ -61,12 +61,10 @@ import Avatar from '@mui/material/Avatar';
 import Badge from '@mui/material/Badge';
 import UserSettingsModal from './Auth/UserSettingsModal';
 import { useNotifications } from '../context/NotificationContext';
-
-
-
+import { API_BASE_URL } from '../services/apiClient';
 const pages = [
   { text: 'Home', iconName: 'HomeIcon', path: '/' },
-  { text: 'Ergebnisse', iconName: 'TableViewIcon', path: '/ergebnisse' },
+  { text: 'Tabelle', iconName: 'TableViewIcon', path: '/tabelle' },
   { text: 'Teams', iconName: 'Diversity3Icon', path: '/teams' },
   { text: 'Historiker-Ecke', iconName: 'ScheduleIcon', path: '/historie' },
   { text: 'Regeln', iconName: 'GavelIcon', path: '/regeln' },
@@ -180,8 +178,14 @@ function Header() {
   // Custom breakpoint for mobile menu activation at 850px
   const isMobile = useMediaQuery('(max-width:850px)');
 
-  const { currentUser, isAdmin, teamId } = useAuth();
+  const { currentUser, isAdmin, teamId, team } = useAuth();
   const { unreadCount } = useNotifications();
+
+  const [logoError, setLogoError] = React.useState(false);
+
+  // Compute team logo source if available
+  const logoUrlToUse = (!logoError && team) ? ((theme.palette.mode === 'light' && team.logoUrlLight) ? team.logoUrlLight : team.logoUrl) || (team.logoUrlLight || team.logoUrl) : null;
+  const avatarLogoSrc = logoUrlToUse ? (logoUrlToUse.startsWith('http') ? logoUrlToUse : `${API_BASE_URL}${logoUrlToUse}`) : null;
 
   const handleLogout = async () => {
     try {
@@ -233,17 +237,34 @@ function Header() {
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           {currentUser && (
             <IconButton onClick={() => { setOpenSettings(true); handleDrawerToggle(); }} color="inherit" sx={{ ml: 1 }}>
-              <Avatar sx={{
-                width: 32,
-                height: 32,
-                fontSize: '0.9rem',
-                bgcolor: theme.palette.secondary.main,
-                color: theme.palette.common.white,
-                fontFamily: 'Comfortaa',
-                fontWeight: 'bold'
-              }}>
-                {getInitials(currentUser)}
-              </Avatar>
+              {avatarLogoSrc ? (
+                <Box 
+                  component="img" 
+                  src={avatarLogoSrc} 
+                  alt="Team Logo" 
+                  onError={() => setLogoError(true)}
+                  sx={{ 
+                    width: 32, 
+                    height: 32, 
+                    objectFit: 'contain',
+                    backgroundColor: theme.palette.mode === 'dark' && team.logoUrlLight ? 'transparent' : (theme.palette.mode === 'light' ? 'transparent' : '#fff'),
+                    borderRadius: team.logoUrlLight ? '0' : '50%',
+                    padding: team.logoUrlLight ? '0' : '2px', 
+                  }} 
+                />
+              ) : (
+                <Avatar sx={{
+                  width: 32,
+                  height: 32,
+                  fontSize: '0.9rem',
+                  bgcolor: theme.palette.secondary.main,
+                  color: theme.palette.common.white,
+                  fontFamily: 'Comfortaa',
+                  fontWeight: 'bold'
+                }}>
+                  {getInitials(currentUser)}
+                </Avatar>
+              )}
             </IconButton>
           )}
           <IconButton sx={{ ml: 1 }} onClick={colorMode.toggleColorMode} color="inherit">
@@ -469,24 +490,39 @@ function Header() {
               {currentUser ? (
                 <Tooltip title="Einstellungen & Benachrichtigungen">
                   <IconButton onClick={() => setOpenSettings(true)} color="inherit">
-                    <Avatar sx={{
-                      width: 40,
-                      height: 40,
-                      fontSize: '1rem',
-                      bgcolor: theme.palette.secondary.main,
-                      color: theme.palette.common.white,
-                      fontFamily: 'Comfortaa',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      border: `2px solid ${alpha(theme.palette.common.white, 0.2)}`,
-                      '&:hover': {
-                        border: `2px solid ${theme.palette.secondary.main}`,
-                        transform: 'scale(1.05)'
-                      },
-                      transition: 'all 0.2s ease-in-out'
-                    }}>
-                      {getInitials(currentUser)}
-                    </Avatar>
+                    {avatarLogoSrc ? (
+                      <Box component="img" src={avatarLogoSrc} alt="Team Logo" 
+                        onError={() => setLogoError(true)}
+                        sx={{ 
+                          width: 40, height: 40, objectFit: 'contain', cursor: 'pointer',
+                          backgroundColor: theme.palette.mode === 'dark' && team.logoUrlLight ? 'transparent' : (theme.palette.mode === 'light' ? 'transparent' : '#fff'),
+                          borderRadius: team.logoUrlLight ? '0' : '50%',
+                          padding: team.logoUrlLight ? '0' : '3px',
+                          border: `2px solid transparent`,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': { transform: 'scale(1.05)' }
+                        }} 
+                      />
+                    ) : (
+                      <Avatar sx={{
+                        width: 40,
+                        height: 40,
+                        fontSize: '1rem',
+                        bgcolor: theme.palette.secondary.main,
+                        color: theme.palette.common.white,
+                        fontFamily: 'Comfortaa',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        border: `2px solid ${alpha(theme.palette.common.white, 0.2)}`,
+                        '&:hover': {
+                          border: `2px solid ${theme.palette.secondary.main}`,
+                          transform: 'scale(1.05)'
+                        },
+                        transition: 'all 0.2s ease-in-out'
+                      }}>
+                        {getInitials(currentUser)}
+                      </Avatar>
+                    )}
                   </IconButton>
                 </Tooltip>
               ) : (

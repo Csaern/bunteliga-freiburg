@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [teamId, setTeamId] = useState(null);
+  const [team, setTeam] = useState(null);
   const [role, setRole] = useState(null);
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
@@ -37,9 +38,26 @@ export const AuthProvider = ({ children }) => {
             setTeamId(data.teamId || null);
             setRole(data.role || (data.isAdmin ? 'admin' : 'team'));
             setSettings(data.settings || {});
+            if (data.teamId) {
+                try {
+                    const teamDoc = await getDoc(doc(db, 'teams', data.teamId));
+                    if (teamDoc.exists()) {
+                        setTeam({ id: teamDoc.id, ...teamDoc.data() });
+                    } else {
+                        setTeam(null);
+                    }
+                } catch (err) {
+                    console.error('Fehler beim Laden des Team-Dokuments:', err);
+                    setTeam(null);
+                }
+            } else {
+                setTeam(null);
+            }
+
           } else {
             setIsAdmin(false);
             setTeamId(null);
+            setTeam(null);
             setRole(null);
             setSettings({});
           }
@@ -47,11 +65,13 @@ export const AuthProvider = ({ children }) => {
           console.error('Fehler beim Laden des Benutzer-Status:', error);
           setIsAdmin(false);
           setTeamId(null);
+          setTeam(null);
           setRole(null);
         }
       } else {
         setIsAdmin(false);
         setTeamId(null);
+        setTeam(null);
         setRole(null);
         setSettings({});
       }
@@ -68,10 +88,10 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     isAdmin,
     teamId,
+    team,
     role,
     settings,
-    setSettings, // NEU: Damit wir sie nach Updates direkt im Context aktualisieren können
-    // Hier können später Login/Logout-Funktionen hinzugefügt werden
+    setSettings, 
   };
 
   return (

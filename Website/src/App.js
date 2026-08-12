@@ -23,8 +23,6 @@ import VenuesPage from './pages/VenuesPage';
 import RulesPage from './pages/RulesPage';
 import BookingOverview from './components/BookingOverview';
 import LoginPage from './pages/LoginPage';
-// AdminPage und AdminDashboardPage werden nicht mehr direkt benötigt,
-// stattdessen verwenden wir AdminBoard
 import AdminBoard from './pages/AdminBoard';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import DashboardPage from './pages/DashboardPage';
@@ -83,7 +81,7 @@ function App() {
             <Header />
             <main className="main-content">
               <Routes>
-                <Route path="/ergebnisse" element={<ResultsPage />} />
+                <Route path="/tabelle" element={<ResultsPage />} />
                 <Route path="/platzreservierung" element={<BookingOverview />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />

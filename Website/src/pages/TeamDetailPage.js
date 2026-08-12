@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -19,7 +19,8 @@ import {
   MenuItem,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  IconButton
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -33,6 +34,8 @@ import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 import PublicIcon from '@mui/icons-material/Public';
 import EventIcon from '@mui/icons-material/Event';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import { API_BASE_URL } from '../services/apiClient';
 import * as teamApi from '../services/teamApiService';
 import * as seasonApi from '../services/seasonApiService';
@@ -42,6 +45,9 @@ import DynamicLeagueTable from '../components/DynamicLeagueTable';
 const TeamDetailPage = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const targetSeasonId = queryParams.get('seasonId');
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:850px)'); // Changed to 850px as requested
   const [team, setTeam] = useState(null);
@@ -51,6 +57,8 @@ const TeamDetailPage = () => {
   const [selectedSeasonId, setSelectedSeasonId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  
+  const [showTeamInfo, setShowTeamInfo] = useState(false);
 
   // Helper zum Generieren einer "zufälligen" aber consistenten Farbe basierend auf dem Namen
   const getFallbackColor = (name) => {
@@ -115,10 +123,13 @@ const TeamDetailPage = () => {
         availableSeasons.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
         setAllSeasons(availableSeasons);
 
-        // Setze die Saison, in der das Team zuletzt gespielt hat (die erste in der sortierten Liste)
+        // Setze die Saison, in der das Team zuletzt gespielt hat (die erste in der sortierten Liste),
+        // es sei denn, es wurde explizit eine via URL (?seasonId=) angefordert.
         let seasonToSelect = null;
 
-        if (availableSeasons.length > 0) {
+        if (targetSeasonId && availableSeasons.some(s => s.id === targetSeasonId)) {
+          seasonToSelect = availableSeasons.find(s => s.id === targetSeasonId);
+        } else if (availableSeasons.length > 0) {
           seasonToSelect = availableSeasons[0];
         }
 
@@ -190,36 +201,42 @@ const TeamDetailPage = () => {
     <Container maxWidth="lg" sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
       <Grid container spacing={3} direction="column">
         {/* Back Button */}
-        <Grid item>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(-1)}
-            sx={{
-              color: theme.palette.text.secondary,
-              mb: isMobile ? 0.5 : 2, // Reduced margin on mobile
-              '&:hover': { color: theme.palette.primary.main, backgroundColor: theme.palette.action.hover }
-            }}
-          >
-            Zurück
-          </Button>
+        <Grid item sx={{ pb: '0 !important', pt: '0 !important' }}>
+          <Box sx={{ display: 'flex' }}>
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => navigate(-1)}
+              sx={{
+                color: theme.palette.text.secondary,
+                mt: 0,
+                mb: 0,
+                py: 0.5,
+                '&:hover': { color: theme.palette.primary.main, backgroundColor: theme.palette.action.hover }
+              }}
+            >
+              Zurück
+            </Button>
+          </Box>
         </Grid>
 
         {/* Header - Minimal & Centered */}
-        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, textAlign: 'center' }}>
+        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center', mb: 1, pt: { xs: '4px !important', sm: '8px !important' } }}>
+          <Box 
+            onClick={() => setShowTeamInfo(prev => !prev)} 
+            sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, textAlign: 'center', cursor: 'pointer' }}
+          >
             {(logoError || !logoUrl) ? (
               <Box
                 sx={{
-                  width: 120,
-                  minHeight: 140, // Leicht höher für Schild-Proportion
+                  width: 80,
+                  minHeight: 90,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: theme.palette.grey[200],
-                  borderRadius: '0 0 50% 50%', // Schild-Form beibehalten
+                  borderRadius: '0 0 50% 50%',
                   position: 'relative',
                   overflow: 'hidden',
-                  // boxShadow removed
                 }}
               >
                 <Box
@@ -232,13 +249,13 @@ const TeamDetailPage = () => {
                   }}
                 />
                 <Typography
-                  variant="h2"
+                  variant="h3"
                   sx={{
                     fontFamily: 'Comfortaa',
                     fontWeight: 'bold',
                     color: '#fff',
                     zIndex: 1,
-                    textShadow: 'none', // Removed text shadow as well for consistency
+                    textShadow: 'none',
                   }}
                 >
                   {team.name.charAt(0).toUpperCase()}
@@ -251,300 +268,311 @@ const TeamDetailPage = () => {
                 alt={`${team.name} Logo`}
                 onError={() => setLogoError(true)}
                 sx={{
-                  width: 180, // Etwas größer für gute Sichtbarkeit da alleinstehend
-                  height: 180,
+                  width: 100,
+                  height: 100,
                   objectFit: 'contain',
-                  // filter removed
                 }}
               />
             )}
 
-            <Typography
-              variant="h4"
-              component="h1"
-              sx={{
-                color: theme.palette.text.primary,
-                fontFamily: 'Comfortaa',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                mt: 1
-              }}
-            >
-              {team.name}
-            </Typography>
-          </Box>
-        </Grid>
-
-        {/* Team Information - Collapsible Accordion Integrated into Card */}
-        {(team.description || team.contactPerson || team.contactEmail || team.contactPhone || team.website || team.socialMedia || team.foundedYear) && (
-          <Grid item xs={12} sx={{ mb: 2 }}>
-            {/* Die Accordion selbst ist jetzt der Border-Container */}
-            <Accordion
-              defaultExpanded={false}
-              sx={{
-                ...sectionCardSx,
-                p: 0, // Reset padding for accordion root
-                '&.Mui-expanded': { margin: 0 }, // Prevent margin jump
-                '&:before': { display: 'none' } // Remove default divider
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon sx={{ color: theme.palette.text.secondary }} />}
-                sx={{
-                  px: { xs: 2, sm: 3 },
-                  py: 0, // Reduced vertical padding
-                  minHeight: 40, // Reduced minHeight
-                  '& .MuiAccordionSummary-content': { margin: '8px 0' } // Reduced margin for content
-                }}
-              >
-                <Typography
-                  variant="h6"
-                  sx={{
-                    color: theme.palette.text.secondary,
-                    fontFamily: 'Comfortaa',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Team-Informationen
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 }, pt: 0 }}>
-                <Grid container spacing={3}>
-                  {team.description && (
-                    <Grid item xs={12}>
-                      <Typography variant="body1" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
-                        {team.description}
-                      </Typography>
-                    </Grid>
-                  )}
-
-                  <Grid item xs={12}>
-                    <Grid container spacing={2}>
-                      {(team.contactPerson || team.contactEmail || team.contactPhone || team.website) && (
-                        <Grid item xs={12} md={6}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {team.contactPerson && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: theme.palette.action.selected, width: 32, height: 32 }}>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>
-                                    {team.contactPerson.charAt(0)}
-                                  </Typography>
-                                </Avatar>
-                                <Box>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block' }}>Ansprechpartner</Typography>
-                                  <Typography variant="body2" sx={{ fontFamily: 'Comfortaa' }}>{team.contactPerson}</Typography>
-                                </Box>
-                              </Box>
-                            )}
-                            {team.contactEmail && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: theme.palette.action.selected, width: 32, height: 32 }}><EmailIcon sx={{ fontSize: 18, color: theme.palette.text.primary }} /></Avatar>
-                                <Box>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block' }}>E-Mail</Typography>
-                                  <MuiLink href={`mailto:${team.contactEmail}`} underline="hover" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontSize: '0.875rem' }}>
-                                    {team.contactEmail}
-                                  </MuiLink>
-                                </Box>
-                              </Box>
-                            )}
-                            {team.contactPhone && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: theme.palette.action.selected, width: 32, height: 32 }}><PhoneIcon sx={{ fontSize: 18, color: theme.palette.text.primary }} /></Avatar>
-                                <Box>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block' }}>Telefon</Typography>
-                                  <MuiLink href={`tel:${team.contactPhone}`} underline="hover" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontSize: '0.875rem' }}>
-                                    {team.contactPhone}
-                                  </MuiLink>
-                                </Box>
-                              </Box>
-                            )}
-                            {team.website && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: theme.palette.action.selected, width: 32, height: 32 }}><PublicIcon sx={{ fontSize: 18, color: theme.palette.text.primary }} /></Avatar>
-                                <Box>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block' }}>Website</Typography>
-                                  <MuiLink href={team.website} target="_blank" rel="noopener" underline="hover" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontSize: '0.875rem' }}>
-                                    {team.website}
-                                  </MuiLink>
-                                </Box>
-                              </Box>
-                            )}
-                          </Box>
-                        </Grid>
-                      )}
-
-                      {/* Social Media & Founded */}
-                      {(team.socialMedia?.facebook || team.socialMedia?.instagram || team.socialMedia?.twitter || team.foundedYear) && (
-                        <Grid item xs={12} md={6}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {team.foundedYear && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: theme.palette.action.selected, width: 32, height: 32 }}><EventIcon sx={{ fontSize: 18, color: theme.palette.text.primary }} /></Avatar>
-                                <Box>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block' }}>Gegründet</Typography>
-                                  <Typography variant="body2" sx={{ fontFamily: 'Comfortaa' }}>{team.foundedYear}</Typography>
-                                </Box>
-                              </Box>
-                            )}
-
-                            {(team.socialMedia?.facebook || team.socialMedia?.instagram || team.socialMedia?.twitter) && (
-                              <Box sx={{ mt: 1 }}>
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1 }}>Social Media</Typography>
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                  {team.socialMedia.facebook && (
-                                    <Chip icon={<FacebookIcon fontSize="small" />} label="Facebook" component="a" href={team.socialMedia.facebook} target="_blank" clickable size="small" sx={{ fontFamily: 'Comfortaa', bgcolor: '#1877f2', color: '#fff', '& .MuiChip-icon': { color: '#fff' } }} />
-                                  )}
-                                  {team.socialMedia.instagram && (
-                                    <Chip icon={<InstagramIcon fontSize="small" />} label="Instagram" component="a" href={team.socialMedia.instagram} target="_blank" clickable size="small" sx={{ fontFamily: 'Comfortaa', bgcolor: '#e4405f', color: '#fff', '& .MuiChip-icon': { color: '#fff' } }} />
-                                  )}
-                                  {team.socialMedia.twitter && (
-                                    <Chip icon={<TwitterIcon fontSize="small" />} label="Twitter" component="a" href={team.socialMedia.twitter} target="_blank" clickable size="small" sx={{ fontFamily: 'Comfortaa', bgcolor: '#1da1f2', color: '#fff', '& .MuiChip-icon': { color: '#fff' } }} />
-                                  )}
-                                </Box>
-                              </Box>
-                            )}
-                          </Box>
-                        </Grid>
-                      )}
-                    </Grid>
-                  </Grid>
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
-          </Grid>
-        )}
-
-        {/* Statistics Section */}
-        {stats && (
-          <Grid item sx={{ mt: 2, mb: 4 }}>
-            <Paper sx={sectionCardSx}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
               <Typography
                 variant="h5"
+                component="h1"
                 sx={{
                   color: theme.palette.text.primary,
                   fontFamily: 'Comfortaa',
                   fontWeight: 700,
-                  mb: 3,
                   textTransform: 'uppercase',
-                  textAlign: 'left' // Linksbündig
+                  letterSpacing: '0.05em',
+                  mt: 0.5
+                }}
+              >
+                {team.name}
+              </Typography>
+              {(team.description || team.contactPerson || team.contactEmail || team.contactPhone || team.website || team.socialMedia || team.foundedYear) && (
+                <IconButton 
+                  sx={{ mt: 0.5, color: showTeamInfo ? theme.palette.primary.main : theme.palette.text.secondary }}
+                  size="small"
+                >
+                  <InfoOutlinedIcon />
+                </IconButton>
+              )}
+            </Box>
+          </Box>
+        </Grid>
+
+        {/* Expanded Team Information Container */}
+        {showTeamInfo && (team.description || team.contactPerson || team.contactEmail || team.contactPhone || team.website || team.socialMedia || team.foundedYear) && (
+          <Grid item xs={12} sx={{ mb: 1, pt: '0 !important' }}>
+            <Paper
+              elevation={0}
+              sx={{
+                ...sectionCardSx,
+                p: { xs: 2.5, sm: 3 },
+                position: 'relative',
+                backgroundColor: theme.palette.action.hover,
+                border: `1px solid ${theme.palette.divider}`
+              }}
+            >
+              <IconButton 
+                onClick={() => setShowTeamInfo(false)} 
+                sx={{ position: 'absolute', top: 8, right: 8, color: theme.palette.text.secondary }}
+                size="small"
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+              
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  color: theme.palette.text.secondary,
+                  fontFamily: 'Comfortaa',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  mb: 1
+                }}
+              >
+                Team-Informationen
+              </Typography>
+              
+              <Grid container spacing={3}>
+                {team.description && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontFamily: 'Comfortaa', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {team.description}
+                    </Typography>
+                  </Grid>
+                )}
+
+                <Grid item xs={12}>
+                  <Grid container spacing={2}>
+                    {(team.contactPerson || team.contactEmail || team.contactPhone || team.website) && (
+                      <Grid item xs={12} md={6}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          {team.contactPerson && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Avatar sx={{ bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, width: 28, height: 28 }}>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 'bold' }}>
+                                  {team.contactPerson.charAt(0)}
+                                </Typography>
+                              </Avatar>
+                              <Box>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', lineHeight: 1.1 }}>Ansprechpartner</Typography>
+                                <Typography variant="body2" sx={{ fontFamily: 'Comfortaa' }}>{team.contactPerson}</Typography>
+                              </Box>
+                            </Box>
+                          )}
+                          {team.contactEmail && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Avatar sx={{ bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, width: 28, height: 28 }}><EmailIcon sx={{ fontSize: 16, color: theme.palette.text.primary }} /></Avatar>
+                              <Box>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', lineHeight: 1.1 }}>E-Mail</Typography>
+                                <MuiLink href={`mailto:${team.contactEmail}`} underline="hover" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontSize: '0.875rem' }}>
+                                  {team.contactEmail}
+                                </MuiLink>
+                              </Box>
+                            </Box>
+                          )}
+                          {team.contactPhone && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Avatar sx={{ bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, width: 28, height: 28 }}><PhoneIcon sx={{ fontSize: 16, color: theme.palette.text.primary }} /></Avatar>
+                              <Box>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', lineHeight: 1.1 }}>Telefon</Typography>
+                                <MuiLink href={`tel:${team.contactPhone}`} underline="hover" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontSize: '0.875rem' }}>
+                                  {team.contactPhone}
+                                </MuiLink>
+                              </Box>
+                            </Box>
+                          )}
+                          {team.website && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Avatar sx={{ bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, width: 28, height: 28 }}><PublicIcon sx={{ fontSize: 16, color: theme.palette.text.primary }} /></Avatar>
+                              <Box>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', lineHeight: 1.1 }}>Website</Typography>
+                                <MuiLink href={team.website} target="_blank" rel="noopener" underline="hover" sx={{ color: theme.palette.primary.main, fontFamily: 'Comfortaa', fontSize: '0.875rem' }}>
+                                  {team.website}
+                                </MuiLink>
+                              </Box>
+                            </Box>
+                          )}
+                        </Box>
+                      </Grid>
+                    )}
+
+                    {/* Social Media & Founded */}
+                    {(team.socialMedia?.facebook || team.socialMedia?.instagram || team.socialMedia?.twitter || team.foundedYear) && (
+                      <Grid item xs={12} md={6}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          {team.foundedYear && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Avatar sx={{ bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, width: 28, height: 28 }}><EventIcon sx={{ fontSize: 16, color: theme.palette.text.primary }} /></Avatar>
+                              <Box>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', lineHeight: 1.1 }}>Gegründet</Typography>
+                                <Typography variant="body2" sx={{ fontFamily: 'Comfortaa' }}>{team.foundedYear}</Typography>
+                              </Box>
+                            </Box>
+                          )}
+
+                          {(team.socialMedia?.facebook || team.socialMedia?.instagram || team.socialMedia?.twitter) && (
+                            <Box sx={{ mt: 0.5 }}>
+                              <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1 }}>Social Media</Typography>
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                {team.socialMedia.facebook && (
+                                  <Chip icon={<FacebookIcon fontSize="small" />} label="Facebook" component="a" href={team.socialMedia.facebook} target="_blank" clickable size="small" sx={{ fontFamily: 'Comfortaa', bgcolor: '#1877f2', color: '#fff', '& .MuiChip-icon': { color: '#fff' } }} />
+                                )}
+                                {team.socialMedia.instagram && (
+                                  <Chip icon={<InstagramIcon fontSize="small" />} label="Instagram" component="a" href={team.socialMedia.instagram} target="_blank" clickable size="small" sx={{ fontFamily: 'Comfortaa', bgcolor: '#e4405f', color: '#fff', '& .MuiChip-icon': { color: '#fff' } }} />
+                                )}
+                                {team.socialMedia.twitter && (
+                                  <Chip icon={<TwitterIcon fontSize="small" />} label="Twitter" component="a" href={team.socialMedia.twitter} target="_blank" clickable size="small" sx={{ fontFamily: 'Comfortaa', bgcolor: '#1da1f2', color: '#fff', '& .MuiChip-icon': { color: '#fff' } }} />
+                                )}
+                              </Box>
+                            </Box>
+                          )}
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Grid>
+        )}
+
+        {/* Season Selector und Header */}
+        {selectedSeasonId && (
+          <Grid item xs={12} sx={{ mt: { xs: 2, sm: 4 }, mb: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', gap: 2 }}>
+              <Typography
+                variant={isMobile ? 'subtitle1' : 'h5'}
+                sx={{
+                  color: theme.palette.text.primary,
+                  fontFamily: 'Comfortaa',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
                 }}
               >
                 Saison-Statistik
               </Typography>
 
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: { xs: 1, md: 4 }, width: '100%' }}>
-                {/* Goals Scored */}
-                <Box sx={{ textAlign: 'center', flex: 1 }}>
-                  <SportsSoccerIcon sx={{ fontSize: isMobile ? 28 : 36, mb: 1, color: theme.palette.primary.main }} />
-                  <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1 }}>
-                    {stats.goalsScoredPerGame}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-                    Tore / Spiel
-                  </Typography>
-                </Box>
-
-                {/* Divider */}
-                <Box sx={{ width: '1px', height: 40, bgcolor: theme.palette.divider }} />
-
-                {/* Goals Conceded - Back to Shield (SecurityIcon) and Blue */}
-                <Box sx={{ textAlign: 'center', flex: 1 }}>
-                  <SecurityIcon sx={{ fontSize: isMobile ? 28 : 36, mb: 1, color: theme.palette.info.main }} />
-                  <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1 }}>
-                    {stats.goalsConcededPerGame}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-                    Gegentore
-                  </Typography>
-                </Box>
-
-                {/* Divider */}
-                <Box sx={{ width: '1px', height: 40, bgcolor: theme.palette.divider }} />
-
-                {/* Points */}
-                <Box sx={{ textAlign: 'center', flex: 1 }}>
-                  <EmojiEventsIcon sx={{ fontSize: isMobile ? 28 : 36, mb: 1, color: theme.palette.secondary.main }} />
-                  <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1 }}>
-                    {stats.pointsPerGame}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-                    Punkte / Spiel
-                  </Typography>
-                </Box>
-              </Box>
-            </Paper>
-          </Grid>
-        )}
-
-        {selectedSeasonId && (
-          <Grid item>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-              {/* Season Selector - jetzt hier platziert */}
               {allSeasons.length > 0 && (
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel sx={{ color: theme.palette.text.secondary, fontSize: '0.875rem' }}>Saison</InputLabel>
+                <FormControl size="small" variant="outlined" sx={{ minWidth: 120 }}>
                   <Select
                     value={selectedSeasonId || ''}
                     onChange={handleSeasonChange}
-                    label="Saison"
+                    displayEmpty
                     sx={{
-                      color: theme.palette.text.primary,
-                      fontSize: '0.875rem',
-                      height: '40px', // Etwas höher
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: theme.palette.divider,
-                      },
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: theme.palette.text.secondary,
-                      },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                        borderColor: theme.palette.primary.main,
-                      },
-                      '& .MuiSelect-icon': {
-                        color: theme.palette.text.secondary,
-                      },
-                    }}
-                    MenuProps={{
-                      PaperProps: {
-                        sx: {
-                          bgcolor: theme.palette.background.paper,
-                          color: theme.palette.text.primary,
-                        },
-                      },
+                      height: 32,
+                      fontSize: '0.85rem',
+                      fontFamily: 'Comfortaa',
+                      fontWeight: 'bold',
+                      borderRadius: 1.5,
+                      backgroundColor: theme.palette.background.paper
                     }}
                   >
                     {allSeasons.map((season) => (
-                      <MenuItem key={season.id} value={season.id}>
-                        {season.name} {season.status === 'active' ? '(Aktiv)' : ''}
+                      <MenuItem 
+                        key={season.id} 
+                        value={season.id} 
+                        sx={{ 
+                          fontFamily: 'Comfortaa', 
+                          fontSize: '0.85rem',
+                          color: season.status === 'active' ? '#FFD700' : 'inherit'
+                        }}
+                      >
+                        {season.name}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               )}
             </Box>
-            <DynamicFixtureList
-              title="ERGEBNISSE"
-              details={false}
-              seasonId={selectedSeasonId}
-              showType="results"
-              userTeamId={teamId}
-            />
           </Grid>
         )}
 
-        {/* League Table */}
+        {/* Combined Content Section */}
         {selectedSeasonId && (
-          <Grid>
-            <DynamicLeagueTable
-              title="TABELLE"
-              form={true}
-              seasonId={selectedSeasonId}
-              userTeamId={teamId}
-            />
+          <Grid item xs={12} sx={{ mb: 4 }}>
+            <Paper sx={{
+                 p: { xs: 1, sm: 2, md: 3 }, // Minimaler Rand im Mobile-Modus
+                 borderRadius: { xs: 2, sm: 3 },
+                 boxShadow: theme.palette.mode === 'dark'
+                  ? '0 4px 20px rgba(0,0,0,0.3)'
+                  : '0 4px 20px rgba(0,0,0,0.05)',
+                 backgroundColor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.6)' : '#ffffff',
+                 backdropFilter: 'blur(10px)',
+                 border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              {/* Statistics Section Content */}
+              {stats && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: { xs: 1, md: 4 }, width: '100%', py: { xs: 1, md: 2 }, mb: 2 }}>
+                  {/* Goals Scored */}
+                  <Box sx={{ textAlign: 'center', flex: 1 }}>
+                    <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.primary.main, lineHeight: 1 }}>
+                      {stats.goalsScoredPerGame}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', mt: 1, letterSpacing: '0.05em', fontSize: { xs: '0.65rem', sm: '0.8rem' } }}>
+                      {isMobile ? 'Tore/Sp.' : 'Tore / Spiel'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ width: '1px', height: 40, bgcolor: theme.palette.divider }} />
+
+                  {/* Goals Conceded */}
+                  <Box sx={{ textAlign: 'center', flex: 1 }}>
+                    <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.info.main, lineHeight: 1 }}>
+                      {stats.goalsConcededPerGame}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', mt: 1, letterSpacing: '0.05em', fontSize: { xs: '0.65rem', sm: '0.8rem' } }}>
+                      {isMobile ? 'Gegentore/Sp.' : 'Gegentore / Spiel'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ width: '1px', height: 40, bgcolor: theme.palette.divider }} />
+
+                  {/* Points */}
+                  <Box sx={{ textAlign: 'center', flex: 1 }}>
+                    <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontFamily: 'Comfortaa', fontWeight: 700, color: theme.palette.secondary.main, lineHeight: 1 }}>
+                      {stats.pointsPerGame}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, textTransform: 'uppercase', mt: 1, letterSpacing: '0.05em', fontSize: { xs: '0.65rem', sm: '0.8rem' } }}>
+                      {isMobile ? 'Pkt./Sp.' : 'Punkte / Spiel'}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+              {/* League Table Mini */}
+              <Box sx={{ mt: 2, mb: 1 }}>
+                <DynamicLeagueTable
+                  title="TABELLE"
+                  form={false}
+                  seasonId={selectedSeasonId}
+                  userTeamId={teamId}
+                  miniTable={true}
+                  disableContainer={true}
+                />
+              </Box>
+
+              {/* Fixtures */}
+              <Box sx={{ mt: 3, mb: 1 }}>
+                <DynamicFixtureList
+                  title="ALLE SPIELE"
+                  details={true}
+                  seasonId={selectedSeasonId}
+                  showType="all"
+                  userTeamId={teamId}
+                  disableContainer={true}
+                />
+              </Box>
+            </Paper>
           </Grid>
         )}
+
+
 
         {/* Recent Results */}
 

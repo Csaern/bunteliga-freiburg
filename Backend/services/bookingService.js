@@ -1553,7 +1553,7 @@ class BookingService {
 
         if (!user.admin) {
             const teamDoc = await teamsCollection.doc(homeTeamId).get();
-            if (!teamDoc.exists || !teamDoc.data().captainIds.includes(user.uid)) {
+            if (!teamDoc.exists || !teamDoc.data().captainIds || !teamDoc.data().captainIds.includes(user.uid)) {
                 throw new Error('Du bist kein Kapitän des angegebenen Heimteams.');
             }
             if (pitch.isVerified || pitch.teamId !== homeTeamId) {

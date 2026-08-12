@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Box, Container } from '@mui/material';
 import NewsCarousel from '../components/News/News';
 import DynamicFixtureList from '../components/DynamicFixtureList';
-import DynamicLeagueTable from '../components/DynamicLeagueTable';
 import * as seasonApi from '../services/seasonApiService';
 
 const HomePage = () => {
@@ -41,24 +40,17 @@ const HomePage = () => {
       <NewsCarousel />
       <Container maxWidth="md" sx={{ px: { xs: 2, sm: 3 } }}>
         <DynamicFixtureList
-          title="Ergebnisse"
-          details={true}
-          seasonId={currentSeason?.id}
-          showType="results"
-          disableContainer={true}
-        />
-        <DynamicLeagueTable
-          title="Tabelle"
-          form={false}
-          seasonId={currentSeason?.id}
-          disableContainer={true}
-        />
-
-        <DynamicFixtureList
           title="Nächste Spiele"
           details={true}
           seasonId={currentSeason?.id}
           showType="upcoming"
+          disableContainer={true}
+        />
+        <DynamicFixtureList
+          title="Ergebnisse"
+          details={true}
+          seasonId={currentSeason?.id}
+          showType="results"
           disableContainer={true}
         />
       </Container>
