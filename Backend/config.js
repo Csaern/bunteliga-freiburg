@@ -13,6 +13,12 @@ const config = {
     // Auth / Security
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 
+    // Öffentliche Team-API (/api/public) für externe Vereins-Websites
+    publicApi: {
+        cacheSeconds: Number(process.env.PUBLIC_API_CACHE_SECONDS ?? 60),
+        rateLimitPerMinute: Number(process.env.PUBLIC_API_RATE_LIMIT ?? 120),
+    },
+
     // Firebase service account is usually handled via firebase.json in this project
     // but could be added here if needed.
 };

@@ -80,6 +80,9 @@ function initSocket(socketIoInstance) {
  * Used for refreshing tables or fixture lists globally.
  */
 function broadcastUpdate(type) {
+    // Cache der öffentlichen Team-API invalidieren, damit externe Seiten sofort aktuelle Daten erhalten
+    require('../middleware/publicApiMiddleware').clearPublicCache();
+
     if (io) {
         io.emit('global_update', { type, timestamp: Date.now() });
         console.log(`[NotificationService] 🌐 Broadcasted global_update: ${type}`);

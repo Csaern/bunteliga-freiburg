@@ -1,19 +1,26 @@
 # Deployment Guide - Bunte Liga Freiburg
 
-Dieser Guide beschreibt die notwendigen Schritte, um die Anwendung auf einem Webserver (z. B. Ubuntu mit Nginx) zu deployen.
+Dieser Guide beschreibt die notwendigen Schritte für ein klassisches Linux-Server-Deployment (z. B. Ubuntu mit Nginx und PM2).
+
+> **Tipp für Plesk-Nutzer:**  
+> Wenn du Plesk nutzt, verwende die Datei [PLESK_DEPLOYMENT_GUIDE.md](file:///c:/Users/doerflingerh/Documents/bunteliga-freiburg/PLESK_DEPLOYMENT_GUIDE.md) sowie das automatische 1-Klick-Build-Skript `build_for_plesk.bat`.
+
+---
 
 ## 1. Backend Setup (Node.js)
 
-1. Kopiere den `Backend`-Ordner auf den Server.
+1. Kopiere den `Backend`-Ordner auf den Server (ohne `node_modules`, `logs`).
 2. Installiere die Abhängigkeiten: `npm install --production`.
-3. Erstelle eine `.env`-Datei basierend auf der `.env.example`:
+3. Erstelle eine `.env`-Datei basierend auf `Backend/.env.example`:
    ```env
    PORT=3001
    WEBSITE_URL=https://bunteliga-freiburg.de
    CORS_ORIGIN=https://bunteliga-freiburg.de
+   PUBLIC_API_CACHE_SECONDS=60
+   PUBLIC_API_RATE_LIMIT_PER_MINUTE=120
    ```
-4. Stelle sicher, dass die `firebase.json` (Service Account) im Backend-Ordner liegt.
-5. Starte den Server (empfohlen mit `pm2`):
+4. Stelle sicher, dass die `firebase.json` (Firebase Service Account Key) im Backend-Ordner liegt.
+5. Starte den Server (z. B. via `npm start` oder empfohlen mit `pm2`):
    ```bash
    pm2 start index.js --name "bunteliga-backend"
    ```
@@ -22,6 +29,7 @@ Dieser Guide beschreibt die notwendigen Schritte, um die Anwendung auf einem Web
 
 1. Baue die Anwendung lokal oder auf dem Server:
    ```bash
+   cd Website
    npm run build
    ```
 2. Der Inhalt des `build`-Ordners muss vom Webserver (Nginx) ausgeliefert werden.
@@ -92,3 +100,10 @@ Der Ordner `Backend/uploads` muss Schreibrechte für den Node.js-Prozess besitze
 ```bash
 chmod -R 755 uploads
 ```
+
+## 6. Öffentliche Vereins-API (Public API)
+
+Das Backend stellt unter `/api/public/teams/...` schreibgeschützte Endpunkte für externe Vereins-Websites bereit (Tabelle und Spielplan).
+- CORS ist hierfür standardmäßig offen (`*`).
+- Die Dokumentation der Endpunkte und Caching-/Rate-Limit-Einstellungen findest du in [Backend/PUBLIC_API.md](file:///c:/Users/doerflingerh/Documents/bunteliga-freiburg/Backend/PUBLIC_API.md).
+

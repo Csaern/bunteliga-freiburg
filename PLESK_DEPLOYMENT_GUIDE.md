@@ -3,82 +3,81 @@
 Diese Anleitung führt dich Schritt für Schritt durch den Prozess, deine Bunte Liga Website auf Plesk zu veröffentlichen.
 
 ## Voraussetzungen
-1.  Zugang zu deinem Plesk-Panel.
-2.  Eine eingerichtete Domain in Plesk (z.B. `bunteliga-freiburg.de`).
-3.  Die Umgebung **Node.js** muss in Plesk installiert/aktiviert sein.
+1. Zugang zu deinem Plesk-Panel.
+2. Eine eingerichtete Domain in Plesk (z.B. `bunteliga-freiburg.de`).
+3. Die Umgebung **Node.js** muss in Plesk installiert/aktiviert sein.
+4. Die Datei `firebase.json` (Firebase Service Account Key) muss auf dem Server im Hauptverzeichnis der App liegen (`/httpdocs/firebase.json`).
 
 ---
 
-## Schritt 1: Das Projekt "bauen" (Lokal auf deinem PC)
-Bevor wir etwas hochladen, müssen wir die Website "bauen". React-Code muss erst in fertiges HTML/JS übersetzt werden.
+## Schritt 1: Das Projekt "bauen" (1-Klick auf deinem PC)
+Bevor etwas hochgeladen wird, baut das Skript die Website und packt alles in eine fertige ZIP-Datei.
 
-1.  Öffne den Ordner `bunteliga-freiburg` im Datei-Explorer.
-2.  Doppelklicke auf die Datei: **`build_for_plesk.bat`**
-    *   Ein schwarzes Fenster öffnet sich.
-    *   Es werden Pakete installiert und die Website gebaut.
-    *   Am Ende steht "SUCCESS!".
+1. Öffne den Ordner `bunteliga-freiburg` im Datei-Explorer.
+2. Doppelklicke auf: **`build_for_plesk.bat`** (oder führe `build_for_plesk.ps1` in PowerShell aus).
+   - Das Frontend wird gebaut (`npm run build`).
+   - Die gebauten Web-Dateien werden automatisch in `Backend/public` kopiert.
+   - Es wird automatisch eine fertige Datei **`deploy_plesk.zip`** im Hauptordner erstellt.
 
-**Was ist passiert?**
-Das Skript hat deine Website gebaut und in den Ordner `Backend/public` kopiert. Dein `Backend`-Ordner enthält nun ALLES, was du brauchst.
-
----
-
-## Schritt 2: Dateien hochladen
-1.  Gehe in Plesk zum **Dateimanager** deiner Domain.
-2.  Lösche NICHT den `uploads`-Ordner (darin liegen Team-Logos und die Ewige-Tabelle-Excel!).
-3.  Überschreibe alle anderen Dateien mit dem neuen Inhalt aus dem `Backend`-Ordner.
-    *   *Tipp:* Zippe nur den Inhalt (OHNE `node_modules` und OHNE `uploads`), lade die ZIP hoch und entpacke sie.
-4.  Stelle sicher, dass die Struktur so aussieht:
-    *   `/httpdocs/index.js`
-    *   `/httpdocs/package.json`
-    *   `/httpdocs/public/...` (Ordner)
-    *   `/httpdocs/routes/...` (Ordner)
-    *   `/httpdocs/uploads/...` (Ordner - NICHT löschen!)
-    *   ...etc
-
-> **WICHTIG:** Lade NICHT den Ordner `node_modules` hoch! Das macht Plesk gleich selbst.
+> **Sicherheit eingebaut:** Das Skript schließt automatisch `node_modules`, `uploads` (Logos/Excel), `logs` und `.env` aus. So wiegt das ZIP nur wenige Megabyte und deine Logos auf dem Server können niemals versehentlich überschrieben werden!
 
 ---
 
-## Schritt 3: Node.js konfigurieren
-Gehe in Plesk auf das Dashboard deiner Domain und klicke auf **"Node.js"**.
+## Schritt 2: ZIP in Plesk hochladen und entpacken
+1. Gehe in Plesk zum **Dateimanager** deiner Domain (`/httpdocs`).
+2. Klicke auf **"Dateien hochladen"** und wähle die Datei `deploy_plesk.zip`.
+3. Klicke neben der hochgeladenen `deploy_plesk.zip` auf die drei Punkte bzw. **"Dateien extrahieren"** (Extract files) und bestätige mit "Ersetzen".
+4. Lösche danach die `deploy_plesk.zip` wieder aus dem Dateimanager.
+
+**Deine Ordnerstruktur in `/httpdocs` sieht nun so aus:**
+- `/httpdocs/index.js`
+- `/httpdocs/package.json`
+- `/httpdocs/firebase.json` (einmalig hochgeladen)
+- `/httpdocs/.env` (einmalig angelegt oder über Plesk Variablen)
+- `/httpdocs/public/` (die gebaute React-Website)
+- `/httpdocs/routes/`, `/httpdocs/services/`, `/httpdocs/middleware/`, ...
+- `/httpdocs/uploads/` (enthält Team-Logos & Excel – bleibt immer erhalten!)
+
+---
+
+## Schritt 3: Node.js in Plesk konfigurieren
+Gehe im Plesk-Dashboard deiner Domain auf **"Node.js"**.
 
 Stelle folgendes ein:
-*   **Node.js Version:** Wähle eine aktuelle Version (z.B. 18, 20 oder 22).
-*   **Paketmanager:** `npm`
-*   **Dokumentenstamm:** `/httpdocs/public` (Da liegen die statischen Dateien deiner Website).
-*   **Anwendungs-Startdatei:** `index.js`
-*   **Anwendungsmodus:** `Production`
+* **Node.js Version:** Eine aktuelle Version (18, 20 oder 22).
+* **Paketmanager:** `npm`
+* **Dokumentenstamm:** `/httpdocs/public`
+* **Anwendungsmodus:** `Production`
+* **Anwendungs-Startdatei:** `index.js`
 
-Klicke auf **"NPM Install"** (oder "Installation von Abhängigkeiten").
-*   Plesk lädt nun alle benötigten Bibliotheken herunter.
+Klicke auf **"NPM Install"** (Installation von Abhängigkeiten).
+* Plesk lädt nun automatisch die Bibliotheken aus `package.json` herunter.
 
 ---
 
 ## Schritt 4: Umgebungsvariablen (Environment Variables)
-In der Node.js-Konfiguration gibt es einen Button oder Bereich für "Environment Variables" (Umgebungsvariablen). Füge folgende hinzu:
+In der Node.js-Konfiguration gibt es den Bereich **"Environment Variables"** (Umgebungsvariablen). Hinterlege dort folgende Werte:
 
-| Variable | Wert (Beispiel) |
-| :--- | :--- |
-| `PORT` | `8080` (oder was Plesk vorgibt) |
-| `WEBSITE_URL` | `https://deine-domain.de` |
-| `API_URL` | `https://deine-domain.de` |
-| `CORS_ORIGIN` | `https://deine-domain.de` |
+| Variable | Wert (Beispiel) | Beschreibung |
+| :--- | :--- | :--- |
+| `PORT` | `8080` | Port laut Plesk Node.js Konfiguration |
+| `WEBSITE_URL` | `https://bunteliga-freiburg.de` | Öffentliche Domain der Website |
+| `API_URL` | `https://bunteliga-freiburg.de` | API-URL (in Produktion identisch) |
+| `CORS_ORIGIN` | `https://bunteliga-freiburg.de` | Erlaubter Ursprung für geschützte Routen |
+| `PUBLIC_API_CACHE_SECONDS` | `60` | Cache-Dauer für die öffentliche Team-API |
+| `PUBLIC_API_RATE_LIMIT` | `120` | Rate-Limit pro Minute für `/api/public` |
 
-*Ersetze `https://deine-domain.de` mit deiner echten Domain.*
+*Tipp: Du kannst alternativ auch eine Datei `/httpdocs/.env` anhand der mitgelieferten `Backend/.env.example` erstellen.*
 
 ---
 
 ## Schritt 5: WebSocket (Socket.IO) für Plesk aktivieren ⚠️
 
-Das Backend nutzt **Socket.IO für Echtzeit-Benachrichtigungen**. Plesk leitet Anfragen über einen internen Nginx-Proxy weiter, der standardmäßig WebSocket-Verbindungen **blockiert**.
+Damit Benachrichtigungen (Spielanfragen, Ergebnis-Updates) in Echtzeit funktionieren, muss Plesks Nginx-Proxy WebSocket-Header weiterleiten:
 
-Damit Benachrichtigungen (neue Spielanfragen etc.) in Echtzeit funktionieren, muss Nginx die entsprechenden Headers weiterleiten:
-
-### So gehst du vor:
-1.  Gehe in Plesk zu deiner Domain → **"Apache & Nginx-Einstellungen"**
-2.  Scrolle zu **"Zusätzliche Nginx-Direktiven"** (im HTTPS/SSL-Bereich)
-3.  Füge folgendes ein:
+1. Gehe in Plesk zu deiner Domain → **"Apache & Nginx-Einstellungen"**.
+2. Scrolle zu **"Zusätzliche Nginx-Direktiven"** (im HTTPS/SSL-Bereich).
+3. Füge folgende Direktive ein:
 
 ```nginx
 location /socket.io/ {
@@ -94,11 +93,9 @@ location /socket.io/ {
 }
 ```
 
-> **Hinweis:** Ersetze `8080` mit dem Port, den Plesk für deine Node.js-App verwendet (steht in der Node.js-Konfiguration).
+> **Hinweis:** Ersetze `8080` mit dem Port, den Plesk für deine Node.js-App anzeigt.
 
-4.  Klicke auf **"Speichern"**.
-
-> **Warum ist das nötig?** Socket.IO startet die Verbindung als normales HTTP und upgraded sie dann zu WebSocket. Ohne die `Upgrade`/`Connection` Header versteht Plesk's Nginx-Proxy das nicht und bricht die Verbindung ab. Real-Time-Nachrichten würden dann nicht ankommen.
+4. Klicke auf **"Speichern"**.
 
 ---
 
@@ -106,8 +103,8 @@ location /socket.io/ {
 Klicke in der Node.js Oberfläche auf **"App neu starten"** (Restart App).
 
 ## Fertig!
-Rufe deine Domain im Browser auf. Du solltest nun deine Website sehen.
-*   Die Website wird geladen.
-*   Daten können abgerufen werden (API funktioniert intern).
-*   Echtzeit-Benachrichtigungen über Socket.IO funktionieren.
-*   Alles läuft über eine einzige Domain.
+Rufe deine Domain im Browser auf:
+* Die Website läuft unter deiner Domain.
+* Die interne API `/api/...` läuft unter derselben Domain.
+* Die neue öffentliche Team-API für Vereins-Websites ist unter `https://deine-domain.de/api/public/...` erreichbar.
+* Echtzeit-Benachrichtigungen über Socket.IO sind aktiv.

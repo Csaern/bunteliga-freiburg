@@ -470,7 +470,7 @@ async function adminCreateResult(resultData, adminUid) {
     location: location || null,
   };
 
-  return db.runTransaction(async (transaction) => {
+  const createdResult = await db.runTransaction(async (transaction) => {
     let friendly = false;
     let finalDate = date;
     let finalLocation = location;
@@ -509,8 +509,10 @@ async function adminCreateResult(resultData, adminUid) {
     return { id: newResultRef.id, ...finalResultData };
   });
 
-  // Globaler Broadcast
+  // Globaler Broadcast (Websocket & Cache invalidieren)
   notificationService.broadcastUpdate('results_updated');
+
+  return createdResult;
 }
 
 /**
@@ -544,6 +546,10 @@ async function adminUpdateResult(resultId, updateData, adminUid) {
 
   await resultRef.update(payload);
   const updatedDoc = await resultRef.get();
+
+  // Globaler Broadcast (Websocket & Cache invalidieren)
+  notificationService.broadcastUpdate('results_updated');
+
   return { id: updatedDoc.id, ...updatedDoc.data() };
 }
 
@@ -558,7 +564,7 @@ async function adminDeleteResult(resultId) {
   }
   const bookingId = resultDoc.data().bookingId;
 
-  return db.runTransaction(async (transaction) => {
+  await db.runTransaction(async (transaction) => {
     if (bookingId) {
       const bookingRef = bookingsCollection.doc(bookingId);
       const bookingDoc = await transaction.get(bookingRef);
@@ -569,7 +575,7 @@ async function adminDeleteResult(resultId) {
     transaction.delete(resultRef);
   });
 
-  // Globaler Broadcast
+  // Globaler Broadcast (Websocket & Cache invalidieren)
   notificationService.broadcastUpdate('results_updated');
 }
 

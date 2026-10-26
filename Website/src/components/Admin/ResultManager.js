@@ -175,68 +175,146 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
 
 
     const renderModalActions = () => {
-        // Actions for Custom Detail/Delete View
+        // 1. Delete Mode: Confirm deletion
         if (modalMode === 'delete') {
-            if (showDeleteConfirm) {
-                return (
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, width: '100%' }}>
-                        <Button variant="outlined" onClick={() => setShowDeleteConfirm(false)} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>Abbrechen</Button>
-                        <Button variant="contained" color="error" onClick={handleDelete}>Endgültig löschen</Button>
-                    </Box>
-                );
-            }
+            return (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', gap: 1 }}>
+                    <Button
+                        key="btn-delete-cancel"
+                        type="button"
+                        variant="outlined"
+                        onClick={() => setModalMode('view')}
+                        sx={{ color: 'grey.400', borderColor: 'grey.700' }}
+                    >
+                        Abbrechen
+                    </Button>
+                    <Button
+                        key="btn-delete-confirm"
+                        type="button"
+                        variant="contained"
+                        color="error"
+                        onClick={handleDelete}
+                    >
+                        Endgültig löschen
+                    </Button>
+                </Box>
+            );
+        }
+
+        // 2. Create Mode: Submit new result
+        if (modalMode === 'create') {
+            return (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', gap: 1 }}>
+                    <Button
+                        key="btn-create-cancel"
+                        type="button"
+                        variant="outlined"
+                        onClick={handleCloseModal}
+                        sx={{ color: 'grey.400', borderColor: 'grey.700' }}
+                    >
+                        Abbrechen
+                    </Button>
+                    <Button
+                        key="btn-create-submit"
+                        type="submit"
+                        form="admin-result-form"
+                        variant="contained"
+                        sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                    >
+                        Erstellen
+                    </Button>
+                </Box>
+            );
+        }
+
+        // 3. Edit Mode: Save edited result
+        if (modalMode === 'edit') {
             return (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    {selectedResult?.status === 'pending' ? (
-                        <Button variant="outlined" color="error" startIcon={<CancelIcon />} onClick={() => { }}>Ablehnen</Button>
-                    ) : (
-                        <Button variant="outlined" color="error" onClick={() => setShowDeleteConfirm(true)}>Löschen</Button>
-                    )}
+                    <Button
+                        key="btn-edit-cancel"
+                        type="button"
+                        variant="outlined"
+                        onClick={() => selectedResult ? setModalMode('view') : handleCloseModal()}
+                        sx={{ color: 'grey.400', borderColor: 'grey.700' }}
+                    >
+                        Abbrechen
+                    </Button>
 
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                        {selectedResult?.status === 'pending' ? (
-                            <>
-                                <Button variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={handleConfirmResult}>Bestätigen</Button>
-                                <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ color: 'grey.400' }}><MoreVertIcon /></IconButton>
-                                <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { bgcolor: theme.palette.background.paper, color: theme.palette.text.primary } }}>
-                                    <MenuItem onClick={() => { setModalMode('edit'); setAnchorEl(null); }}>Bearbeiten</MenuItem>
-                                    <MenuItem onClick={() => { setShowDeleteConfirm(true); setAnchorEl(null); }}>Löschen</MenuItem>
-                                </Menu>
-                            </>
-                        ) : (
-                            <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>Bearbeiten</Button>
+                        {selectedResult && (
+                            <Button
+                                key="btn-edit-delete"
+                                type="button"
+                                variant="outlined"
+                                color="error"
+                                onClick={() => setModalMode('delete')}
+                            >
+                                Löschen
+                            </Button>
                         )}
+                        <Button
+                            key="btn-edit-submit"
+                            type="submit"
+                            form="admin-result-form"
+                            variant="contained"
+                            sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                        >
+                            Speichern
+                        </Button>
                     </Box>
                 </Box>
             );
         }
 
-        // Actions for Form (Create/Edit/View)
+        // 4. View Mode: Read-only with Bearbeiten, Löschen, Bestätigen
         return (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                {/* Left: Cancel */}
-                <Button variant="outlined" onClick={handleCloseModal} sx={{ color: 'grey.400', borderColor: 'grey.700' }}>
-                    Abbrechen
+                <Button
+                    key="btn-view-close"
+                    type="button"
+                    variant="outlined"
+                    onClick={handleCloseModal}
+                    sx={{ color: 'grey.400', borderColor: 'grey.700' }}
+                >
+                    Schließen
                 </Button>
 
-                {/* Center: Delete (only in edit/view mode) */}
-                {(modalMode === 'edit' || modalMode === 'view') && (
-                    <Button variant="outlined" color="error" onClick={() => setModalMode('delete')}>
-                        Löschen
-                    </Button>
-                )}
-
-                {/* Right: Save/Edit */}
-                <Box>
-                    {modalMode === 'view' ? (
-                        <Button variant="contained" onClick={() => setModalMode('edit')} sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
-                            Bearbeiten
-                        </Button>
-                    ) : (
-                        <Button type="submit" form="admin-result-form" variant="contained" sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}>
-                            Speichern
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    {selectedResult?.status === 'pending' && (
+                        <Button
+                            key="btn-view-confirm"
+                            type="button"
+                            variant="contained"
+                            color="success"
+                            startIcon={<CheckCircleIcon />}
+                            onClick={handleConfirmResult}
+                        >
+                            Bestätigen
                         </Button>
                     )}
+                    <Button
+                        key="btn-view-delete"
+                        type="button"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => setModalMode('delete')}
+                    >
+                        Löschen
+                    </Button>
+                    <Button
+                        key="btn-view-edit"
+                        type="button"
+                        variant="contained"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setModalMode('edit');
+                        }}
+                        sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
+                    >
+                        Bearbeiten
+                    </Button>
                 </Box>
             </Box>
         );
@@ -298,7 +376,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
             <AppModal
                 open={isModalOpen}
                 onClose={handleCloseModal}
-                title={modalMode === 'create' ? 'Neues Ergebnis' : 'Ergebnisdetails'}
+                title={modalMode === 'create' ? 'Neues Ergebnis' : modalMode === 'edit' ? 'Ergebnis bearbeiten' : modalMode === 'delete' ? 'Ergebnis löschen' : 'Ergebnisdetails'}
                 fullScreenMobile
                 actions={renderModalActions()}
             >
@@ -313,7 +391,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                             date: selectedBooking.date,
                             pitchId: selectedBooking.pitchId
                         } : null)}
-                        teams={currentSeason.teams}
+                        teams={currentSeason?.teams || []}
                         pitches={allPitches}
                         season={currentSeason}
                         results={results}
@@ -353,9 +431,7 @@ const ResultManager = ({ teams, currentSeason, getTeamName }) => {
                             </Box>
                         </Box>
 
-                        {showDeleteConfirm && (<Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>Möchtest du dieses Ergebnis wirklich löschen?</Alert>)}
-
-
+                        <Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ffcdd2' }}>Möchtest du dieses Ergebnis wirklich löschen?</Alert>
                     </Box>
                 )
                 }

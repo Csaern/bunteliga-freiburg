@@ -32,3 +32,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 firebase.json
+
+# deployment
+deploy_plesk.zip
+temp_staging/
+temp_deploy_staging/
