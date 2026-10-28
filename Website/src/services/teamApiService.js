@@ -66,6 +66,18 @@ export const addCaptainToTeam = async (teamId, userId) => {
   return apiClient(`/api/teams/${teamId}/captains`, 'POST', { userId });
 };
 
+export const removeCaptainToTeam = async (teamId, userId) => {
+  return apiClient(`/api/teams/${teamId}/captains/${userId}`, 'DELETE');
+};
+
 export const removeCaptainFromTeam = async (teamId, userId) => {
   return apiClient(`/api/teams/${teamId}/captains/${userId}`, 'DELETE');
+};
+
+export const generateTeamApiKey = async () => {
+  return apiClient('/api/v1/my-team/api-key', 'POST');
+};
+
+export const revokeTeamApiKey = async () => {
+  return apiClient('/api/v1/my-team/api-key', 'DELETE');
 };

@@ -1553,7 +1553,9 @@ class BookingService {
 
         if (!user.admin) {
             const teamDoc = await teamsCollection.doc(homeTeamId).get();
-            if (!teamDoc.exists || !teamDoc.data().captainIds || !teamDoc.data().captainIds.includes(user.uid)) {
+            const isAssignedTeam = user.teamId && user.teamId === homeTeamId;
+            const isCaptain = teamDoc.exists && Array.isArray(teamDoc.data().captainIds) && teamDoc.data().captainIds.includes(user.uid);
+            if (!teamDoc.exists || (!isAssignedTeam && !isCaptain)) {
                 throw new Error('Du bist kein Kapitän des angegebenen Heimteams.');
             }
             if (pitch.isVerified || pitch.teamId !== homeTeamId) {
@@ -1577,9 +1579,19 @@ class BookingService {
             }
         }
 
+        const parsedBookingDate = (typeof date === "string" && !date.includes("T") && time)
+            ? BookingService._createBerlinDate(date, time)
+            : new Date(date);
+        if (isNaN(parsedBookingDate.getTime())) {
+            throw new Error("Ungültiges Datum oder Uhrzeit.");
+        }
+        if (!bookingData.friendly && awayTeamId) {
+            await BookingService._checkSeasonRulesForPairing(homeTeamId, awayTeamId, seasonId);
+        }
+
         const newBookingData = {
             ...bookingData,
-            date: new Date(date), // Convert string to Date object
+            date: parsedBookingDate, // Convert string to Date object
             createdBy: user.uid,
             status: awayTeamId ? 'pending_away_confirm' : 'confirmed',
             isCustom: true, // NEU: Explizit als individuelle Buchung markieren

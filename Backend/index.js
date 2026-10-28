@@ -33,6 +33,7 @@ const scFreiburgRoutes = require('./routes/scFreiburgRoutes');
 const matchRoutes = require('./routes/matchRoutes');
 const holidayRoutes = require('./routes/holidayRoutes');
 const publicTeamRoutes = require('./routes/publicTeamRoutes');
+const v1Routes = require('./routes/v1Routes');
 
 
 const db = getFirestore();
@@ -45,8 +46,14 @@ const port = config.port;
 // alle anderen Routen bleiben auf die eigene Website beschränkt.
 const restrictedCors = cors({ origin: config.corsOrigin });
 const publicCors = cors({ origin: '*', methods: ['GET', 'OPTIONS'] });
+const v1Cors = cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+});
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/public/')) return publicCors(req, res, next);
+  if (req.path.startsWith('/api/public/') || req.path === '/api/public') return publicCors(req, res, next);
+  if (req.path.startsWith('/api/v1/') || req.path === '/api/v1') return v1Cors(req, res, next);
   return restrictedCors(req, res, next);
 });
 
@@ -91,6 +98,7 @@ app.use('/api/scfreiburg', scFreiburgRoutes); // NEU: SC Freiburg Heimspiele
 app.use('/api/matches', matchRoutes); // NEU: Isolierte Spielanfragen
 app.use('/api/holidays', holidayRoutes); // NEU: Feiertage & Schulferien BW
 app.use('/api/public', publicTeamRoutes); // NEU: Öffentliche Team-API (Tabelle & Spiele je Mannschaft)
+app.use('/api/v1', v1Routes); // NEU: REST-API v1 (Lesend & Team-Operationen für Apps/Vereine)
 
 // --- FRONTEND SERVING (Plesk Deployment) ---
 // Serve static files from the React app

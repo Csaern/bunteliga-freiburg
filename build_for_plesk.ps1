@@ -13,51 +13,79 @@ Write-Host "     Bunte Liga - Plesk Build Script      " -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Frontend-Abhängigkeiten installieren
-Write-Host "[1/4] Frontend-Abhängigkeiten prüfen (Website)..." -ForegroundColor Yellow
-Set-Location "$rootDir\Website"
-npm install
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[FEHLER] npm install im Website-Ordner fehlgeschlagen." -ForegroundColor Red
-    exit 1
+# 1. Pruefen ob npm vorhanden ist (inkl. lokaler Node-Installation in AppData)
+$localNode = "$env:LOCALAPPDATA\Programs\nodejs"
+if ((Test-Path "$localNode\npm.cmd") -and ($env:Path -notlike "*$localNode*")) {
+    $env:Path = "$localNode;$env:Path"
 }
 
-# 2. Frontend bauen
-Write-Host "[2/4] Baue Frontend (React Production Build)..." -ForegroundColor Yellow
-npm run build
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[FEHLER] npm run build fehlgeschlagen." -ForegroundColor Red
-    exit 1
-}
-Set-Location $rootDir
+$hasNpm = Get-Command npm -ErrorAction SilentlyContinue
 
-# 3. Build ins Backend kopieren
-Write-Host "[3/4] Kopiere Build-Dateien nach Backend\public..." -ForegroundColor Yellow
-$backendPublic = "$rootDir\Backend\public"
-if (Test-Path $backendPublic) {
-    Remove-Item -Recurse -Force $backendPublic
-}
-New-Item -ItemType Directory -Path $backendPublic | Out-Null
-Copy-Item -Path "$rootDir\Website\build\*" -Destination $backendPublic -Recurse -Force
+if ($hasNpm) {
+    # 1. Frontend-Abhaengigkeiten installieren
+    Write-Host "[1/4] Frontend-Abhaengigkeiten pruefen (Website)..." -ForegroundColor Yellow
+    Set-Location "$rootDir\Website"
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[FEHLER] npm install im Website-Ordner fehlgeschlagen." -ForegroundColor Red
+        exit 1
+    }
 
-# 4. Fertiges deploy_plesk.zip schnüren
-Write-Host "[4/4] Erstelle deploy_plesk.zip für den Upload..." -ForegroundColor Yellow
+    # 2. Frontend bauen
+    Write-Host "[2/4] Baue Frontend (React Production Build)..." -ForegroundColor Yellow
+    npm run build
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[FEHLER] npm run build fehlgeschlagen." -ForegroundColor Red
+        exit 1
+    }
+    Set-Location $rootDir
+
+    # 3. Build ins Backend kopieren
+    Write-Host "[3/4] Kopiere Build-Dateien nach Backend\public..." -ForegroundColor Yellow
+    $backendPublic = "$rootDir\Backend\public"
+    if (Test-Path $backendPublic) {
+        Remove-Item -Recurse -Force $backendPublic
+    }
+    New-Item -ItemType Directory -Path $backendPublic | Out-Null
+    Copy-Item -Path "$rootDir\Website\build\*" -Destination $backendPublic -Recurse -Force
+} else {
+    Write-Host "[HINWEIS] 'npm' ist auf diesem Rechner nicht im PATH gefunden worden." -ForegroundColor Cyan
+    $backendPublic = "$rootDir\Backend\public"
+    if (Test-Path "$backendPublic\index.html") {
+        Write-Host "[INFO] Verwende bereits vorhandenen Frontend-Build in Backend\public..." -ForegroundColor Green
+    } else {
+        Write-Host "[FEHLER] Kein Frontend-Build in Backend\public und kein npm verfuegbar." -ForegroundColor Red
+        Write-Host "Bitte installiere Node.js (https://nodejs.org/) oder baue die Website." -ForegroundColor Red
+        exit 1
+    }
+}
+
+# 4. Fertiges deploy_plesk.zip schnüren (Linux-kompatibel mit Vorwaerts-Slashes)
+Write-Host "[4/4] Erstelle deploy_plesk.zip fuer den Upload..." -ForegroundColor Yellow
 $zipPath = "$rootDir\deploy_plesk.zip"
-$staging = "$rootDir\temp_staging"
+$backendDir = "$rootDir\Backend"
 
-if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
 
-New-Item -ItemType Directory -Path $staging | Out-Null
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
 
 # Ausschlüsse: uploads (bleibt auf Server!), node_modules, logs, .env, firebase.json
 $exclude = @('node_modules', 'uploads', 'logs', '.env', 'firebase.json')
-Get-ChildItem -Path "$rootDir\Backend" | Where-Object { $_.Name -notin $exclude } | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination $staging -Recurse -Force
+
+Get-ChildItem -Path $backendDir -Recurse | Where-Object {
+    if ($_.PSIsContainer) { return $false }
+    $rel = $_.FullName.Substring($backendDir.Length + 1)
+    $firstPart = $rel.Split([IO.Path]::DirectorySeparatorChar)[0]
+    return ($firstPart -notin $exclude)
+} | ForEach-Object {
+    $relPath = $_.FullName.Substring($backendDir.Length + 1).Replace('\', '/')
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $relPath, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
 }
 
-Compress-Archive -Path "$staging\*" -DestinationPath $zipPath -CompressionLevel Optimal
-Remove-Item -Recurse -Force $staging
+$zip.Dispose()
 
 $zipSizeMb = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
 

@@ -14,6 +14,7 @@ class Result {
    * @param {string|null} [data.bookingId=null] - Optionale ID der zugehörigen Spielbuchung.
    * @param {string|null} [data.date=null] - Datum des Spiels (ISO String oder Timestamp).
    * @param {string|null} [data.location=null] - Ort des Spiels.
+   * @param {boolean} [data.friendly=false] - Gibt an, ob es ein Freundschaftsspiel ist.
    */
   constructor({
     homeTeamId,
@@ -28,6 +29,7 @@ class Result {
     bookingId = null,
     date = null,
     location = null,
+    friendly = false,
   }) {
     // 1. Validierung
     if (!homeTeamId || !homeTeamName || !awayTeamId || !awayTeamName || !seasonId || !reportedByTeamId || !reportedByUserId) {
@@ -54,6 +56,7 @@ class Result {
     this.bookingId = bookingId;
     this.date = date; // NEU
     this.location = location; // NEU
+    this.friendly = Boolean(friendly);
 
     /**
      * @type {string}
@@ -94,6 +97,7 @@ class Result {
       bookingId: this.bookingId,
       date: this.date, // NEU
       location: this.location, // NEU
+      friendly: this.friendly,
       status: this.status,
       confirmedByTeamId: this.confirmedByTeamId,
       confirmedByUserId: this.confirmedByUserId,

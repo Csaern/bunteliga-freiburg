@@ -9,30 +9,23 @@ import {
   Typography,
   CircularProgress,
   useTheme,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  useMediaQuery,
-  IconButton,
-  Grid,
   InputAdornment,
   Tabs,
   Tab,
   Snackbar,
-  Alert
+  Alert,
+  Paper,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import LanguageIcon from '@mui/icons-material/Language';
-import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
-import TwitterIcon from '@mui/icons-material/Twitter';
 import InfoIcon from '@mui/icons-material/Info';
 import ContactMailIcon from '@mui/icons-material/ContactMail';
 import ShareIcon from '@mui/icons-material/Share';
-import LockIcon from '@mui/icons-material/Lock'; // Import Lock icon
+import LockIcon from '@mui/icons-material/Lock';
+import KeyIcon from '@mui/icons-material/Key';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import * as teamApi from '../services/teamApiService';
-import * as userApi from '../services/userApiService'; // Import user api
 import ChangePasswordModal from './Auth/ChangePasswordModal';
 
 import AppModal from './Modals/AppModal';
@@ -41,20 +34,13 @@ import AppModal from './Modals/AppModal';
 const TeamSettings = ({ onClose }) => {
   const { teamId } = useAuth();
   const theme = useTheme();
-  // fullScreen handled by AppModal
 
   const [team, setTeam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
-
-  // ... (rest of state)
-
-  // ... (loadTeamData)
-
-  // ... (useEffect, snackbar, save, tab handlers)
-
-
+  const [generatedApiKey, setGeneratedApiKey] = useState(null);
+  const [apiKeyBusy, setApiKeyBusy] = useState(false);
 
   // Feedback state
   const [snackbar, setSnackbar] = useState({
@@ -137,7 +123,6 @@ const TeamSettings = ({ onClose }) => {
 
       showSnackbar('Einstellungen erfolgreich gespeichert!', 'success');
 
-      // Close modal after short delay to let user see success message
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -150,9 +135,51 @@ const TeamSettings = ({ onClose }) => {
     }
   };
 
+  const handleGenerateApiKey = async () => {
+    try {
+      setApiKeyBusy(true);
+      const res = await teamApi.generateTeamApiKey();
+      setGeneratedApiKey(res.apiKey);
+      setTeam(prev => ({
+        ...prev,
+        apiKeyPrefix: res.prefix,
+        apiKeyCreatedAt: res.createdAt,
+      }));
+      showSnackbar('Neuer Team-API-Key generiert!', 'success');
+    } catch (error) {
+      console.error('Fehler beim Generieren des API-Keys:', error);
+      showSnackbar(error.message || 'Fehler beim Generieren des API-Keys.', 'error');
+    } finally {
+      setApiKeyBusy(false);
+    }
+  };
+
+  const handleRevokeApiKey = async () => {
+    try {
+      setApiKeyBusy(true);
+      await teamApi.revokeTeamApiKey();
+      setGeneratedApiKey(null);
+      setTeam(prev => ({
+        ...prev,
+        apiKeyPrefix: null,
+        apiKeyCreatedAt: null,
+      }));
+      showSnackbar('Team-API-Key wurde widerrufen.', 'info');
+    } catch (error) {
+      console.error('Fehler beim Widerrufen des API-Keys:', error);
+      showSnackbar(error.message || 'Fehler beim Widerrufen des API-Keys.', 'error');
+    } finally {
+      setApiKeyBusy(false);
+    }
+  };
+
+  const handleCopyText = (text, label) => {
+    navigator.clipboard.writeText(text);
+    showSnackbar(`${label} in die Zwischenablage kopiert!`, 'success');
+  };
+
   // Password Change State
   const [openChangePassword, setOpenChangePassword] = useState(false);
-
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -227,6 +254,7 @@ const TeamSettings = ({ onClose }) => {
             <Tab icon={<InfoIcon />} iconPosition="start" label="Allgemein" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
             <Tab icon={<ContactMailIcon />} iconPosition="start" label="Kontakt" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
             <Tab icon={<ShareIcon />} iconPosition="start" label="Social" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
+            <Tab icon={<KeyIcon />} iconPosition="start" label="API" sx={{ fontFamily: 'Comfortaa', fontWeight: 600 }} />
           </Tabs>
 
         </Box>
@@ -368,6 +396,82 @@ const TeamSettings = ({ onClose }) => {
             )}
           </Box>
 
+          {/* Tab 3: Team API / App */}
+          <Box role="tabpanel" hidden={activeTab !== 3}>
+            {activeTab === 3 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Nutze die REST-API (<code>/api/v1</code>) für eigene Vereins-Apps oder Websites.
+                  Mit deinem Team-API-Key kannst du Spiele vereinbaren, bestätigen, absagen und Ergebnisse melden.
+                </Typography>
+
+                <Paper variant="outlined" sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Eure Team-ID</Typography>
+                    <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>{teamId}</Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<ContentCopyIcon />}
+                    onClick={() => handleCopyText(teamId, 'Team-ID')}
+                  >
+                    Kopieren
+                  </Button>
+                </Paper>
+
+                {generatedApiKey ? (
+                  <Alert severity="warning" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                      Neuer Team-API-Key (bitte jetzt kopieren – wird nur einmalig angezeigt):
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 1 }}>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                        {generatedApiKey}
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<ContentCopyIcon />}
+                        onClick={() => handleCopyText(generatedApiKey, 'API-Key')}
+                      >
+                        Kopieren
+                      </Button>
+                    </Box>
+                  </Alert>
+                ) : (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="caption" color="text.secondary">Aktueller API-Key Status</Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5, fontFamily: 'monospace' }}>
+                      {team?.apiKeyPrefix ? `Aktiv (${team.apiKeyPrefix})` : 'Noch kein Team-API-Key erstellt'}
+                    </Typography>
+                  </Paper>
+                )}
+
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<KeyIcon />}
+                    disabled={apiKeyBusy}
+                    onClick={handleGenerateApiKey}
+                  >
+                    {team?.apiKeyPrefix ? 'Neuen API-Key generieren (rotieren)' : 'API-Key generieren'}
+                  </Button>
+                  {team?.apiKeyPrefix && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteOutlineIcon />}
+                      disabled={apiKeyBusy}
+                      onClick={handleRevokeApiKey}
+                    >
+                      API-Key widerrufen
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            )}
+          </Box>
 
         </Box>
       </AppModal>

@@ -1,4 +1,8 @@
-require('dotenv').config();
+try {
+    require('dotenv').config();
+} catch (_) {
+    // Falls dotenv in der Laufzeitumgebung bereits über Plesk/Systemvariablen bereitgestellt wird
+}
 
 const config = {
     // Basic Server Settings
@@ -13,7 +17,7 @@ const config = {
     // Auth / Security
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 
-    // Öffentliche Team-API (/api/public) für externe Vereins-Websites
+    // Öffentliche Team-API (/api/public & /api/v1) für externe Vereins-Websites und Apps
     publicApi: {
         cacheSeconds: Number(process.env.PUBLIC_API_CACHE_SECONDS ?? 60),
         rateLimitPerMinute: Number(process.env.PUBLIC_API_RATE_LIMIT ?? 120),
