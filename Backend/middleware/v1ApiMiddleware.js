@@ -247,12 +247,22 @@ async function resolveAuth(req) {
     const userProfile = userDoc.exists ? userDoc.data() : {};
 
     let teamId = decodedToken.teamId || userProfile.teamId || null;
+    const isUserAdmin = Boolean(decodedToken.admin || userProfile.isAdmin);
 
     // Fallback: Prüfen, ob der User als Kapitän in einem Team eingetragen ist
     if (!teamId) {
         const capSnap = await teamsCollection.where('captainIds', 'array-contains', decodedToken.uid).limit(1).get();
         if (!capSnap.empty) {
             teamId = capSnap.docs[0].id;
+        }
+    }
+
+    // Falls ein Admin-Account ein Team auswählt (z. B. zum Erstellen eines Team-API-Keys),
+    // kann er die Ziel-Team-ID per Header X-Team-Id, Query ?forTeamId= oder Body forTeamId übergeben
+    if (isUserAdmin) {
+        const overrideTeamId = req.headers['x-team-id'] || req.query?.forTeamId || req.body?.forTeamId;
+        if (overrideTeamId && typeof overrideTeamId === 'string') {
+            teamId = overrideTeamId.trim();
         }
     }
 
@@ -323,4 +333,3 @@ module.exports = {
     authenticateTeam,
     optionalTeamAuth,
 };
-

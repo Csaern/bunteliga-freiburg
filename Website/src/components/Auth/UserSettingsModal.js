@@ -16,7 +16,12 @@ import {
     Switch,
     FormControlLabel,
     FormGroup,
-    Collapse
+    Collapse,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel,
+    Paper
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -25,7 +30,11 @@ import LockIcon from '@mui/icons-material/Lock';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import EmailIcon from '@mui/icons-material/Email';
 import PersonIcon from '@mui/icons-material/Person';
+import KeyIcon from '@mui/icons-material/Key';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import * as userApiService from '../../services/userApiService';
+import * as teamApiService from '../../services/teamApiService';
 import notificationApiService from '../../services/notificationApiService';
 import { useAuth } from '../../context/AuthProvider';
 import { signOut } from 'firebase/auth';
@@ -43,8 +52,6 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoIcon from '@mui/icons-material/Info';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
-import Badge from '@mui/material/Badge';
-import Tooltip from '@mui/material/Tooltip';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
@@ -83,7 +90,7 @@ function TabPanel(props) {
 const UserSettingsModal = ({ open, onClose }) => {
     const theme = useTheme();
     const navigate = useNavigate();
-    const { currentUser, settings, setSettings } = useAuth();
+    const { currentUser, teamId, team, isAdmin, settings, setSettings } = useAuth();
     const [tabValue, setTabValue] = useState(0);
 
     // Email Settings State
@@ -111,16 +118,48 @@ const UserSettingsModal = ({ open, onClose }) => {
     const [notifications, setNotifications] = useState([]);
     const [notifLoading, setNotifLoading] = useState(false);
 
+    // API Key / Token State
+    const [selectedApiTeamId, setSelectedApiTeamId] = useState(teamId || '');
+    const [allTeams, setAllTeams] = useState([]);
+    const [generatedApiKey, setGeneratedApiKey] = useState(null);
+    const [apiKeyPrefix, setApiKeyPrefix] = useState(team?.apiKeyPrefix || null);
+    const [apiKeyBusy, setApiKeyBusy] = useState(false);
+    const [apiFeedback, setApiFeedback] = useState({ type: '', text: '' });
+
     // Initial fetch when opening modal if tab is 0
     React.useEffect(() => {
         if (open && tabValue === 0) {
             fetchNotifications();
-            // Initialize email prefs from context
             if (settings?.emailNotifications) {
                 setEmailPrefs(settings.emailNotifications);
             }
         }
-    }, [open, tabValue, settings]);
+        if (open && tabValue === 2) {
+            const targetId = selectedApiTeamId || teamId || '';
+            if (targetId && !selectedApiTeamId) {
+                setSelectedApiTeamId(targetId);
+            }
+            if (isAdmin && allTeams.length === 0) {
+                teamApiService.getTeamsForActiveSeasonPublic()
+                    .catch(() => teamApiService.getAllTeamsPublic())
+                    .then(list => {
+                        if (Array.isArray(list)) {
+                            setAllTeams(list);
+                            if (!targetId && list.length > 0) {
+                                setSelectedApiTeamId(list[0].id);
+                            }
+                        }
+                    })
+                    .catch(() => {});
+            }
+        }
+    }, [open, tabValue, settings, teamId, isAdmin, selectedApiTeamId, allTeams.length]);
+
+    React.useEffect(() => {
+        if (team?.apiKeyPrefix && (!selectedApiTeamId || selectedApiTeamId === teamId)) {
+            setApiKeyPrefix(team.apiKeyPrefix);
+        }
+    }, [team, selectedApiTeamId, teamId]);
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
@@ -128,12 +167,69 @@ const UserSettingsModal = ({ open, onClose }) => {
         setSuccess(false);
         setSettingsError('');
         setSettingsSuccess(false);
+        setApiFeedback({ type: '', text: '' });
         if (newValue === 0) {
             fetchNotifications();
-            // Initialize email prefs from context
             if (settings?.emailNotifications) {
                 setEmailPrefs(settings.emailNotifications);
             }
+        }
+    };
+
+    const handleGenerateApiKey = async () => {
+        const targetTeamId = selectedApiTeamId || teamId;
+        if (!targetTeamId) {
+            setApiFeedback({ type: 'error', text: 'Bitte wähle zuerst ein Team aus.' });
+            return;
+        }
+        try {
+            setApiKeyBusy(true);
+            setApiFeedback({ type: '', text: '' });
+            const res = await teamApiService.generateTeamApiKey(isAdmin ? targetTeamId : null);
+            setGeneratedApiKey(res.apiKey);
+            setApiKeyPrefix(res.prefix);
+            setApiFeedback({ type: 'success', text: 'Neuer Team-API-Key wurde erstellt!' });
+        } catch (err) {
+            setApiFeedback({ type: 'error', text: err.message || 'Fehler beim Erstellen des API-Keys.' });
+        } finally {
+            setApiKeyBusy(false);
+        }
+    };
+
+    const handleRevokeApiKey = async () => {
+        const targetTeamId = selectedApiTeamId || teamId;
+        if (!targetTeamId) return;
+        try {
+            setApiKeyBusy(true);
+            setApiFeedback({ type: '', text: '' });
+            await teamApiService.revokeTeamApiKey(isAdmin ? targetTeamId : null);
+            setGeneratedApiKey(null);
+            setApiKeyPrefix(null);
+            setApiFeedback({ type: 'info', text: 'Team-API-Key wurde widerrufen.' });
+        } catch (err) {
+            setApiFeedback({ type: 'error', text: err.message || 'Fehler beim Widerrufen des API-Keys.' });
+        } finally {
+            setApiKeyBusy(false);
+        }
+    };
+
+    const handleCopyBearerToken = async () => {
+        if (!currentUser) return;
+        try {
+            const token = await currentUser.getIdToken(true);
+            await navigator.clipboard.writeText(token);
+            setApiFeedback({ type: 'success', text: 'Firebase Bearer-Token (1h gültig) in die Zwischenablage kopiert!' });
+        } catch (err) {
+            setApiFeedback({ type: 'error', text: 'Token konnte nicht kopiert werden.' });
+        }
+    };
+
+    const handleCopyToClipboard = async (value, label) => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setApiFeedback({ type: 'success', text: `${label} in die Zwischenablage kopiert!` });
+        } catch (_) {
+            setApiFeedback({ type: 'error', text: 'Kopieren fehlgeschlagen.' });
         }
     };
 
@@ -260,6 +356,8 @@ const UserSettingsModal = ({ open, onClose }) => {
         setEmailSettingsExpanded(false);
         setPasswordExpanded(false);
         setShowPassword(false);
+        setGeneratedApiKey(null);
+        setApiFeedback({ type: '', text: '' });
         setTabValue(0);
         onClose();
     };
@@ -321,6 +419,7 @@ const UserSettingsModal = ({ open, onClose }) => {
                 >
                     <Tab icon={<NotificationsIcon sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' } }} />} iconPosition="start" label="Benachrichtigungen" />
                     <Tab icon={<PersonIcon sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' } }} />} iconPosition="start" label="Allgemein" />
+                    <Tab icon={<KeyIcon sx={{ fontSize: { xs: '1.1rem', sm: '1.4rem' } }} />} iconPosition="start" label="API / Token" />
                 </Tabs>
             </Box>
 
@@ -329,7 +428,7 @@ const UserSettingsModal = ({ open, onClose }) => {
                 minHeight: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                px: { xs: 1.5, sm: 3 }, // Reduced for mobile
+                px: { xs: 1.5, sm: 3 },
                 pb: 2
             }}>
                 <TabPanel value={tabValue} index={1}>
@@ -472,6 +571,135 @@ const UserSettingsModal = ({ open, onClose }) => {
                         >
                             Abmelden
                         </Button>
+                    </Box>
+                </TabPanel>
+
+                <TabPanel value={tabValue} index={2}>
+                    <Box sx={{ flex: 1, overflowY: 'auto', py: 1, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            Hier kannst du dir einen dauerhaften <strong>Team-API-Key</strong> (<code>blf_...</code>) oder einen temporären <strong>Firebase Bearer-Token</strong> für <code>/api/v1</code> erstellen.
+                        </Typography>
+
+                        {apiFeedback.text && (
+                            <Alert severity={apiFeedback.type || 'info'} onClose={() => setApiFeedback({ type: '', text: '' })}>
+                                {apiFeedback.text}
+                            </Alert>
+                        )}
+
+                        {isAdmin && (
+                            <FormControl fullWidth size="small">
+                                <InputLabel id="api-team-select-label">Team auswählen (Admin)</InputLabel>
+                                <Select
+                                    labelId="api-team-select-label"
+                                    label="Team auswählen (Admin)"
+                                    value={selectedApiTeamId}
+                                    onChange={(e) => {
+                                        setSelectedApiTeamId(e.target.value);
+                                        setGeneratedApiKey(null);
+                                        const found = allTeams.find(t => t.id === e.target.value);
+                                        setApiKeyPrefix(found?.apiKeyPrefix || null);
+                                    }}
+                                >
+                                    {allTeams.map(t => (
+                                        <MenuItem key={t.id} value={t.id}>
+                                            {t.name} ({t.id})
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
+
+                        {(selectedApiTeamId || teamId) && (
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                                <Box>
+                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                                        Aktive Team-ID
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                                        {selectedApiTeamId || teamId}
+                                    </Typography>
+                                </Box>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<ContentCopyIcon />}
+                                    onClick={() => handleCopyToClipboard(selectedApiTeamId || teamId, 'Team-ID')}
+                                >
+                                    Kopieren
+                                </Button>
+                            </Paper>
+                        )}
+
+                        {generatedApiKey ? (
+                            <Alert severity="warning" sx={{ borderRadius: 2, '& .MuiAlert-message': { width: '100%' } }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                    Dein neuer Team-API-Key (bitte jetzt kopieren):
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 1 }}>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                        {generatedApiKey}
+                                    </Typography>
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        startIcon={<ContentCopyIcon />}
+                                        onClick={() => handleCopyToClipboard(generatedApiKey, 'Team-API-Key')}
+                                    >
+                                        Kopieren
+                                    </Button>
+                                </Box>
+                            </Alert>
+                        ) : (
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                                    Dauerhafter Team-API-Key (Header <code>X-API-Key</code>)
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontFamily: 'monospace', mt: 0.5 }}>
+                                    {apiKeyPrefix ? `Aktiv (${apiKeyPrefix})` : 'Noch kein Key für dieses Team generiert'}
+                                </Typography>
+                            </Paper>
+                        )}
+
+                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                            <Button
+                                variant="contained"
+                                startIcon={<KeyIcon />}
+                                disabled={apiKeyBusy || (!selectedApiTeamId && !teamId)}
+                                onClick={handleGenerateApiKey}
+                                sx={{ borderRadius: 2, fontWeight: 'bold' }}
+                            >
+                                {apiKeyPrefix ? 'Neuen Team-API-Key generieren' : 'Team-API-Key generieren'}
+                            </Button>
+                            {apiKeyPrefix && (
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<DeleteOutlineIcon />}
+                                    disabled={apiKeyBusy}
+                                    onClick={handleRevokeApiKey}
+                                    sx={{ borderRadius: 2 }}
+                                >
+                                    Widerrufen
+                                </Button>
+                            )}
+                        </Box>
+
+                        <Divider sx={{ my: 1 }} />
+
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary, mb: 1 }}>
+                                Alternativ: Firebase Bearer-Token (1 Stunde gültig)
+                            </Typography>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                startIcon={<ContentCopyIcon />}
+                                onClick={handleCopyBearerToken}
+                                sx={{ borderRadius: 2, py: 1, fontWeight: 'bold' }}
+                            >
+                                Aktuellen Bearer-Token in Zwischenablage kopieren
+                            </Button>
+                        </Box>
                     </Box>
                 </TabPanel>
 
